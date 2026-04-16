@@ -3,11 +3,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Appendix G design tokens — NPX navy palette, dark-only first release.
+   shadcn/ui OKLCH tokens below coexist for primitive components that
+   depend on them (Tailwind 4 layer). Components should prefer the
+   semantic tokens here (--bg, --surface, --text, --requirement, etc).
+   Zero hex values outside this file (Phase 5 gate per G.1). */
+
 @theme inline {
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
-	--font-sans: var(--font-geist-sans);
-	--font-mono: var(--font-geist-mono);
+	--font-sans: var(--font-sans);
+	--font-mono: var(--font-mono);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -53,8 +59,62 @@
 	}
 }
 
+/* NPX navy palette — G.1.
+   Applied via .dark because we're dark-only; :root keeps a neutral fallback. */
+.dark {
+	--bg: #0A1830;
+	--surface: #0F2440;
+	--surface-2: #162E52;
+	--border-strong: #24385C;
+	--text: #E6ECF5;
+	--text-muted: #94A3C3;
+	--accent-brand: #4EA8FF;
+	--accent-brand-hover: #72BDFF;
+	--requirement: #4EA8FF;
+	--guidance: #F5B94E;
+	--success: #4ADE80;
+	--warning: #F59E0B;
+	--danger: #EF4444;
+
+	/* Map shadcn tokens onto the NPX palette so existing primitives
+	   (sidebar, tooltip, card) inherit the brand look without rewrites. */
+	--background: #0A1830;
+	--foreground: #E6ECF5;
+	--card: #0F2440;
+	--card-foreground: #E6ECF5;
+	--popover: #0F2440;
+	--popover-foreground: #E6ECF5;
+	--primary: #4EA8FF;
+	--primary-foreground: #0A1830;
+	--secondary: #162E52;
+	--secondary-foreground: #E6ECF5;
+	--muted: #162E52;
+	--muted-foreground: #94A3C3;
+	--accent: #162E52;
+	--accent-foreground: #E6ECF5;
+	--destructive: #EF4444;
+	--border: #24385C;
+	--input: #24385C;
+	--ring: #4EA8FF;
+	--chart-1: #4EA8FF;
+	--chart-2: #4ADE80;
+	--chart-3: #F5B94E;
+	--chart-4: #EF4444;
+	--chart-5: #94A3C3;
+	--sidebar: #0F2440;
+	--sidebar-foreground: #E6ECF5;
+	--sidebar-primary: #4EA8FF;
+	--sidebar-primary-foreground: #0A1830;
+	--sidebar-accent: #162E52;
+	--sidebar-accent-foreground: #E6ECF5;
+	--sidebar-border: #24385C;
+	--sidebar-ring: #4EA8FF;
+}
+
 :root {
 	--radius: 0.625rem;
+
+	/* Neutral light fallback. Dark theme below overrides everything. */
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.141 0.005 285.823);
 	--card: oklch(1 0 0);
@@ -88,40 +148,6 @@
 	--sidebar-ring: oklch(0.705 0.015 286.067);
 }
 
-.dark {
-	--background: oklch(0.141 0.005 285.823);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.21 0.006 285.885);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.21 0.006 285.885);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.92 0.004 286.32);
-	--primary-foreground: oklch(0.21 0.006 285.885);
-	--secondary: oklch(0.274 0.006 286.033);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.274 0.006 286.033);
-	--muted-foreground: oklch(0.705 0.015 286.067);
-	--accent: oklch(0.274 0.006 286.033);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.552 0.016 285.938);
-	--chart-1: oklch(0.488 0.243 264.376);
-	--chart-2: oklch(0.696 0.17 162.48);
-	--chart-3: oklch(0.769 0.188 70.08);
-	--chart-4: oklch(0.627 0.265 303.9);
-	--chart-5: oklch(0.645 0.246 16.439);
-	--sidebar: oklch(0.21 0.006 285.885);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.274 0.006 286.033);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.552 0.016 285.938);
-}
-
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
@@ -137,5 +163,16 @@
 
 	body {
 		@apply bg-background text-foreground;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
 	}
 }

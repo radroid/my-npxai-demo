@@ -13,7 +13,10 @@
 		"lint:fix": "biome check --write app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",
 		"preflight": "bun run scripts/preflight.ts",
 		"ingest": "bun run scripts/ingest.ts",
-		"eval:kb": "bun run scripts/eval-kb.ts"
+		"eval:kb": "bun run scripts/eval-kb.ts",
+		"build:cloudflare": "bunx opennextjs-cloudflare build",
+		"preview:cloudflare": "bunx opennextjs-cloudflare preview",
+		"deploy:cloudflare": "bunx opennextjs-cloudflare deploy"
 	},
 	"dependencies": {
 		"@ai-sdk/openai": "^3.0.52",
