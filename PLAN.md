@@ -99,6 +99,7 @@ Project is scaffolded with assistant-ui starter. Dependencies installed (Next 16
 - **2026-04-16** — `.env.example` committed with placeholder values for all 6 variables — see Appendix B.5; contains zero real secrets.
 - **2026-04-16** — **Plan consistency pass** (external review): removed stale `/api/chat/threads` rate-limit + UUID-validation entries (localStorage-only decision); aligned D.6 deny-event logging with H.6 no-raw-content policy; standardized `UPSTASH_REDIS_REST_URL` naming; replaced psql-only `\df` with portable `pg_proc` query in H.1; eval script exit code gated on ship bar (MVP bar is human-facing); added seed rerun semantics (`TRUNCATE RESTART IDENTITY`); added Cloudflare→Vercel fallback 5-step runbook; clarified that same-origin design means CORS isn't in the request path; added trigger rule to `Needs human decision`.
 - **2026-04-16** — **Eval battery grounded against scraped corpus** (Appendix E.5 / E.6). Each core question's pass criteria now references the specific REGDOC + section in `scraped_regdocs/` (snapshot 2026-04-16, 19 docs / 1670 sections / 13467 paragraphs). Corrections from the pre-scrape draft: Q1 shift-turnover is `§3.2.3`, not `§4.*`; Q2 "control-room staffing roles" → "certified operations personnel + specialties from §3.1.4" (CNSC doesn't use CRSS/ANO labels in 2.2.5); Q3 "licensed vs non-licensed roles" → "Systematic Approach to Training (SAT) / ADDIE cycle"; Q8 pass criteria aligned with the actual §2.2 element list (dropped "fire protection" — only 2 hits in 2.10.1); Q12 replaced "conventional + nuclear safety" with "environmental protection under NSCA/graded approach" (REGDOC-2.9.1 was scraped and provides stronger synthesis ground than 2.8.1's 48 paragraphs). Also added `must_cite_section` and `must_contain_all_from_group` fields to the JSONL format so the grader can score citation specificity and paraphrase-tolerant keyword coverage.
+- **2026-04-16** — **Vector index: HNSW, not ivfflat.** Original Appendix A.2 used `ivfflat (... lists = 100)`. Post-ingestion smoke test on the 1945-chunk corpus showed severe recall loss: client-side exact cosine for "minimum staff complement for a nuclear power plant" put REGDOC-2.2.5 §3.1.1 at similarity 0.75 and §3.1.4 at 0.72, but the RPC (ivfflat default `probes = 1`) returned REGDOC-1.1.1 / 2.3.2 / 3.5.3 with REGDOC-2.2.5 absent from top-10. Root cause: 100 lists over 1945 rows = ~19 rows/list, default probes=1 scores only one list. Fix: `migrations/001-switch-to-hnsw.sql` drops the ivfflat index and recreates as HNSW (pgvector default since 0.5.0, no per-table tuning). Appendix A.2 updated inline. Smoke: `bun run scripts/smoke-rag.ts` passes ≥ 5/6 expected-REGDOC-in-top-3 probes after migration.
 - **2026-04-16** — **Auth added — optional, magic-link, non-gating** (Appendix J). Supabase Auth magic-link sign-in opens three tiers: `anon` (5/day Knowledge Hub per IP, 2/day Generator), `signed_in` (50/day KH, 20/day Gen per user), `npx_circle` (100/day KH, 40/day Gen) auto-assigned for emails in `npxinnovation.ca`, `brucepower.com`, `opg.com`, `cnsc-ccsn.gc.ca`, `cameco.com`, `uwaterloo.ca`. Drivers: (1) wallet protection — Raj is paying personally and anon gets throttled hard; (2) NPX evaluators get real headroom without signup friction blocking first-click; (3) sign-ups from nuclear-industry domains double as warm outreach signal; (4) email-verification tax kills drive-by bot abuse. Server-side thread persistence remains deferred — localStorage still the store for both anon and signed-in, so Appendix B's "no chat threads table" decision stands.
 
 ---
@@ -173,8 +174,12 @@ CREATE TABLE IF NOT EXISTS regdoc_chunks (
   embedding        vector(1536),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- HNSW index — see 2026-04-16 decision + migrations/001-switch-to-hnsw.sql.
+-- Fresh Supabase projects can run this block directly. Projects that ran
+-- the original ivfflat version must apply the migration (DROP + CREATE
+-- USING hnsw) to restore retrieval quality.
 CREATE INDEX IF NOT EXISTS regdoc_chunks_embedding_idx
-  ON regdoc_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+  ON regdoc_chunks USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS regdoc_chunks_regdoc_id_idx ON regdoc_chunks(regdoc_id);
 
 -- Simulated plant state
