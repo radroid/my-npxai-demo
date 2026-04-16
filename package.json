@@ -10,7 +10,10 @@
 		"lint": "biome check app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",
 		"format": "biome format app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",
 		"format:fix": "biome format --write app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",
-		"lint:fix": "biome check --write app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json"
+		"lint:fix": "biome check --write app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",
+		"preflight": "bun run scripts/preflight.ts",
+		"ingest": "bun run scripts/ingest.ts",
+		"eval:kb": "bun run scripts/eval-kb.ts"
 	},
 	"dependencies": {
 		"@ai-sdk/openai": "^3.0.52",
