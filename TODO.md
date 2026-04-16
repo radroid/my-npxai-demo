@@ -101,7 +101,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
   - [x] `app/generator/page.tsx`
   - [x] `app/insights/page.tsx`
   - [x] `app/equivalency/page.tsx`
-- [ ] Configure `open-next.config.ts` for Cloudflare deployment
+- [ ] Configure `open-next.config.ts` for Cloudflare deployment - use domain 'npx.curlycloud.dev'
 - [ ] Write `app/globals.css` CSS variables per Appendix G.1 — G.3 (colors, typography, spacing, radii). All component styles reference tokens; zero hex values in components.
 - [ ] Load Inter + JetBrains Mono via `next/font` (self-hosted, no runtime CDN)
 
