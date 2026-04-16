@@ -10,7 +10,11 @@
 
 *Items that genuinely can't be resolved without Raj. Keep this list short — everything else gets decided by the agent.*
 
+**Trigger rule for agents:** if a blocker can't be resolved within 24 hours of being identified, or it requires judgment that research can't settle (personal narrative, subjective brand calls, credentials), add a one-line bullet here.
+
 - *(none yet — will populate as agent iterations surface truly irreducible choices)*
+
+> **Ship readiness checklist** lives in Appendix H.5 — single source of truth; don't duplicate it here.
 
 ---
 
@@ -92,6 +96,7 @@ Project is scaffolded with assistant-ui starter. Dependencies installed (Next 16
 - **2026-04-16** — **Launch materials** (Appendix I): 90s Loom script with shot list + contingencies; three outreach DMs (Kshitij / Bharath / Margaret) + one institutional email, each tonally tuned to the recipient. All drafts — Raj personalizes before sending.
 - **2026-04-16** — **Chat threads = localStorage-only.** No server-side thread table, no `app/api/chat/threads/route.ts`. Consequences: (a) no RLS surface to get wrong; (b) no raw-query persistence on our servers (matches Appendix H.6); (c) threads don't cross devices — acceptable for demo. State managed with `zustand` (already installed) persisted to localStorage.
 - **2026-04-16** — `.env.example` committed with placeholder values for all 6 variables — see Appendix B.5; contains zero real secrets.
+- **2026-04-16** — **Plan consistency pass** (external review): removed stale `/api/chat/threads` rate-limit + UUID-validation entries (localStorage-only decision); aligned D.6 deny-event logging with H.6 no-raw-content policy; standardized `UPSTASH_REDIS_REST_URL` naming; replaced psql-only `\df` with portable `pg_proc` query in H.1; eval script exit code gated on ship bar (MVP bar is human-facing); added seed rerun semantics (`TRUNCATE RESTART IDENTITY`); added Cloudflare→Vercel fallback 5-step runbook; clarified that same-origin design means CORS isn't in the request path; added trigger rule to `Needs human decision`.
 
 ---
 
@@ -111,9 +116,21 @@ Project is scaffolded with assistant-ui starter. Dependencies installed (Next 16
 |---|---|
 | Cowork scraping slow | Ship with 5 highest-priority REGDOCs |
 | assistant-ui integration issues | Custom textarea + message list |
-| Cloudflare deploy fails | Deploy to Vercel |
+| Cloudflare deploy fails | Deploy to Vercel (see runbook below) |
 | RAG quality weak | Hybrid search (keyword + vector), increase retrieval count |
 | Time runs out | Cut Generator, ship Knowledge Hub only |
+
+### Cloudflare → Vercel fallback runbook (5 steps)
+
+Trigger: `bunx wrangler deploy` fails for reasons we can't debug in the remaining ship window.
+
+1. In Vercel dashboard → Import Git Repo → select this repo. Framework auto-detects Next.js.
+2. Project Settings → Environment Variables → add all 6 from `.env.local` (Production scope). Do NOT paste `SUPABASE_SERVICE_ROLE_KEY` into a browser-exposed scope — it stays server-only; Vercel's default is server-only for non-`NEXT_PUBLIC_*` vars, which is correct.
+3. Remove `@opennextjs/cloudflare` from the build path: Vercel uses native Next.js runtime, so `open-next.config.ts` is ignored automatically. No code change needed; just don't point Vercel at the `opennext` build output.
+4. Deploy (`vercel --prod` locally after `vercel link`, or click Deploy in dashboard). Note the assigned `*.vercel.app` URL.
+5. Re-run Phase 5 post-deploy checks against the new URL: `bun run eval:kb` (pointed at prod), manual Generator run for Unit 3 Evening, OpenGraph preview on the new URL. Update outreach drafts to reference the Vercel URL.
+
+Cloudflare-specific features not used in this app (Workers KV, Durable Objects, R2) so nothing else needs porting.
 
 ---
 
@@ -290,7 +307,6 @@ Applied at every public API route. `lib/guard.ts` wraps the handler; no route by
 |---|---|---|---|
 | `/api/knowledge-hub/query` | 10 | 60 | Covers demo usage + re-asks; blocks abuse |
 | `/api/generator/turnover` | 5 | 20 | More expensive (larger context) |
-| `/api/chat/threads` | 30 | 300 | Thread metadata only, cheap |
 
 IP resolution order (Cloudflare Workers): `cf-connecting-ip` → `x-forwarded-for` (first IP) → fallback `unknown`. `unknown` shares one bucket globally so we never rate-limit "everyone" by accident but still have a ceiling.
 
@@ -298,7 +314,6 @@ IP resolution order (Cloudflare Workers): `cf-connecting-ip` → `x-forwarded-fo
 
 - **Knowledge Hub query**: `trim()`, reject empty, reject `> 1000` chars, strip ASCII control chars `[\x00-\x08\x0B\x0C\x0E-\x1F]`. Log (don't block) on matches against a jailbreak-prefix watchlist: `ignore (all )?previous`, `disregard (the )?above`, `you are now`, `system:\s`.
 - **Generator inputs**: `station`, `unit`, `shift` validated against closed enums server-side. Reject anything else with 400.
-- **Thread id / message id**: UUID v4 regex. Anything else → 400.
 
 ### B.3 Output caps
 
@@ -319,7 +334,7 @@ One Redis counter `openai:calls:YYYY-MM-DD` incremented on each successful OpenA
 
 ### B.6 CORS / origin
 
-Route handlers respond only to same-origin requests. Explicitly set `Access-Control-Allow-Origin` to the deployed domain; do not echo `*`. Preflight returns 405 for any unexpected method.
+The app is **same-origin end-to-end** — browser loads `{domain}/knowledge-hub` and fetches `{domain}/api/...` from the same deployment. CORS is not in the request path at all (neither on localhost, Cloudflare preview, nor Vercel fallback — all same-origin). Route handlers therefore do not emit `Access-Control-Allow-Origin`. If cross-origin usage is ever introduced (not in scope), set allow-origin to an explicit allowlist of the deployed domains — never echo `*`. Preflight returns 405 for any unexpected method.
 
 ---
 
@@ -539,7 +554,7 @@ Before streaming a token, and on final accumulated output, run:
 
 - **Deny:** `<script`, `<iframe`, `javascript:`, `data:text/html`, `onerror=`, `onload=`. If any appears, truncate at that position and append "[response truncated — unsafe content]".
 - **Sanitize at render time:** frontend uses the existing `@assistant-ui/react-markdown` renderer with `remark-gfm` — confirm it does NOT enable raw HTML passthrough.
-- Log the full input + top-snippet IDs on deny events for later review (with IP hashed, not raw).
+- On deny events, emit a guard log line with: hashed IP, route, guard reason (`output_script_block` etc.), top-snippet IDs, prompt version, and output length. **Never** the raw user query or raw output — matches H.6. If deeper forensics is ever needed, add an opt-in debug mode rather than making this the default.
 
 ### D.7 Prompt versioning
 
@@ -594,7 +609,7 @@ The literal prompt text in D.1 and D.4 lives in `lib/prompts.ts` exported as nam
 
 ### E.4 Smoke script
 
-`bun run eval:kb` — runs all 20 questions against the deployed endpoint, prints a pass/fail table, exits non-zero on any adversarial failure or score below MVP bar. Runs as part of Phase 5 pre-deploy check.
+`bun run eval:kb` — runs all 20 questions against the configured endpoint, prints a pass/fail table. **Exit code is gated on the ship bar** (≥17/20 AND all 3 adversarial pass) because that's what gating cares about. The MVP bar (14/20) is a human-facing checkpoint during Phase 3 development — read the table, not the exit code. This keeps the script single-purpose and removes drift between "script passes" and "phase gate passes".
 
 ---
 
@@ -614,6 +629,7 @@ Seed data for the Generator. Lives in `seeds/bruce-power.sql` (committed, readab
 - **Parameter realism:** nominal CANDU values (PHT ~10 MPa, PHT T_out ~310°C, moderator ~70°C, steam ~4.7 MPa). Off-normal values are flagged `attention` or `alarm` with plausible deviation magnitudes.
 - **Operator roles:** SM (Shift Manager), CRSS (Control Room Shift Supervisor), ANO (Authorized Nuclear Operator), Field Operator — matches CNSC REGDOC-2.2.5 staffing model.
 - **Timestamps:** anchor to a notional demo shift boundary. Seed script computes `now() - interval` to keep the data feeling fresh on every demo.
+- **Rerun semantics (idempotency):** `seeds/bruce-power.sql` begins with `TRUNCATE plant_status, work_orders, shift_log_entries RESTART IDENTITY;` then inserts. These are fixtures — no row is worth preserving across runs. `regdoc_chunks` is NOT truncated (it's real ingested data, populated by a different script). Safe to rerun `bun run seed:plant` any number of times; unsafe to point it at a prod DB with real operator data (there is none for this demo).
 
 ### F.2 `plant_status` — representative rows (full set in `seeds/bruce-power.sql`)
 
@@ -782,10 +798,10 @@ Breakpoints: `sm 640 / md 768 / lg 1024 / xl 1280`.
 Each phase has a binary pass/fail gate. Do not advance `Current phase` in PLAN.md until the gate is green.
 
 ### H.1 Phase 1 — Setup (Thu Apr 16)
-- [ ] Supabase: `regdoc_chunks`, `plant_status`, `work_orders`, `shift_log_entries` tables exist with RLS enabled (`SELECT relrowsecurity FROM pg_class WHERE relname = 'regdoc_chunks'` = `t`).
-- [ ] Supabase: `match_regdoc_chunks` and `get_turnover_snapshot` RPCs exist (`\df` shows them).
+- [ ] Supabase: `regdoc_chunks`, `plant_status`, `work_orders`, `shift_log_entries` tables exist with RLS enabled — run in Supabase SQL editor: `SELECT relname, relrowsecurity FROM pg_class WHERE relname IN ('regdoc_chunks','plant_status','work_orders','shift_log_entries');` — every row must show `relrowsecurity = t`.
+- [ ] Supabase: `match_regdoc_chunks` and `get_turnover_snapshot` RPCs exist — run: `SELECT proname FROM pg_proc WHERE proname IN ('match_regdoc_chunks','get_turnover_snapshot');` — must return both names.
 - [ ] `.env.local` contains all 6 variables (grep for each name, none blank).
-- [ ] Upstash: `REDIS_REST_URL` ping returns `PONG`.
+- [ ] Upstash: `UPSTASH_REDIS_REST_URL` ping returns `PONG` (e.g., `curl -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" $UPSTASH_REDIS_REST_URL/ping`).
 - [ ] Cloudflare: `bunx wrangler whoami` succeeds.
 - [ ] Grep: `rg "SUPABASE_SERVICE_ROLE_KEY" app/` returns zero matches.
 - [ ] Grep: `.env.local` is listed in `.gitignore` (`rg "^\.env\.local" .gitignore`).
@@ -823,7 +839,7 @@ See Appendix E.2 — **ship bar** is the Phase-3 gate: ≥ 17/20 Knowledge Hub b
 - [ ] OpenGraph preview renders in LinkedIn and Slack previews (test with `https://www.opengraph.xyz/` or similar).
 - [ ] Analytics confirms page views being recorded.
 - [ ] A fresh browser session can: open the URL → ask one Knowledge Hub question and see cited answer → switch to Generator → generate Unit 3 Evening report → read both without console errors.
-- [ ] Loom video recorded and uploaded (human task — see future Loom-script appendix).
+- [ ] Loom video recorded and uploaded (human task — script + shot list in Appendix I.1).
 
 ### H.6 Observability
 
