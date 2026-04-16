@@ -74,15 +74,16 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 > Before starting any task below, read `PLAN.md` to confirm the current phase and any scope changes. Do NOT attempt anything in the Human section above.
 
 ### Phase 1 — Setup (Thu Apr 16)
-- [ ] `bun add @supabase/ssr` — cookie-aware Supabase client for App Router route handlers
-- [ ] Create `lib/supabase.ts` helper — exports a server-side Supabase client built with **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** only, cookie-aware via `@supabase/ssr`. Must NOT import or reference `SUPABASE_SERVICE_ROLE_KEY`. All access goes through the RPCs from Appendix A.4 + A.6.
-- [ ] Create `lib/supabase-browser.ts` — browser client (anon key + session from cookies) for the sign-in modal
-- [ ] Create `scripts/ingest.ts` (separate entry point) — uses `SUPABASE_SERVICE_ROLE_KEY` for bulk chunk inserts during ingestion. Lives outside `app/` so it's never bundled into the runtime build. Implements Appendix C.3 parsing rules, C.4 chunking, C.5 embedding batching + retries, and C.6 verification output.
+- [x] `bun add @supabase/ssr` — cookie-aware Supabase client for App Router route handlers
+- [x] Create `lib/supabase.ts` helper — exports a server-side Supabase client built with **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** only, cookie-aware via `@supabase/ssr`. Must NOT import or reference `SUPABASE_SERVICE_ROLE_KEY`. All access goes through the RPCs from Appendix A.4 + A.6.
+- [x] Create `lib/supabase-browser.ts` — browser client (anon key + session from cookies) for the sign-in modal
+- [ ] Create `scripts/ingest.ts` (separate entry point) — uses `SUPABASE_SERVICE_ROLE_KEY` for bulk chunk inserts during ingestion. Lives outside `app/` so it's never bundled into the runtime build. Consumes the pre-parsed JSON under `scraped_regdocs/` (one file per REGDOC, schema: `{regdoc_id, title, url, sections[{section_number, section_title, anchor, paragraphs:[{text, requirement_type}]}]}`), reconstructs section text, applies Appendix C.4 chunking (400 tokens, 60-token overlap, sentence-aware, one chunk per section boundary), C.5 embedding batching + retries, batched `INSERT` into `regdoc_chunks` (1000 rows/statement per Supabase batch-insert guidance), and C.6 verification output.
+- [ ] Run the ingestion: `bun run ingest` against the Supabase project populates `regdoc_chunks` from all 19 files in `scraped_regdocs/`. Acceptance: `SELECT count(*) FROM regdoc_chunks` returns > 1500 chunks; `SELECT count(*) FROM regdoc_chunks WHERE embedding IS NULL` returns 0; a smoke `match_regdoc_chunks` RPC call for "shift turnover" returns rows citing `REGDOC-2.3.4`. Script is idempotent — on rerun it TRUNCATEs `regdoc_chunks` first (it's derived data, safe to regenerate).
 - [ ] Add `grep` guard to pre-deploy check: fail the build if `SUPABASE_SERVICE_ROLE_KEY` appears under `app/`
-- [ ] Create `lib/openai.ts` helper (configured OpenAI client)
-- [ ] Add `@upstash/ratelimit` + `@upstash/redis` to dependencies (`bun add @upstash/ratelimit @upstash/redis`)
-- [ ] Create `lib/guard.ts` — wraps route handlers with per-route rate limits (Appendix B.1), input validation (B.2), and the global daily circuit breaker (B.4). Resolves client IP per B.1 ordering **and** reads the authenticated user via `supabase.auth.getUser()`; if present, calls `get_user_tier()` RPC once per request and uses the tiered bucket formula in Appendix J.5 (`rl:{route}:{identifier}`). Also picks tier-scaled input-char cap (B.2) and output `max_tokens` (B.3).
-- [ ] Create `lib/validators.ts` — zod schemas for query body, generator inputs, thread/message IDs (Appendix B.2)
+- [x] Create `lib/openai.ts` helper (configured OpenAI client)
+- [x] Add `@upstash/ratelimit` + `@upstash/redis` to dependencies (`bun add @upstash/ratelimit @upstash/redis`)
+- [x] Create `lib/guard.ts` — wraps route handlers with per-route rate limits (Appendix B.1), input validation (B.2), and the global daily circuit breaker (B.4). Resolves client IP per B.1 ordering **and** reads the authenticated user via `supabase.auth.getUser()`; if present, calls `get_user_tier()` RPC once per request and uses the tiered bucket formula in Appendix J.5 (`rl:{route}:{identifier}`). Also picks tier-scaled input-char cap (B.2) and output `max_tokens` (B.3).
+- [x] Create `lib/validators.ts` — zod schemas for query body, generator inputs, thread/message IDs (Appendix B.2)
 - [ ] Pre-deploy secrets scan script — Appendix B.5 grep, exit non-zero on any hit. Hook into `bun run build` or a lint step.
 - [ ] Set same-origin CORS headers in every route handler (Appendix B.6)
 - [ ] Scaffold route handler stubs under `app/api/`:
@@ -93,8 +94,8 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
   - [ ] `app/auth/callback/route.ts` — exchanges the magic-link code for a session cookie via `@supabase/ssr`, then redirects to `/knowledge-hub` (Appendix J.3 step 4)
   - [ ] `app/auth/signout/route.ts` — `supabase.auth.signOut()`, clear cookies, redirect to `/`
 - [ ] **Do NOT** create `app/api/chat/threads/route.ts` — threads are localStorage-only per the 2026-04-16 decision. If assistant-ui starter scaffolded this file, delete it.
-- [ ] Create `lib/thread-store.ts` — zustand store with `persist` middleware targeting localStorage for Knowledge Hub thread list + message history
-- [ ] Create `.env.example` at repo root with placeholder values for all 6 env vars (OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN) — zero real secrets
+- [x] Create `lib/thread-store.ts` — zustand store with `persist` middleware targeting localStorage for Knowledge Hub thread list + message history
+- [x] Create `.env.example` at repo root with placeholder values for all 6 env vars (OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN) — zero real secrets
 - [ ] Create placeholder page shells:
   - [ ] `app/knowledge-hub/page.tsx`
   - [ ] `app/generator/page.tsx`
@@ -115,10 +116,10 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Wire `bun run seed:plant` script (executes `seeds/bruce-power.sql` via Supabase connection) — uses `SUPABASE_SERVICE_ROLE_KEY` since it's a one-shot ingestion like chunk insert
 
 ### Phase 3 — RAG pipeline (Sat Apr 18)
-- [ ] Create `lib/prompts.ts` — export `KNOWLEDGE_HUB_SYSTEM` (Appendix D.1 verbatim), `GENERATOR_SYSTEM` (D.4 verbatim), `PROMPT_VERSION` constant.
-- [ ] Create `lib/context-envelope.ts` — wraps retrieved chunks in `<context_snippet>` tags per D.2 with HTML-entity escaping on body.
-- [ ] Create `lib/output-guard.ts` — D.6 output validation: deny-list scan, truncate-on-hit, hashed-IP logging.
-- [ ] Create `lib/logger.ts` — structured JSON logger per Appendix H.6; exports `logRequest()`, `logGuardEvent()`, `hashIp(ip)` **and `hashUser(userId)`** (same daily-salt rotation). Every request log includes `tier` (anon | signed_in | npx_circle); authenticated requests additionally include `user_hash`.
+- [x] Create `lib/prompts.ts` — export `KNOWLEDGE_HUB_SYSTEM` (Appendix D.1 verbatim), `GENERATOR_SYSTEM` (D.4 verbatim), `PROMPT_VERSION` constant. *(done early in Phase 1; was originally Phase 3)*
+- [x] Create `lib/context-envelope.ts` — wraps retrieved chunks in `<context_snippet>` tags per D.2 with HTML-entity escaping on body. *(done early in Phase 1; was originally Phase 3)*
+- [x] Create `lib/output-guard.ts` — D.6 output validation: deny-list scan, truncate-on-hit, hashed-IP logging. *(done early in Phase 1; was originally Phase 3)*
+- [x] Create `lib/logger.ts` — structured JSON logger per Appendix H.6; exports `logRequest()`, `logGuardEvent()`, `hashIp(ip)` **and `hashUser(userId)`** (same daily-salt rotation). Every request log includes `tier` (anon | signed_in | npx_circle); authenticated requests additionally include `user_hash`.
 - [ ] Verify `@assistant-ui/react-markdown` + `remark-gfm` config has raw-HTML passthrough disabled. If enabled by default, explicitly disable.
 - [ ] Implement `/api/knowledge-hub/query/route.ts`:
   - [ ] Wrap handler with `withGuard()` from `lib/guard.ts` (rate limit + validation + circuit breaker per Appendix B)
