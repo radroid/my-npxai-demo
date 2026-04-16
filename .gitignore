@@ -43,3 +43,6 @@ next-env.d.ts
 
 # local planning docs
 SPRINT_PLAN.md
+
+# scrapped docs
+scraped_regdocs/
