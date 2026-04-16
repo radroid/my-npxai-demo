@@ -46,3 +46,6 @@ SPRINT_PLAN.md
 
 # scrapped docs
 scraped_regdocs/
+
+# local agent state
+.claude/
