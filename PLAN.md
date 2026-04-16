@@ -58,9 +58,9 @@ Architecture note for README: portable to Azure OpenAI + Cosmos DB vector + Azur
 
 ## Current phase
 
-**Phase 1 — Setup** (Thursday April 16 evening)
+**Phase 2 — Scaffolding** (Friday April 17)
 
-Project is scaffolded with assistant-ui starter. Dependencies installed (Next 16, assistant-ui, Supabase, OpenAI SDK, wrangler, opennext/cloudflare). Next: provision Supabase + Cloudflare, kick off Cowork scraping, build API route stubs.
+Phase 1 closed 2026-04-16 evening. Lib stack, route stubs, auth handlers, page shells, design tokens, OpenNext + Wrangler config all committed. Ingestion complete: 1945 chunks in `regdoc_chunks`, HNSW index applied, `bun run scripts/smoke-rag.ts` → 6/6 probes return the correct REGDOC in top-3. Two Phase-1 items carried as open human holds (don't block Phase 2 start): enable Email provider in Supabase Auth dashboard; create public GitHub repo + connect Cloudflare Git integration. Next: wire assistant-ui `Thread` + custom runtime adapter to `/api/knowledge-hub/query`, build top nav + sign-in modal + footer, author Appendix F seed SQL.
 
 > When the current phase changes, update this section. Phases: 1 Setup → 2 Scaffolding → 3 RAG pipeline → 4 Full build → 5 Polish + ship.
 
