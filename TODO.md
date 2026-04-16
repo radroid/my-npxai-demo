@@ -19,6 +19,10 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Run Appendix A.2 (tables + indexes)
 - [ ] Run Appendix A.3 (RLS + revokes) — **critical: without this, anon has direct table access**
 - [ ] Run Appendix A.4 (RPC functions + grants)
+- [ ] Run Appendix A.6 (profiles table + auth trigger + `get_user_tier` RPC)
+- [ ] Supabase dashboard → Auth → Providers → Email: enable the provider and confirm magic-link / Email OTP is the sign-in mode
+- [ ] Supabase dashboard → Auth → URL Configuration: set Site URL (localhost now, swap to production URL on Phase 5) and add `/auth/callback` under Redirect URLs
+- [ ] Supabase dashboard → Auth → Email Templates → **Magic Link** template: sanity-check the subject line + from address. Default is fine for the demo; personalize later if desired.
 - [ ] Run `bunx wrangler login` to authenticate Cloudflare
 - [ ] Create `.env.local` at repo root with:
   - `OPENAI_API_KEY`
@@ -36,6 +40,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 ### Phase 2 — Scaffolding (Fri Apr 17)
 - [ ] Review agent's assistant-ui integration in browser, confirm dark navy theme looks right
 - [ ] Review agent's Appendix F seed data — confirm CANDU parameters, values, and shift-log narrative ring true, or flag corrections. If approved, no action needed; agent will run `bun run seed:plant` to apply.
+- [ ] Test the sign-in modal once agent wires it up: enter your Gmail → receive magic link → click → land on Knowledge Hub → confirm nav shows you signed in. Flag any UX friction before outreach.
 
 ### Phase 3 — RAG pipeline (Sat Apr 18)
 - [ ] Verify Cowork scraping completed; confirm chunk count in Supabase
@@ -48,7 +53,8 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Review the Appendix G design system (colors, type, states, a11y). If OK, no action; agent will implement. If NPX has specific brand assets (logo SVG, exact palette from their site), hand them over to override tokens.
 
 ### Phase 5 — Polish + ship (Mon Apr 20)
-- [ ] Cross-device manual test (iPhone + tablet + desktop)
+- [ ] After deploy, update Supabase dashboard → Auth → URL Configuration → Site URL to the production URL (and add it to Redirect URLs). Otherwise magic links will redirect to localhost.
+- [ ] Cross-device manual test (iPhone + tablet + desktop) — exercise both anon path and signed-in path
 - [ ] Run `bunx wrangler deploy` (or approve agent doing it) and verify live URL
 - [ ] Set up basic analytics (so you know when NPX team visits)
 - [ ] **Record 90-second Loom video** — follow shot list + script in Appendix I.1. Do the pre-warm query + two takes. Replace `{LOOM_URL}` etc. in the outreach drafts once uploaded.
@@ -68,12 +74,14 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 > Before starting any task below, read `PLAN.md` to confirm the current phase and any scope changes. Do NOT attempt anything in the Human section above.
 
 ### Phase 1 — Setup (Thu Apr 16)
-- [ ] Create `lib/supabase.ts` helper — exports a server-side Supabase client built with **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** only. Must NOT import or reference `SUPABASE_SERVICE_ROLE_KEY`. All access goes through the RPCs from Appendix A.4.
+- [ ] `bun add @supabase/ssr` — cookie-aware Supabase client for App Router route handlers
+- [ ] Create `lib/supabase.ts` helper — exports a server-side Supabase client built with **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** only, cookie-aware via `@supabase/ssr`. Must NOT import or reference `SUPABASE_SERVICE_ROLE_KEY`. All access goes through the RPCs from Appendix A.4 + A.6.
+- [ ] Create `lib/supabase-browser.ts` — browser client (anon key + session from cookies) for the sign-in modal
 - [ ] Create `scripts/ingest.ts` (separate entry point) — uses `SUPABASE_SERVICE_ROLE_KEY` for bulk chunk inserts during ingestion. Lives outside `app/` so it's never bundled into the runtime build. Implements Appendix C.3 parsing rules, C.4 chunking, C.5 embedding batching + retries, and C.6 verification output.
 - [ ] Add `grep` guard to pre-deploy check: fail the build if `SUPABASE_SERVICE_ROLE_KEY` appears under `app/`
 - [ ] Create `lib/openai.ts` helper (configured OpenAI client)
 - [ ] Add `@upstash/ratelimit` + `@upstash/redis` to dependencies (`bun add @upstash/ratelimit @upstash/redis`)
-- [ ] Create `lib/guard.ts` — wraps route handlers with per-route rate limits (Appendix B.1), input validation (B.2), and the global daily circuit breaker (B.4). Also resolves client IP per B.1 ordering.
+- [ ] Create `lib/guard.ts` — wraps route handlers with per-route rate limits (Appendix B.1), input validation (B.2), and the global daily circuit breaker (B.4). Resolves client IP per B.1 ordering **and** reads the authenticated user via `supabase.auth.getUser()`; if present, calls `get_user_tier()` RPC once per request and uses the tiered bucket formula in Appendix J.5 (`rl:{route}:{identifier}`). Also picks tier-scaled input-char cap (B.2) and output `max_tokens` (B.3).
 - [ ] Create `lib/validators.ts` — zod schemas for query body, generator inputs, thread/message IDs (Appendix B.2)
 - [ ] Pre-deploy secrets scan script — Appendix B.5 grep, exit non-zero on any hit. Hook into `bun run build` or a lint step.
 - [ ] Set same-origin CORS headers in every route handler (Appendix B.6)
@@ -82,6 +90,8 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
   - [ ] `app/api/generator/plant-status/route.ts`
   - [ ] `app/api/generator/work-orders/route.ts`
   - [ ] `app/api/generator/turnover/route.ts`
+  - [ ] `app/auth/callback/route.ts` — exchanges the magic-link code for a session cookie via `@supabase/ssr`, then redirects to `/knowledge-hub` (Appendix J.3 step 4)
+  - [ ] `app/auth/signout/route.ts` — `supabase.auth.signOut()`, clear cookies, redirect to `/`
 - [ ] **Do NOT** create `app/api/chat/threads/route.ts` — threads are localStorage-only per the 2026-04-16 decision. If assistant-ui starter scaffolded this file, delete it.
 - [ ] Create `lib/thread-store.ts` — zustand store with `persist` middleware targeting localStorage for Knowledge Hub thread list + message history
 - [ ] Create `.env.example` at repo root with placeholder values for all 6 env vars (OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN) — zero real secrets
@@ -98,7 +108,8 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Wire assistant-ui (`ThreadListSidebar` + `Thread`) into `app/knowledge-hub/page.tsx`
 - [ ] Build custom runtime adapter pointing to `/api/knowledge-hub/query`
 - [ ] Test send/receive round-trip with a mock response
-- [ ] Build top nav component (Logo + Why NPX AI? | Features | FAQ | Contact | Sign In)
+- [ ] Build top nav component (Logo + Why NPX AI? | Features | FAQ | Contact | Sign In / profile chip when authed)
+- [ ] Build sign-in modal per Appendix J.6 — email input, `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } })`, loading/success/error states, a11y (role="dialog", focus trap, `aria-live` status, returns focus on close), full-screen on mobile
 - [ ] Build footer component with "Built by Raj Dholakia as a demonstration for NPX Innovation"
 - [ ] Write `seeds/bruce-power.sql` implementing Appendix F (≈50 plant_status rows, ≈12 work_orders, ≈15 shift_log_entries). Use `now() - interval '<N> minutes'` for timestamps so data feels fresh per demo.
 - [ ] Wire `bun run seed:plant` script (executes `seeds/bruce-power.sql` via Supabase connection) — uses `SUPABASE_SERVICE_ROLE_KEY` since it's a one-shot ingestion like chunk insert
@@ -107,7 +118,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Create `lib/prompts.ts` — export `KNOWLEDGE_HUB_SYSTEM` (Appendix D.1 verbatim), `GENERATOR_SYSTEM` (D.4 verbatim), `PROMPT_VERSION` constant.
 - [ ] Create `lib/context-envelope.ts` — wraps retrieved chunks in `<context_snippet>` tags per D.2 with HTML-entity escaping on body.
 - [ ] Create `lib/output-guard.ts` — D.6 output validation: deny-list scan, truncate-on-hit, hashed-IP logging.
-- [ ] Create `lib/logger.ts` — structured JSON logger per Appendix H.6; exports `logRequest()`, `logGuardEvent()`, `hashIp(ip)` (daily-salt via `Date.now()/86400000 | 0` + static seed).
+- [ ] Create `lib/logger.ts` — structured JSON logger per Appendix H.6; exports `logRequest()`, `logGuardEvent()`, `hashIp(ip)` **and `hashUser(userId)`** (same daily-salt rotation). Every request log includes `tier` (anon | signed_in | npx_circle); authenticated requests additionally include `user_hash`.
 - [ ] Verify `@assistant-ui/react-markdown` + `remark-gfm` config has raw-HTML passthrough disabled. If enabled by default, explicitly disable.
 - [ ] Implement `/api/knowledge-hub/query/route.ts`:
   - [ ] Wrap handler with `withGuard()` from `lib/guard.ts` (rate limit + validation + circuit breaker per Appendix B)
@@ -120,6 +131,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Create `evals/knowledge-hub.jsonl` from Appendix E.1 (one JSON object per question, matching the E.3 format)
 - [ ] Create `scripts/eval-kb.ts` — runs the battery against the local/deployed endpoint, grades by `must_cite` / `must_contain` / `must_not_contain`, prints pass/fail table, exits non-zero on any adversarial failure (E.2)
 - [ ] Wire `bun run eval:kb` into `package.json` scripts
+- [ ] Add tier-aware integration tests: (a) 6th anon KH query/day → 429; (b) 51st signed_in KH query/day → 429; (c) 1400-char query succeeds as signed_in, fails 400 as anon (per Appendix H.3 + J.10)
 - [ ] Frontend: parse citation markers using the regex from Appendix D.5; render as clickable chips mapped to retrieved snippet metadata
 - [ ] Frontend: "Sources" panel showing retrieved chunks
 - [ ] Frontend: streaming response wired into assistant-ui Thread
@@ -162,6 +174,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Pre-deploy: `bun run eval:kb` passes the ship bar (≥17/20, all adversarial Qs pass) per Appendix E.2
 - [ ] Assist human with `bunx wrangler deploy` (agent can run it, human verifies)
 - [ ] Post-deploy smoke test: `bun run eval:kb` (Appendix E) + Generator run for Unit 3 Evening (the demo "money shot" per Appendix F.5) + spot check other units/shifts
+- [ ] Post-deploy sign-in smoke: in an incognito window, open the prod URL → click Sign In → enter Raj's email → receive and click magic link → land on `/knowledge-hub` with session cookie set → issue one query and confirm `tier` appears in the request log (Appendix H.5 + J.10)
 
 ### Ongoing / cross-phase
 - [ ] Keep `PLAN.md` current phase updated when phase transitions happen

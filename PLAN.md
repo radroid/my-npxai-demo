@@ -47,7 +47,8 @@ Ship a polished NPX-branded demo app (Knowledge Hub + Generator + Insights + Equ
 | Vector DB | Supabase pgvector (1536 dims) |
 | Database | Supabase Postgres |
 | Deploy | Cloudflare Workers via `@opennextjs/cloudflare` |
-| Rate limiting | Upstash Redis + `@upstash/ratelimit` (sliding window) |
+| Rate limiting | Upstash Redis + `@upstash/ratelimit` (sliding window), tier-aware per Appendix J |
+| Auth | Supabase Auth — magic link, optional (see Appendix J) |
 | Package manager | **Bun** (never npm/yarn/pnpm) |
 | Scraping | Cowork task (parallel workstream) |
 
@@ -97,12 +98,13 @@ Project is scaffolded with assistant-ui starter. Dependencies installed (Next 16
 - **2026-04-16** — **Chat threads = localStorage-only.** No server-side thread table, no `app/api/chat/threads/route.ts`. Consequences: (a) no RLS surface to get wrong; (b) no raw-query persistence on our servers (matches Appendix H.6); (c) threads don't cross devices — acceptable for demo. State managed with `zustand` (already installed) persisted to localStorage.
 - **2026-04-16** — `.env.example` committed with placeholder values for all 6 variables — see Appendix B.5; contains zero real secrets.
 - **2026-04-16** — **Plan consistency pass** (external review): removed stale `/api/chat/threads` rate-limit + UUID-validation entries (localStorage-only decision); aligned D.6 deny-event logging with H.6 no-raw-content policy; standardized `UPSTASH_REDIS_REST_URL` naming; replaced psql-only `\df` with portable `pg_proc` query in H.1; eval script exit code gated on ship bar (MVP bar is human-facing); added seed rerun semantics (`TRUNCATE RESTART IDENTITY`); added Cloudflare→Vercel fallback 5-step runbook; clarified that same-origin design means CORS isn't in the request path; added trigger rule to `Needs human decision`.
+- **2026-04-16** — **Auth added — optional, magic-link, non-gating** (Appendix J). Supabase Auth magic-link sign-in opens three tiers: `anon` (5/day Knowledge Hub per IP, 2/day Generator), `signed_in` (50/day KH, 20/day Gen per user), `npx_circle` (100/day KH, 40/day Gen) auto-assigned for emails in `npxinnovation.ca`, `brucepower.com`, `opg.com`, `cnsc-ccsn.gc.ca`, `cameco.com`, `uwaterloo.ca`. Drivers: (1) wallet protection — Raj is paying personally and anon gets throttled hard; (2) NPX evaluators get real headroom without signup friction blocking first-click; (3) sign-ups from nuclear-industry domains double as warm outreach signal; (4) email-verification tax kills drive-by bot abuse. Server-side thread persistence remains deferred — localStorage still the store for both anon and signed-in, so Appendix B's "no chat threads table" decision stands.
 
 ---
 
 ## Scope guardrails (what we're NOT doing)
 
-- No auth/login flows (email signup on homepage is UI-only).
+- Auth is **optional, magic-link only, non-gating** (see Appendix J). Anon click-to-try stays first-class; sign-in unlocks higher daily limits. Homepage "newsletter" email capture remains UI-only and is unrelated to auth.
 - No real plant data integration — simulated Bruce Power data only.
 - No production-grade observability, analytics beyond basic page views.
 - No multi-tenant features.
@@ -289,11 +291,85 @@ GRANT EXECUTE ON FUNCTION get_turnover_snapshot(text)             TO anon, authe
 
 | Context | Key | Allowed |
 |---|---|---|
-| Browser (client components) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Call RPCs only |
-| Route handlers (`app/api/**`) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` (server-side instance) | Call RPCs only |
+| Browser (client components) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Call RPCs; initiate magic-link sign-in; read session cookie |
+| Route handlers (`app/api/**`) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` via `@supabase/ssr` cookie adapter | Resolve `auth.uid()` from cookie; call RPCs (RLS + `SECURITY DEFINER` gate access) |
 | Offline ingestion (`scripts/ingest.ts`) | `SUPABASE_SERVICE_ROLE_KEY` | INSERT into `regdoc_chunks`, seed plant data |
 
 Rule: **grep the codebase before merging — `SUPABASE_SERVICE_ROLE_KEY` must not appear anywhere under `app/`.**
+
+### A.6 Auth: profiles + tier assignment
+
+Supabase Auth (magic-link) creates rows in `auth.users` automatically on first sign-in. We need one app-side table to store tier and a trigger that classifies new users. Full auth design lives in Appendix J; this block is the SQL that runs in the Supabase SQL editor.
+
+```sql
+-- App-side profile row, 1:1 with auth.users
+CREATE TABLE IF NOT EXISTS profiles (
+  id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email       TEXT NOT NULL,
+  tier        TEXT NOT NULL DEFAULT 'signed_in'
+                CHECK (tier IN ('signed_in', 'npx_circle')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Revoke defaults; only policies below grant access.
+REVOKE ALL ON profiles FROM anon, authenticated;
+
+-- Authenticated users can read ONLY their own profile. No writes from clients.
+CREATE POLICY "profiles_self_read" ON profiles
+  FOR SELECT TO authenticated
+  USING (auth.uid() = id);
+GRANT SELECT ON profiles TO authenticated;
+
+-- On new user: provision profile and classify tier by email domain.
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  v_domain TEXT := lower(split_part(NEW.email, '@', 2));
+  v_tier   TEXT := CASE
+    WHEN v_domain IN (
+      'npxinnovation.ca',
+      'brucepower.com',
+      'opg.com',
+      'cnsc-ccsn.gc.ca',
+      'cameco.com',
+      'uwaterloo.ca'
+    ) THEN 'npx_circle'
+    ELSE 'signed_in'
+  END;
+BEGIN
+  INSERT INTO profiles (id, email, tier)
+    VALUES (NEW.id, NEW.email, v_tier)
+    ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- Server-side tier lookup (called once per authenticated request by lib/guard.ts).
+CREATE OR REPLACE FUNCTION get_user_tier(p_user_id UUID)
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(
+    (SELECT tier FROM profiles WHERE id = p_user_id),
+    'signed_in'
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION get_user_tier(UUID) TO authenticated;
+```
+
+**Why the CHECK list omits `anon` and `banned`:** `anon` is not a stored tier (no profile row for anon users), and `banned` is not pre-wired — add it only if we observe abuse (see Appendix J.9).
+
+**Rotating the NPX-circle domain list:** edit the `CASE` in `handle_new_user()` and re-run the `CREATE OR REPLACE FUNCTION` statement. Existing users don't re-classify on their own; to re-tier an existing user, `UPDATE profiles SET tier = 'npx_circle' WHERE id = '<uid>';` via Supabase SQL editor.
 
 ---
 
@@ -301,25 +377,42 @@ Rule: **grep the codebase before merging — `SUPABASE_SERVICE_ROLE_KEY` must no
 
 Applied at every public API route. `lib/guard.ts` wraps the handler; no route bypasses it.
 
-### B.1 Rate limits (per IP)
+### B.1 Rate limits (tier-aware)
 
-| Route | Per-minute | Per-hour | Rationale |
-|---|---|---|---|
-| `/api/knowledge-hub/query` | 10 | 60 | Covers demo usage + re-asks; blocks abuse |
-| `/api/generator/turnover` | 5 | 20 | More expensive (larger context) |
+Buckets are keyed on `rl:{route}:{identifier}` where `identifier` depends on tier (full formula in Appendix J.5):
+- **anon** → `anon:{hashed IP}` — IP resolution order (Cloudflare Workers): `cf-connecting-ip` → `x-forwarded-for` (first IP) → fallback `unknown`. `unknown` shares one bucket globally so we never rate-limit "everyone" by accident but still have a ceiling.
+- **signed_in / npx_circle** → `user:{auth.uid()}:{tier}` — resolved from the validated Supabase session cookie. IP is irrelevant because authenticated users can legitimately share NATs (coworking, campus, conferences).
 
-IP resolution order (Cloudflare Workers): `cf-connecting-ip` → `x-forwarded-for` (first IP) → fallback `unknown`. `unknown` shares one bucket globally so we never rate-limit "everyone" by accident but still have a ceiling.
+| Route | Tier | Per-minute | Per-hour | Per-day | Rationale |
+|---|---|---|---|---|---|
+| `/api/knowledge-hub/query` | `anon` | 3 | 10 | 5 | Tight wallet defense; enough to demo without signup |
+| `/api/knowledge-hub/query` | `signed_in` | 10 | 40 | 50 | Comfortable session for evaluators who sign in |
+| `/api/knowledge-hub/query` | `npx_circle` | 15 | 80 | 100 | NPX + nuclear-industry domains (Appendix J.2) |
+| `/api/generator/turnover` | `anon` | 1 | 3 | 2 | Most expensive route; real use is gated to signed-in |
+| `/api/generator/turnover` | `signed_in` | 3 | 12 | 20 | — |
+| `/api/generator/turnover` | `npx_circle` | 5 | 20 | 40 | — |
+
+Per-minute limits protect against burst attacks; per-day limits are the wallet cap. Global daily circuit breaker in B.4 (500 total OpenAI calls) sits above all tiers.
 
 ### B.2 Input validation
 
-- **Knowledge Hub query**: `trim()`, reject empty, reject `> 1000` chars, strip ASCII control chars `[\x00-\x08\x0B\x0C\x0E-\x1F]`. Log (don't block) on matches against a jailbreak-prefix watchlist: `ignore (all )?previous`, `disregard (the )?above`, `you are now`, `system:\s`.
-- **Generator inputs**: `station`, `unit`, `shift` validated against closed enums server-side. Reject anything else with 400.
+- **Knowledge Hub query**: `trim()`, reject empty, strip ASCII control chars `[\x00-\x08\x0B\x0C\x0E-\x1F]`. Max length is **tier-scaled** (caller bucket determines cap):
+  - `anon`: 1000 chars
+  - `signed_in`: 1500 chars
+  - `npx_circle`: 2500 chars
+- Log (don't block) on matches against a jailbreak-prefix watchlist: `ignore (all )?previous`, `disregard (the )?above`, `you are now`, `system:\s`.
+- **Generator inputs**: `station`, `unit`, `shift` validated against closed enums server-side. Reject anything else with 400. Tier does not scale Generator inputs (they're enums).
 
 ### B.3 Output caps
 
-- Knowledge Hub: `max_tokens = 800`
-- Generator turnover: `max_tokens = 1500`
-- Embedding: single string only, length-checked above (never batch from user input)
+Knowledge Hub `max_tokens` is tier-scaled so signed-in users can get fuller multi-part answers without anon driving a larger wallet hit:
+- `anon`: 800
+- `signed_in`: 1000
+- `npx_circle`: 1500
+
+Generator turnover: `max_tokens = 1500` for all tiers (report structure is fixed; no benefit to scaling).
+
+Embedding: single string only, length-checked against the tier-scaled query cap (B.2) above (never batch from user input).
 
 ### B.4 Global daily circuit breaker
 
@@ -535,7 +628,7 @@ UNIT: {unit}   SHIFT: {incoming_shift}
 DATA:
 ```json
 {jsonStringified(get_turnover_snapshot(unit).result, null, 2)}
-```
+\```
 ```
 
 ### D.5 Citation contract (for frontend)
@@ -806,6 +899,10 @@ Each phase has a binary pass/fail gate. Do not advance `Current phase` in PLAN.m
 - [ ] Grep: `rg "SUPABASE_SERVICE_ROLE_KEY" app/` returns zero matches.
 - [ ] Grep: `.env.local` is listed in `.gitignore` (`rg "^\.env\.local" .gitignore`).
 - [ ] Cowork scraping task confirmed running (or output already in Supabase).
+- [ ] Supabase: `profiles` table exists with RLS enabled — run `SELECT relname, relrowsecurity FROM pg_class WHERE relname = 'profiles';` — must return `relrowsecurity = t`.
+- [ ] Supabase: `handle_new_user` trigger + `get_user_tier` RPC exist — run `SELECT proname FROM pg_proc WHERE proname IN ('handle_new_user','get_user_tier');` — must return both.
+- [ ] Supabase dashboard → Auth → Providers → Email: "Enable Email provider" is ON and "Confirm email" / magic-link flow is enabled.
+- [ ] Supabase dashboard → Auth → URL Configuration → Site URL matches the deployed (or local) origin; `Redirect URLs` includes `/auth/callback`.
 
 ### H.2 Phase 2 — Scaffolding (Fri Apr 17)
 - [ ] `bun run build` exits 0 with zero type errors.
@@ -820,6 +917,9 @@ See Appendix E.2 — **ship bar** is the Phase-3 gate: ≥ 17/20 Knowledge Hub b
 - [ ] Rate limit returns `429` after the Knowledge Hub per-minute threshold is exceeded (integration test).
 - [ ] Circuit breaker returns `503` with the Appendix B.4 JSON body when the daily counter is forced past 500 (test by setting the counter directly in Redis).
 - [ ] Output guard truncates responses containing `<script` (integration test with a crafted snippet injected via SQL into a test-only chunk).
+- [ ] Tier-aware rate limit: 6th anon Knowledge Hub query/day from the same hashed IP returns `429`; 51st signed_in query/day from the same user returns `429`.
+- [ ] Tier-scaled input cap: a 1400-char query body succeeds as `signed_in` and fails with 400 as `anon` (Appendix B.2 + J.10).
+- [ ] `get_user_tier` returns `'npx_circle'` for a seeded test user with a `@brucepower.com` email (e.g., create via Supabase Auth → Users → Add User, then query).
 
 ### H.4 Phase 4 — Full build (Sun Apr 19)
 - [ ] Every data-driven component shows all four states from Appendix G.4 (audit checklist):
@@ -839,6 +939,8 @@ See Appendix E.2 — **ship bar** is the Phase-3 gate: ≥ 17/20 Knowledge Hub b
 - [ ] OpenGraph preview renders in LinkedIn and Slack previews (test with `https://www.opengraph.xyz/` or similar).
 - [ ] Analytics confirms page views being recorded.
 - [ ] A fresh browser session can: open the URL → ask one Knowledge Hub question and see cited answer → switch to Generator → generate Unit 3 Evening report → read both without console errors.
+- [ ] Sign-in E2E in prod (incognito): click Sign In → submit Raj's email → receive magic-link email → click link → lands on `/knowledge-hub` with session cookie set → one query succeeds with `tier` field in the request log.
+- [ ] Anon E2E in prod (different incognito): click-to-try without signing in still works; the 6th query/day returns the anon-limit 429.
 - [ ] Loom video recorded and uploaded (human task — script + shot list in Appendix I.1).
 
 ### H.6 Observability
@@ -852,6 +954,8 @@ Fields on every route handler response log:
 - `ms` latency
 - `ip_hash` `SHA-256(ip + daily_salt)` — daily salt rotates at 00:00 UTC so hashes can't be correlated across days
 - `rl_remaining` rate-limit tokens left for that IP on that route
+- `tier` `anon | signed_in | npx_circle`
+- `user_hash` present only when authenticated — `SHA-256(user.id + daily_salt)`, same daily-salt rotation as `ip_hash`
 
 Route-specific additional fields:
 - **Knowledge Hub**: `prompt_version`, `query_len`, `retrieval_top_sim` (best score), `retrieval_avg_sim`, `fallback_taken` (bool), `model`, `input_tokens`, `output_tokens`, `est_cost_usd`
@@ -886,6 +990,7 @@ Raj-voiced content. Drafts are a starting point; Raj edits for tone and personal
 **Before recording:**
 - Close noisy tabs; tidy browser. Use incognito so no autocomplete/history shows.
 - Pre-open two tabs: (a) Knowledge Hub empty state, (b) Generator with Unit 3 Evening pre-selected.
+- **Sign in with Raj's Gmail before recording** (gets `signed_in` tier → 50/day KH + 20/day Gen cap). Prevents hitting anon's 5/day limit during takes/retakes. Do not demo the sign-in flow in the 90s cut — it's visible in the tag on the nav bar, which is enough.
 - Warm up the endpoint by running one dummy query a minute before recording (avoids cold-start latency in the footage).
 - Record at 1080p with webcam bubble bottom-right. Loom default audio; use a headset if available.
 
@@ -924,7 +1029,7 @@ Channel: LinkedIn DM. Tone: peer-to-peer technical. Length: short.
 > Stack: Next.js + OpenAI + Supabase pgvector on Cloudflare Workers. Same patterns your team's shipping with.
 >
 > Loom (90s): {LOOM_URL}
-> Live demo: {DEMO_URL}
+> Live demo: {DEMO_URL} — signing in with your `@npxinnovation.ca` email unlocks the extended daily quota, no password needed.
 > Code: {REPO_URL}
 >
 > Background: nuclear engineering at UWaterloo, four years shipping AI products. I'd love to bring both to NPX. Open to a short call whenever suits.
@@ -938,7 +1043,7 @@ Channel: LinkedIn DM. Tone: founder-to-founder, tight, outcomes-forward. Shorter
 > Hi Bharath — two of the Features pages on npxai.com were broken, so I built the real thing over the weekend as a hiring application.
 >
 > 90-second demo: {LOOM_URL}
-> Live: {DEMO_URL}
+> Live: {DEMO_URL} — sign-in with your work email unlocks extended daily quota (no password).
 >
 > It's a RAG hub over CNSC REGDOCs + a shift-turnover generator for CANDU operators. Real data, real citations, no mocks. Would love to help build what those links were always supposed to point to.
 >
@@ -955,7 +1060,7 @@ Channel: LinkedIn DM. Tone: product/UX angle, slightly longer — Margaret sees 
 > Along the way I made some UX calls I'd be curious for your take on: requirement vs guidance as two distinct badge colors, "Sources" panel that scrolls in lockstep with citation clicks, and a dark-only first release because the use case is 24/7 control-room environments.
 >
 > Loom (90s): {LOOM_URL}
-> Live: {DEMO_URL}
+> Live: {DEMO_URL} — sign-in with your work email unlocks extended daily quota.
 >
 > I have a nuclear engineering background and four years shipping AI products. If a product-leaning full-stack role is on your radar, I'd love to chat.
 >
@@ -972,7 +1077,7 @@ Subject: `Demo + application — Raj Dholakia`
 > I sent a demo to Kshitij and Bharath yesterday; forwarding here as an institutional touchpoint.
 >
 > 90-second Loom: {LOOM_URL}
-> Live demo: {DEMO_URL}
+> Live demo: {DEMO_URL} — magic-link sign-in with an `@npxinnovation.ca` email unlocks the extended quota.
 >
 > Summary: working RAG Knowledge Hub over CNSC REGDOCs and a CANDU shift-turnover generator, built to match the "Learn More" pages currently linked to `#` on npxai.com. Applying to both the Intermediate AI Developer and Senior Full Stack Developer openings.
 >
@@ -980,3 +1085,136 @@ Subject: `Demo + application — Raj Dholakia`
 >
 > Best,
 > Raj Dholakia
+
+---
+
+## Appendix J — Auth & user tier model
+
+Opt-in sign-in with Supabase Auth magic link. Anon access stays first-class. Tier determines rate limits (B.1) and input/output caps (B.2, B.3).
+
+### J.1 Why auth at all
+
+1. **Wallet protection** — Raj funds OpenAI + hosting personally. Anon caps are tight (5/day Knowledge Hub per IP) so abusers can't drain credit. Signed-in users get real headroom because the email-verification tax screens out bots.
+2. **Per-user attribution** — one abuser can be tier-downgraded without hitting every user via the global circuit breaker.
+3. **Warm outreach** — any sign-up from a nuclear-industry domain (`brucepower.com`, `opg.com`, `cnsc-ccsn.gc.ca`, `cameco.com`, `uwaterloo.ca`, `npxinnovation.ca`) is a qualified lead. Visible in Supabase dashboard → Authentication → Users after outreach days.
+4. **Abuse friction** — Supabase Auth requires clicking a real email link, which kills drive-by bot traffic and prompt-injection scanners.
+
+**Non-goals:** gating the demo. Click-to-try must remain zero-friction — an NPX evaluator should be able to ask a question without signing in.
+
+### J.2 Tier ladder
+
+| Tier | How you get here | KH per day | Gen per day | KH query cap | KH `max_tokens` |
+|---|---|---|---|---|---|
+| `anon` | Default — no sign-in | 5 | 2 | 1000 chars | 800 |
+| `signed_in` | Supabase magic-link sign-in (any email) | 50 | 20 | 1500 chars | 1000 |
+| `npx_circle` | Signed-in with email in: `npxinnovation.ca`, `brucepower.com`, `opg.com`, `cnsc-ccsn.gc.ca`, `cameco.com`, `uwaterloo.ca` | 100 | 40 | 2500 chars | 1500 |
+
+Tier is computed at sign-up by the `handle_new_user()` trigger (Appendix A.6) and read by `lib/guard.ts` via the `get_user_tier()` RPC once per authenticated request. Domain list is editable in exactly one SQL place — not hardcoded in app code.
+
+Global daily circuit breaker (B.4) remains at 500 total OpenAI calls — ultimate wallet cap regardless of tier.
+
+### J.3 Magic-link flow
+
+1. User clicks **Sign In** in the top nav → modal opens with one email input + "Send magic link" button.
+2. Client calls `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: ``${window.location.origin}/auth/callback`` } })`.
+3. Email is sent via Supabase's built-in SMTP (Supabase free tier: 3 emails/hour — acceptable for demo scale; see J.11 for Resend swap).
+4. User clicks the link → lands on `/auth/callback` which `@supabase/ssr` exchanges for a session cookie, then redirects to `/knowledge-hub`.
+5. On first sign-in, the `handle_new_user()` trigger creates a `profiles` row and assigns tier based on email domain.
+6. Subsequent requests carry the `sb-*-auth-token` cookie. Route handlers call `supabase.auth.getUser()` once, then `get_user_tier()` once, then resolve the rate-limit bucket.
+
+Sign-out: `/auth/signout` route handler calls `supabase.auth.signOut()`, clears cookies, redirects to `/`.
+
+### J.4 Client ↔ Server auth contract
+
+See Appendix A.5 — the table there is now the single source of truth for which key is used where. No new env vars required (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` already cover auth; `SUPABASE_SERVICE_ROLE_KEY` is never touched by auth flows).
+
+### J.5 Rate-limit key formula (updates B.1)
+
+```ts
+// In lib/guard.ts
+const identifier = user
+  ? `user:${user.id}:${tier}`       // signed_in + npx_circle: per-user, tier-scoped
+  : `anon:${hashIp(clientIp)}`;     // anon: per-IP (hashed)
+
+const key = `rl:${route}:${identifier}`;
+```
+
+Why bucket anon by hashed IP but signed-in by user id:
+- Anon abusers rotate IPs slowly and cheaply; IP bucket is the correct wallet defense.
+- Signed-in users legitimately share IPs (coworking, campus, conferences) — IP bucketing would unfairly penalize honest co-workers.
+
+### J.6 Sign-in UI
+
+Lives as a modal (not a route) so the demo page never disappears:
+- **Trigger:** existing **Sign In** button in top nav (Phase 2 agent task).
+- **Empty state:** email input, "Send magic link" primary button, and one line of copy: *"Sign in for 10× more queries per day. Work emails from Bruce Power, OPG, Cameco, CNSC, or NPX unlock an extended tier."*
+- **Loading state:** button disabled with spinner, input locked.
+- **Success state:** "Check your email — the link is valid for 1 hour."
+- **Error state:** inline `--danger` banner with "Something went wrong. Try again." + retry button. Never expose Supabase error strings.
+
+Mobile: modal is full-screen below `md` breakpoint. Keyboard: Enter submits; Esc dismisses.
+
+Accessibility: `role="dialog"` with labelled close button, focus trap, `aria-live="polite"` on the status message, focus returns to the **Sign In** button on close.
+
+Component states it must implement per G.4: loading, empty, error, success. (Four-state discipline from G.4 applies here like every other data-driven component.)
+
+### J.7 Session handling
+
+- Supabase session is JWT in an **httpOnly, Secure, SameSite=Lax** cookie. `@supabase/ssr` sets it correctly out of the box — do not hand-roll cookie options.
+- Access token ~1h, refresh token auto-rotated by `@supabase/ssr` on the server.
+- No server-side session store — all state is in the JWT + Supabase's auth tables.
+- On expiry, the next API call returns `401`; the client renders a "Session expired — sign in again" toast and reopens the sign-in modal.
+
+### J.8 What we log vs what we don't (extends H.6)
+
+Additional fields on authenticated requests:
+- `user_hash` = `SHA-256(user.id + daily_salt)` — same daily-rotating-salt pattern as `ip_hash`, so user activity can't be correlated across days from logs alone.
+- `tier` = `anon | signed_in | npx_circle`.
+
+Still never logged:
+- Raw email address (only Supabase's `auth.users` table holds it; we never echo it into app logs).
+- Raw `auth.uid()` UUID.
+- Magic-link tokens or any fragment of the callback URL.
+
+For "who signed up" questions, query Supabase dashboard → Authentication → Users. That surface requires Raj's Supabase login — no in-app route exposes the user list.
+
+### J.9 Abuse modes & mitigations
+
+| Mode | Mitigation |
+|---|---|
+| Anon attacker rotates IPs to drain OpenAI budget | Anon cap is 5/day per IP; 1000 unique IPs ≈ 5000 requests, still bounded by the 500/day global circuit breaker (B.4). |
+| Attacker creates many disposable email accounts for `signed_in` tier | Rate-limited by Supabase Auth's per-IP sign-up throttling + magic-link verification. Worst case: manually ban via `UPDATE profiles SET tier = 'banned'` once we add `banned` to the CHECK constraint (not pre-wired; add only if observed). |
+| Stolen `@brucepower.com` email grabs `npx_circle` | Still capped at 100/day; unlikely to meaningfully dent the wallet. Real operator emails aren't a credential here. |
+| Magic-link email delayed > 5 min | Link is valid for 1 hour by default in Supabase; UI surfaces "Didn't receive? Resend in 60s." after timer. |
+| Compromised Supabase anon key | Anon key is safe to expose (RLS + `SECURITY DEFINER` RPCs enforce everything). No action needed on leak. |
+| Email enumeration via sign-in flow | Supabase responds identically whether the email exists or not (by design). No mitigation needed. |
+
+### J.10 Testing & acceptance (extends H.3, H.5)
+
+Phase 3 gate additions:
+- Rate-limit returns `429` for the 6th anon query/day from the same hashed IP.
+- Rate-limit returns `429` for the 51st query/day from the same `signed_in` user.
+- `get_user_tier(<seeded test user with @brucepower.com email>)` returns `'npx_circle'`.
+- Tier-scaled caps: a 1400-char query succeeds for `signed_in`, same query from anon returns 400.
+
+Phase 5 ship additions:
+- Full sign-in E2E: open incognito → click Sign In → submit Raj's email → receive magic link → click → land on `/knowledge-hub` with session cookie set → issue one query, confirm `tier` field appears in logs.
+- Signed-out E2E still works end-to-end on the same deployment (anon path unaffected).
+
+### J.11 SMTP provider decision
+
+**Default:** Supabase's built-in SMTP. Free tier limit is 3 emails/hour, which is enough for demo-scale traffic (dozens of sign-ups over the outreach week).
+
+**Escalation trigger:** if we see "email rate-limited" errors in Supabase logs during launch days, swap to Resend:
+1. Create a free Resend account (3k emails/month, no credit card).
+2. Verify a sending domain (or use Resend's sandbox domain for the demo).
+3. In Supabase dashboard → Auth → SMTP Settings, paste Resend SMTP credentials.
+4. No code changes required — Supabase Auth still drives the flow.
+
+Estimated swap time: ~15 minutes. Decision deliberately defers this to "only if needed" — pre-wiring Resend costs dev time for traffic that may never materialize.
+
+### J.12 Out of scope (for this sprint)
+
+- Password auth, OAuth providers (Google / LinkedIn) — can add later; the magic-link surface is enough to demonstrate auth competence.
+- Server-side saved threads. `threads` / `messages` tables are **not** created. Both anon and signed-in threads live in localStorage. This keeps the 2026-04-16 "no chat threads table" decision intact and avoids multiplying RLS surface under time pressure. Cross-device thread sync is a follow-up; flag it as a v2 feature in the Loom.
+- Team / org features, paid tiers, API keys, usage dashboards. All deferred.
