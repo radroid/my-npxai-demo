@@ -14,28 +14,28 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 ## 👤 For Humans (Raj)
 
 ### Phase 1 — Setup (Thu Apr 16)
-- [ ] Create Supabase project at supabase.com
-- [ ] Run Appendix A.1 (pgvector extension) in Supabase SQL editor
-- [ ] Run Appendix A.2 (tables + indexes)
-- [ ] Run Appendix A.3 (RLS + revokes) — **critical: without this, anon has direct table access**
-- [ ] Run Appendix A.4 (RPC functions + grants)
-- [ ] Run Appendix A.6 (profiles table + auth trigger + `get_user_tier` RPC)
+- [x] Create Supabase project at supabase.com
+- [x] Run Appendix A.1 (pgvector extension) in Supabase SQL editor
+- [x] Run Appendix A.2 (tables + indexes)
+- [x] Run Appendix A.3 (RLS + revokes) — **critical: without this, anon has direct table access**
+- [x] Run Appendix A.4 (RPC functions + grants)
+- [x] Run Appendix A.6 (profiles table + auth trigger + `get_user_tier` RPC)
 - [ ] Supabase dashboard → Auth → Providers → Email: enable the provider and confirm magic-link / Email OTP is the sign-in mode
-- [ ] Supabase dashboard → Auth → URL Configuration: set Site URL (localhost now, swap to production URL on Phase 5) and add `/auth/callback` under Redirect URLs
-- [ ] Supabase dashboard → Auth → Email Templates → **Magic Link** template: sanity-check the subject line + from address. Default is fine for the demo; personalize later if desired.
-- [ ] Run `bunx wrangler login` to authenticate Cloudflare
-- [ ] Create `.env.local` at repo root with:
+- [x] Supabase dashboard → Auth → URL Configuration: set Site URL (localhost now, swap to production URL on Phase 5) and add `/auth/callback` under Redirect URLs
+- [x] Supabase dashboard → Auth → Email Templates → **Magic Link** template: sanity-check the subject line + from address. Default is fine for the demo; personalize later if desired.
+- [x] Run `bunx wrangler login` to authenticate Cloudflare
+- [x] Create `.env.local` at repo root with:
   - `OPENAI_API_KEY`
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (used by route handlers + client)
   - `SUPABASE_SERVICE_ROLE_KEY` (used **only** by offline ingestion script)
   - `UPSTASH_REDIS_REST_URL`
   - `UPSTASH_REDIS_REST_TOKEN`
-- [ ] Create Upstash Redis database at console.upstash.com (free tier is enough — ~10k commands/day)
-- [ ] Set an OpenAI usage budget alert at $10 in the OpenAI dashboard (belt + braces with the in-app circuit breaker)
-- [ ] Confirm `.env.local` is in `.gitignore` (it should be by default, but verify)
-- [ ] Kick off the Cowork scraping task — hand it Appendix C (C.1 doc list, C.2 etiquette, C.3 parsing, C.4 chunking, C.5 embedding, C.6 verification). Minimum acceptable output: Tier 1 (5 docs) fully ingested and queryable via `match_regdoc_chunks`.
-- [ ] Confirm `.env.local` exists so the agent can wire up the backend (never paste keys into chat — just confirm presence)
+- [x] Create Upstash Redis database at console.upstash.com (free tier is enough — ~10k commands/day)
+- [x] Set an OpenAI usage budget alert at $10 in the OpenAI dashboard (belt + braces with the in-app circuit breaker)
+- [x] Confirm `.env.local` is in `.gitignore` (it should be by default, but verify)
+- [x] Kick off the Cowork scraping task — hand it Appendix C (C.1 doc list, C.2 etiquette, C.3 parsing, C.4 chunking, C.5 embedding, C.6 verification). Minimum acceptable output: Tier 1 (5 docs) fully ingested and queryable via `match_regdoc_chunks`.
+- [x] Confirm `.env.local` exists so the agent can wire up the backend (never paste keys into chat — just confirm presence)
 
 ### Phase 2 — Scaffolding (Fri Apr 17)
 - [ ] Review agent's assistant-ui integration in browser, confirm dark navy theme looks right
