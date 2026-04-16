@@ -128,8 +128,8 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
   - [ ] Wrap retained chunks using `lib/context-envelope.ts` (D.2) — HTML-escape bodies
   - [ ] Stream from `gpt-4o-mini` with `KNOWLEDGE_HUB_SYSTEM`, `max_tokens: 800`, and the output guard (D.6) in the token pipeline
 - [ ] Handle out-of-corpus / ambiguous queries gracefully (fallback rules from Appendix D.3 + verified against Appendix E questions 14–16, 20)
-- [ ] Create `evals/knowledge-hub.jsonl` from Appendix E.1 (one JSON object per question, matching the E.3 format)
-- [ ] Create `scripts/eval-kb.ts` — runs the battery against the local/deployed endpoint, grades by `must_cite` / `must_contain` / `must_not_contain`, prints pass/fail table, exits non-zero on any adversarial failure (E.2)
+- [ ] Create `evals/knowledge-hub.jsonl` from Appendix E.1 (one JSON object per question, matching the extended E.3 format: `must_cite`, `must_cite_section`, `must_contain_any`, `must_contain_all_from_group`, `min_group_hits`, `must_not_contain`). Pull the exact section numbers and grounded phrases from Appendix E.5, not from memory.
+- [ ] Create `scripts/eval-kb.ts` — runs the battery against the local/deployed endpoint, grades per the E.4 order (status → behavior → citations → sections → keywords → group hits → deny list → latency), prints pass/fail table, exits non-zero on anything that violates the ship bar (≥17/20 AND all 3 adversarial pass)
 - [ ] Wire `bun run eval:kb` into `package.json` scripts
 - [ ] Add tier-aware integration tests: (a) 6th anon KH query/day → 429; (b) 51st signed_in KH query/day → 429; (c) 1400-char query succeeds as signed_in, fails 400 as anon (per Appendix H.3 + J.10)
 - [ ] Frontend: parse citation markers using the regex from Appendix D.5; render as clickable chips mapped to retrieved snippet metadata
