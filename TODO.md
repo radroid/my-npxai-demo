@@ -22,6 +22,9 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Run Appendix A.6 (profiles table + auth trigger + `get_user_tier` RPC)
 - [ ] Supabase dashboard → Auth → Providers → Email: enable the provider and confirm magic-link / Email OTP is the sign-in mode
 - [ ] Run `migrations/001-switch-to-hnsw.sql` in Supabase SQL editor — replaces the ivfflat index with HNSW. Required after the initial ingestion run because ivfflat with `lists=100` over 1945 rows misses most relevant chunks. Verify with `bun run scripts/smoke-rag.ts` from your terminal afterward — expect ≥ 5/6 probes pass.
+- [ ] Create a **public** GitHub repo for this project and push `main` to it. The outreach drafts in Appendix I.2 reference `{REPO_URL}`, so visibility = public. Branch strategy: push-to-main only, no preview branches this sprint.
+- [ ] Cloudflare dashboard → Workers & Pages → Create → Connect to Git → select this repo. Build command: `bunx opennextjs-cloudflare build`. Deploy command: auto (CF runs `opennextjs-cloudflare deploy`). Project name: `npxai-demo` (matches `wrangler.jsonc`).
+- [ ] Cloudflare dashboard → Workers & Pages → npxai-demo → Settings → Variables and Secrets → add the 5 runtime env vars from your `.env.local` (OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN). Do **not** set `SUPABASE_SERVICE_ROLE_KEY` — it's ingestion-only and runs locally.
 - [x] Supabase dashboard → Auth → URL Configuration: set Site URL (localhost now, swap to production URL on Phase 5) and add `/auth/callback` under Redirect URLs
 - [x] Supabase dashboard → Auth → Email Templates → **Magic Link** template: sanity-check the subject line + from address. Default is fine for the demo; personalize later if desired.
 - [x] Run `bunx wrangler login` to authenticate Cloudflare
@@ -56,7 +59,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 ### Phase 5 — Polish + ship (Mon Apr 20)
 - [ ] After deploy, update Supabase dashboard → Auth → URL Configuration → Site URL to the production URL (and add it to Redirect URLs). Otherwise magic links will redirect to localhost.
 - [ ] Cross-device manual test (iPhone + tablet + desktop) — exercise both anon path and signed-in path
-- [ ] Run `bunx wrangler deploy` (or approve agent doing it) and verify live URL
+- [ ] Trigger deploy by pushing `main` to GitHub (Cloudflare Git integration auto-deploys per decisions log 2026-04-16). Verify live URL + TLS cert.
 - [ ] Set up basic analytics (so you know when NPX team visits)
 - [ ] **Record 90-second Loom video** — follow shot list + script in Appendix I.1. Do the pre-warm query + two takes. Replace `{LOOM_URL}` etc. in the outreach drafts once uploaded.
 - [ ] Personalize the Appendix I.2 outreach drafts (Kshitij, Bharath, Margaret, info@ email) — tune tone in your voice, add {LOOM_URL} / {DEMO_URL} / {REPO_URL}
@@ -174,7 +177,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] OpenGraph meta tags (preview image for LinkedIn/Slack)
 - [ ] Pre-deploy: `bun run build` clean
 - [ ] Pre-deploy: `bun run eval:kb` passes the ship bar (≥17/20, all adversarial Qs pass) per Appendix E.2
-- [ ] Assist human with `bunx wrangler deploy` (agent can run it, human verifies)
+- [ ] Assist human with `git push origin main` and verify the Cloudflare Git integration build log is green (dashboard → Workers & Pages → npxai-demo → Deployments)
 - [ ] Post-deploy smoke test: `bun run eval:kb` (Appendix E) + Generator run for Unit 3 Evening (the demo "money shot" per Appendix F.5) + spot check other units/shifts
 - [ ] Post-deploy sign-in smoke: in an incognito window, open the prod URL → click Sign In → enter Raj's email → receive and click magic link → land on `/knowledge-hub` with session cookie set → issue one query and confirm `tier` appears in the request log (Appendix H.5 + J.10)
 
