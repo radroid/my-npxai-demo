@@ -4,10 +4,10 @@ import { SignInButton } from "./SignInButton";
 import { UserChip } from "./UserChip";
 
 const NAV_LINKS = [
-	{ href: "/#why", label: "Why NPXai" },
-	{ href: "/#showcase", label: "Features" },
-	{ href: "/#faq", label: "FAQ" },
-	{ href: "/#contact", label: "Contact" },
+	{ href: "/knowledge-hub", label: "Knowledge Hub" },
+	{ href: "/generator", label: "Generator" },
+	{ href: "/insights", label: "Insights" },
+	{ href: "/equivalency", label: "Equivalency" },
 ];
 
 export async function TopNav() {
