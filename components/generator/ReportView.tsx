@@ -51,7 +51,7 @@ export function ReportView({
 
 	return (
 		<div className="grid gap-6 lg:grid-cols-[1fr_180px]">
-			<article className="prose-report min-w-0 text-[var(--text)]">
+			<article className="print-area prose-report min-w-0 text-[var(--text)]">
 				<header className="mb-4 flex flex-col gap-2 border-b border-[var(--border)] pb-3">
 					<div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)] font-mono">
 						<span>

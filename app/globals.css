@@ -246,6 +246,64 @@
 	}
 }
 
+/* Generator print stylesheet — triggered by window.print() from the Generator
+   shell's "Print / PDF" button. Strip chrome (sidebars, nav, aurora), keep
+   the report surface full-width and black-on-white so operators get a clean
+   handoff document. Class hooks: .print-area is the report block,
+   [data-print-hide] drops from the print layout. `!important` is required
+   to override the component-level token styles during print — the whole
+   point of this block is to win the cascade against dark-mode backgrounds. */
+@media print {
+	*,
+	*::before,
+	*::after {
+		/* biome-ignore lint/complexity/noImportantStyles: print must force-override component token backgrounds */
+		background: #fff !important;
+		/* biome-ignore lint/complexity/noImportantStyles: print must force-override component text colors */
+		color: #000 !important;
+		/* biome-ignore lint/complexity/noImportantStyles: kill decorative shadows in the print PDF */
+		box-shadow: none !important;
+	}
+	aside,
+	header,
+	nav,
+	footer,
+	[data-print-hide] {
+		/* biome-ignore lint/complexity/noImportantStyles: hide site chrome from the printed document */
+		display: none !important;
+	}
+	.print-area {
+		/* biome-ignore lint/complexity/noImportantStyles: print needs full-bleed layout on the report block */
+		display: block !important;
+		/* biome-ignore lint/complexity/noImportantStyles: print needs full-bleed width */
+		width: 100% !important;
+		/* biome-ignore lint/complexity/noImportantStyles: print needs no max-width cap */
+		max-width: none !important;
+		/* biome-ignore lint/complexity/noImportantStyles: print needs zero outer margin */
+		margin: 0 !important;
+		/* biome-ignore lint/complexity/noImportantStyles: print needs zero padding */
+		padding: 0 !important;
+		/* biome-ignore lint/complexity/noImportantStyles: borders look like boxes on paper */
+		border: 0 !important;
+	}
+	a {
+		/* biome-ignore lint/complexity/noImportantStyles: print-safe link color */
+		color: #000 !important;
+		/* biome-ignore lint/complexity/noImportantStyles: underline links for printed recognizability */
+		text-decoration: underline !important;
+	}
+	h1,
+	h2,
+	h3 {
+		page-break-after: avoid;
+	}
+	pre,
+	blockquote,
+	table {
+		page-break-inside: avoid;
+	}
+}
+
 /* Marketing-only aurora hero. GPU-friendly: only transform + opacity
    animate, the underlying gradient is static. `prefers-reduced-motion`
    (handled above) freezes the bands in a static pose. */

@@ -12,6 +12,12 @@ Rules for agents working in this repo. Only essential, repeatedly-relevant rules
   2. Mentally verify each element in BOTH palettes before shipping. Special danger zone: white/colored text on colored backgrounds — these flip catastrophically if a token doesn't resolve or the contrast doesn't survive the theme swap.
   3. **Tailwind 4 CSS-variable syntax matters.** Write `bg-[var(--accent-brand)]` (explicit `var()`) or `bg-(--accent-brand)` (Tailwind 4 parentheses shorthand). Do NOT use the bracket-only form `bg-[--accent-brand]` — Tailwind 4 treats that as a literal token and the background silently fails to render, leaving white-on-white text in light mode. Same rule for `text-`, `border-`, `ring-`, `fill-`, `stroke-` arbitrary-value utilities.
 
+## OVERNIGHT.md (sprint state, gitignored)
+
+When Raj kicks off a multi-stage overnight or multi-day sprint, agent-side state (the brief verbatim, rule overrides, decisions taken autonomously, branch plan, metrics-in-flight) lives in `OVERNIGHT.md` at the repo root. It is gitignored — safe for orchestration notes that should not pollute the committed history.
+
+On any session start: if `OVERNIGHT.md` exists, read it first. It captures what Raj said, what has been done, what remains, and any autonomous decisions the agent made. When committed files (PLAN.md, TODO.md, REFACTOR_METRICS.md) disagree with OVERNIGHT.md, trust OVERNIGHT for agent-side intent and the committed files for shipped state.
+
 ## PLAN.md + TODO.md workflow
 
 This repo uses a shared-context system between the human (Raj) and agents. Two files coordinate work:
