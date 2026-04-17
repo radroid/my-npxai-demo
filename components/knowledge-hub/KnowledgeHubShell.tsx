@@ -37,7 +37,11 @@ export function KnowledgeHubShell() {
 		<AssistantRuntimeProvider runtime={runtime}>
 			<SidebarProvider>
 				<div className="flex h-[calc(100dvh-3.5rem)] w-full">
-					<Sidebar className="border-r border-[--border]">
+					<Sidebar
+						role="complementary"
+						aria-label="Thread history"
+						className="border-r border-[--border]"
+					>
 						<SidebarHeader className="border-b border-[--border] bg-[--surface] px-3 py-3">
 							<p className="text-sm font-semibold text-[--text]">
 								Knowledge Hub
