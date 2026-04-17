@@ -58,3 +58,26 @@ Running tally of code refactored section-by-section. Goal: cut lines of code wit
 - Lines before: 3674 (campaign-in-scope files, pre-§1 baseline)
 - Lines after: 3516 (after §15)
 - Net delta: **−158 lines overall** (or −256 if Raj authorizes `lib/thread-store.ts` deletion)
+
+## Campaign summary
+
+- **15 sections attempted.** 12 committed cuts, 2 abandoned (KnowledgeHubShell sub-threshold, thread-store is whole-file dead code pending deletion authorization), 1 reorg-not-cut (GeneratorForm split §1 landed on `main` before the course-correction that tightened criteria).
+- **Biggest single-file wins by percent:** report-store.ts (−18.9%), validators.ts (−21.3%, two dead exports), output-guard.ts (−11.3%), KH query route (−9.8%), turnover route (−9.9%), report-markdown.tsx (−8.8%).
+- **Biggest single-file wins by absolute lines:** KH query route (−38), thread.tsx (−33), turnover route (−26), report-store.ts (−23), report-markdown.tsx (−21), globals.css (−21).
+- **Patterns that kept paying off**
+  - Dead exports discovered by repo-wide grep (validators `knowledgeHubQuerySchema` + `GeneratorInput`, report-store `findAnonReportByHash`, globals.css chart + card token mappings)
+  - Helper closures that dedup the envelope of repeated log calls / SSE emit calls / object-construction patterns (guard.ts `guardBase`, logger.ts `saltedHash` + `emit`, KH route `logValidation` + `validationError`, turnover route `send`)
+  - Factory-style React helpers that collapse similar overrides (report-markdown `styled(tag, className)`)
+  - Lookup tables replacing parallel ternary chains (AppShell `THEME_CYCLE`, report-markdown `PRIORITY_CHIP_CLS`, guard.ts tier table)
+- **Patterns that did NOT pay off** (honest documentation so future passes skip them)
+  - Inlining Tailwind 4 `LIMITS` / `WINDOW_MAP` objects — Biome reformats multi-line regardless.
+  - Re-organizing already-tight files into more files — adds import headers and function signatures for negative net.
+  - Rewriting assistant-ui composer type casts without changing behavior.
+- **Gates held the whole campaign.** After every section: `bun run lint` → 0 errors / 0 warnings, `bun run build` → 15/15 routes compile.
+- **Behavioral invariants preserved** (grouped by file). RAG thresholds (LOW_SIM_OOS=0.40, MIN_CHUNK_SIM=0.35), SSE frame shapes, cache key format, `withGuard` + `StreamingGuard` wiring, rate-limit key format, tier resolution order, per-tier scaling tables, daily-salt hash format, localStorage keys, assistant-ui runtime wiring, severity-callout visual structure, slugify format, print stylesheet hooks, aurora keyframes, reduced-motion resets.
+
+## Open items for Raj
+
+1. **Authorize deletion of `lib/thread-store.ts`** (98 lines, zero consumers). Whether to keep as scaffolding for 6B.persistence or start fresh when that work lands.
+2. **Review the §1 GeneratorForm split** (commit 6adc4a2, already on `main`). It traded +74 net LOC for a 69%-smaller parent file and 4 single-concern siblings. Keep or re-squash at your call.
+3. **Merge plan:** this branch is `refactor/overnight-loc-cut` from `main@403c96c`. No functional changes; every section is a mechanical refactor with passing lint + build. Ready to merge whenever you review.
