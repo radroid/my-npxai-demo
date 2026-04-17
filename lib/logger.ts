@@ -6,7 +6,7 @@ import type { Tier } from "./validators";
 const encoder = new TextEncoder();
 
 function utcDateKey(): string {
-	return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+	return new Date().toISOString().slice(0, 10);
 }
 
 async function sha256Hex(input: string): Promise<string> {
@@ -22,9 +22,7 @@ let ephemeralBase: string | undefined;
 function baseSalt(): string {
 	const env = process.env.LOG_HASH_SALT;
 	if (env && env.length > 0) return env;
-	if (!ephemeralBase) {
-		ephemeralBase = crypto.randomUUID();
-	}
+	if (!ephemeralBase) ephemeralBase = crypto.randomUUID();
 	return ephemeralBase;
 }
 
@@ -32,13 +30,15 @@ async function dailySalt(): Promise<string> {
 	return sha256Hex(`${baseSalt()}|${utcDateKey()}`);
 }
 
-export async function hashIp(ip: string): Promise<string> {
-	return (await sha256Hex(`ip|${ip}|${await dailySalt()}`)).slice(0, 16);
+async function saltedHash(prefix: string, value: string): Promise<string> {
+	return (await sha256Hex(`${prefix}|${value}|${await dailySalt()}`)).slice(
+		0,
+		16,
+	);
 }
 
-export async function hashUser(userId: string): Promise<string> {
-	return (await sha256Hex(`uid|${userId}|${await dailySalt()}`)).slice(0, 16);
-}
+export const hashIp = (ip: string) => saltedHash("ip", ip);
+export const hashUser = (userId: string) => saltedHash("uid", userId);
 
 export interface RequestLogFields {
 	route: string;
@@ -64,14 +64,14 @@ export interface RequestLogFields {
 	est_cost_usd?: number;
 }
 
-export function logRequest(fields: RequestLogFields): void {
+function emit(event: string, fields: object): void {
 	console.log(
-		JSON.stringify({
-			t: new Date().toISOString(),
-			event: "request",
-			...fields,
-		}),
+		JSON.stringify({ t: new Date().toISOString(), event, ...fields }),
 	);
+}
+
+export function logRequest(fields: RequestLogFields): void {
+	emit("request", fields);
 }
 
 export type GuardReason =
@@ -91,11 +91,5 @@ export interface GuardLogFields {
 }
 
 export function logGuardEvent(fields: GuardLogFields): void {
-	console.log(
-		JSON.stringify({
-			t: new Date().toISOString(),
-			event: "guard",
-			...fields,
-		}),
-	);
+	emit("guard", fields);
 }
