@@ -1,6 +1,5 @@
-// Request guard: rate limiting (tier-aware, Appendix B.1 + J.5), input
-// validation hook, and global daily OpenAI circuit breaker (B.4).
-// Every public API route wraps its handler with `withGuard()`.
+// Request guard: tier-aware rate limits (Appendix B.1 + J.5) + global daily
+// OpenAI circuit breaker (B.4). Every public API route wraps with `withGuard()`.
 
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
@@ -11,6 +10,13 @@ import { createSupabaseServerClient } from "./supabase";
 import { OUTPUT_MAX_TOKENS, QUERY_CHAR_CAP, type Tier } from "./validators";
 
 const GLOBAL_DAILY_CAP = 500;
+
+type Window = "1 m" | "1 h" | "24 h";
+const WINDOWS = [
+	["minute", "1 m"],
+	["hour", "1 h"],
+	["day", "24 h"],
+] as const;
 
 const LIMITS: Record<
 	string,
@@ -43,11 +49,7 @@ export function getRedis(): Redis {
 }
 
 const limiterCache = new Map<string, Ratelimit>();
-function getLimiter(
-	prefix: string,
-	limit: number,
-	window: "1 m" | "1 h" | "24 h",
-): Ratelimit {
+function getLimiter(prefix: string, limit: number, window: Window): Ratelimit {
 	const key = `${prefix}:${window}`;
 	const cached = limiterCache.get(key);
 	if (cached) return cached;
@@ -64,12 +66,8 @@ function getLimiter(
 function resolveClientIp(req: NextRequest): string {
 	const cf = req.headers.get("cf-connecting-ip");
 	if (cf) return cf;
-	const xff = req.headers.get("x-forwarded-for");
-	if (xff) {
-		const first = xff.split(",")[0]?.trim();
-		if (first) return first;
-	}
-	return "unknown";
+	const first = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+	return first || "unknown";
 }
 
 export interface GuardContext {
@@ -119,13 +117,11 @@ export function withGuard(
 			const { data: tierRow } = await supabase.rpc("get_user_tier", {
 				p_user_id: user.id,
 			});
-			const resolved = typeof tierRow === "string" ? tierRow : "signed_in";
-			tier = (resolved === "npx_circle" ? "npx_circle" : "signed_in") as Tier;
+			tier = tierRow === "npx_circle" ? "npx_circle" : "signed_in";
 			userHash = await hashUser(user.id);
 		}
 
-		const clientIp = resolveClientIp(req);
-		const ipHash = await hashIp(clientIp);
+		const ipHash = await hashIp(resolveClientIp(req));
 		const identifier = user ? `user:${user.id}:${tier}` : `anon:${ipHash}`;
 
 		// Eval-only bypass: if EVAL_BYPASS_KEY is set server-side and the
@@ -137,28 +133,22 @@ export function withGuard(
 			Boolean(bypassKey) && req.headers.get("x-eval-bypass") === bypassKey;
 
 		// Rate limits (per-minute / per-hour / per-day) — check cheapest first.
+		const guardBase = {
+			route: opts.route,
+			ip_hash: ipHash,
+			tier,
+			user_hash: userHash,
+		};
 		const limits = LIMITS[opts.route][tier];
-		const checks: Array<[number, "1 m" | "1 h" | "24 h"]> = [
-			[limits.minute, "1 m"],
-			[limits.hour, "1 h"],
-			[limits.day, "24 h"],
-		];
 		const prefix = `rl:${opts.route}`;
 		let remaining = Number.POSITIVE_INFINITY;
-		for (const [max, window] of checks) {
+		for (const [key, window] of WINDOWS) {
 			if (bypassed) break;
-			const rl = getLimiter(prefix, max, window);
+			const rl = getLimiter(prefix, limits[key], window);
 			const result = await rl.limit(identifier);
 			if (result.remaining < remaining) remaining = result.remaining;
 			if (!result.success) {
-				logGuardEvent({
-					route: opts.route,
-					reason: "rate_limit",
-					ip_hash: ipHash,
-					tier,
-					user_hash: userHash,
-					detail: window,
-				});
+				logGuardEvent({ ...guardBase, reason: "rate_limit", detail: window });
 				return NextResponse.json(
 					{
 						error: "rate_limited",
@@ -179,13 +169,7 @@ export function withGuard(
 			? 0
 			: Number((await getRedis().get<number>(dayKey)) ?? 0);
 		if (currentCalls >= GLOBAL_DAILY_CAP) {
-			logGuardEvent({
-				route: opts.route,
-				reason: "circuit_breaker",
-				ip_hash: ipHash,
-				tier,
-				user_hash: userHash,
-			});
+			logGuardEvent({ ...guardBase, reason: "circuit_breaker" });
 			return NextResponse.json(
 				{
 					error: "demo_rate_limit",
@@ -235,14 +219,14 @@ export function withGuard(
 
 // Call this after a successful OpenAI request to feed the B.4 counter.
 export async function recordOpenAICall(costUsd = 0): Promise<void> {
-	const dayKey = `openai:calls:${new Date().toISOString().slice(0, 10)}`;
-	const costKey = `openai:cost_cents:${new Date().toISOString().slice(0, 10)}`;
+	const today = new Date().toISOString().slice(0, 10);
 	const redis = getRedis();
 	// Increment + set TTL on first write (48h — generous headroom over daily reset).
-	const calls = await redis.incr(dayKey);
-	if (calls === 1) await redis.expire(dayKey, 60 * 60 * 48);
+	const calls = await redis.incr(`openai:calls:${today}`);
+	if (calls === 1) await redis.expire(`openai:calls:${today}`, 60 * 60 * 48);
 	if (costUsd > 0) {
 		const cents = Math.round(costUsd * 100);
+		const costKey = `openai:cost_cents:${today}`;
 		const total = await redis.incrby(costKey, cents);
 		if (total === cents) await redis.expire(costKey, 60 * 60 * 48);
 	}
