@@ -27,13 +27,13 @@ export function SourcesPanel({ data }: SourcesPanelProps) {
 	if (chunks.length === 0) return null;
 
 	return (
-		<div className="mx-auto mt-3 max-w-(--thread-max-width) px-2">
+		<div className="mx-auto mt-3 max-w-(--thread-max-width)">
 			<button
 				type="button"
 				onClick={() => setOpen((v) => !v)}
 				aria-expanded={open}
 				aria-controls="sources-panel-body"
-				className="flex w-full items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+				className="flex w-full items-center justify-between rounded-md border border-border bg-[var(--surface)] px-3 py-2 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 			>
 				<span className="font-medium">
 					Sources · {chunks.length} snippet{chunks.length === 1 ? "" : "s"}
@@ -47,12 +47,12 @@ export function SourcesPanel({ data }: SourcesPanelProps) {
 			{open && (
 				<ol
 					id="sources-panel-body"
-					className="mt-2 space-y-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2"
+					className="mt-2 space-y-2 rounded-md border border-border bg-[var(--surface)] p-2"
 				>
 					{chunks.map((c, idx) => (
 						<li
 							key={c.id}
-							className="rounded-md border border-[var(--border)]/60 bg-[var(--bg)] p-2 text-xs leading-snug"
+							className="rounded-md border border-border/60 bg-[var(--bg)] p-2 text-xs leading-snug"
 						>
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="font-mono text-[10px] text-[var(--text-muted)]">

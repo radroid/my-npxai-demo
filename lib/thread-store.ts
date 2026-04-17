@@ -36,7 +36,10 @@ interface ThreadStoreState {
 
 	setMode: (mode: "anon" | "signed_in") => Promise<void>;
 	setActiveThread: (id: string | null) => void;
-	createThread: (title?: string, initialMessages?: UIMessage[]) => Promise<string>;
+	createThread: (
+		title?: string,
+		initialMessages?: UIMessage[],
+	) => Promise<string>;
 	// Sync the full message list for a thread. Called from onFinish with the
 	// AI-SDK's authoritative `messages` array. Local state is replaced; the
 	// server receives only the tail of new messages (typically the user+assistant
