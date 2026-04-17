@@ -7,7 +7,7 @@ import {
 	useChatRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { SourcesDataUI } from "@/components/knowledge-hub/SourcesDataUI";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -54,36 +54,16 @@ export function KnowledgeHubShell() {
 		if (activeId) void loadMessages(activeId);
 	}, [activeId, loadMessages]);
 
-	// Pre-initialize a thread for signed-in users so the runtime has a stable
-	// server-side target from the first keystroke. Without this, the first turn
-	// after mount hits the onFinish→createThread path, which runs in parallel
-	// with the AI-SDK's own switchToNewThread and leaves the user staring at
-	// the welcome screen until the whole response streams back (Issue #1,
-	// 2026-04-17). Empty threads from this code path are swept by the daily
-	// cleanup_empty_chat_threads pg_cron job — see the migration of the same
-	// day. Anon users keep the old create-on-first-send behaviour because
-	// their thread ids are local-only and carry no cross-session cost.
-	const preInitInFlightRef = useRef(false);
+	// Returning signed-in users land on their most recent thread instead of a
+	// blank welcome screen. Fresh users (zero threads) see the welcome — the
+	// thread mints lazily on first send via the onFinish path below. No eager
+	// server-row creation here, so no zombie rows if the user navigates away.
 	useEffect(() => {
 		if (!loaded) return;
 		if (mode !== "signed_in") return;
 		if (activeId) return;
-		if (preInitInFlightRef.current) return;
-		if (threads.length > 0) {
-			// Returning user landed without an active thread — snap to their
-			// most recent instead of minting a fresh zombie.
-			setActiveThread(threads[0].id);
-			return;
-		}
-		preInitInFlightRef.current = true;
-		(async () => {
-			try {
-				await createThread("New thread");
-			} finally {
-				preInitInFlightRef.current = false;
-			}
-		})();
-	}, [loaded, mode, activeId, threads, setActiveThread, createThread]);
+		if (threads.length > 0) setActiveThread(threads[0].id);
+	}, [loaded, mode, activeId, threads, setActiveThread]);
 
 	// The runtime's message tree is seeded from the store on mount. `runtimeKey`
 	// (not `activeId`) drives remount so the onFinish null→tid transition keeps

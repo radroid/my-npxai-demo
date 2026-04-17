@@ -14,25 +14,13 @@ import { useThreadStore } from "@/lib/thread-store";
 export function ThreadSidebar({ onNavigate }: { onNavigate?: () => void }) {
 	const threads = useThreadStore((s) => s.threads);
 	const activeId = useThreadStore((s) => s.activeThreadId);
-	const mode = useThreadStore((s) => s.mode);
 	const setActiveThread = useThreadStore((s) => s.setActiveThread);
-	const createThread = useThreadStore((s) => s.createThread);
 
-	// "+ New thread" eagerly creates a server-backed thread for signed-in users
-	// so the runtime + composer have a stable target from the very first
-	// keystroke (pre-init rationale in KnowledgeHubShell). Anon users still
-	// take the cheap setActiveThread(null) path — their thread ids are
-	// local-only, so the onFinish create-on-first-send flow carries no cost.
-	const onNew = async () => {
-		if (mode === "signed_in") {
-			try {
-				await createThread("New thread");
-			} catch {
-				setActiveThread(null);
-			}
-		} else {
-			setActiveThread(null);
-		}
+	// "+ New thread" clears the active thread. The server row mints lazily via
+	// createThread inside the onFinish handler on the first send — no eager
+	// POST here, which avoids zombie rows for users who abandon the composer.
+	const onNew = () => {
+		setActiveThread(null);
 		onNavigate?.();
 	};
 
