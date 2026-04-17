@@ -118,8 +118,8 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Build top nav component (Logo + Why NPX AI? | Features | FAQ | Contact | Sign In / profile chip when authed)
 - [ ] Build sign-in modal per Appendix J.6 — email input, `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } })`, loading/success/error states, a11y (role="dialog", focus trap, `aria-live` status, returns focus on close), full-screen on mobile
 - [ ] Build footer component with "Built by Raj Dholakia as a demonstration for NPX Innovation"
-- [ ] Write `seeds/bruce-power.sql` implementing Appendix F (≈50 plant_status rows, ≈12 work_orders, ≈15 shift_log_entries). Use `now() - interval '<N> minutes'` for timestamps so data feels fresh per demo.
-- [ ] Wire `bun run seed:plant` script (executes `seeds/bruce-power.sql` via Supabase connection) — uses `SUPABASE_SERVICE_ROLE_KEY` since it's a one-shot ingestion like chunk insert
+- [~] Write `seeds/bruce-power.sql` implementing Appendix F (≈50 plant_status rows, ≈12 work_orders, ≈15 shift_log_entries). Use `now() - interval '<N> minutes'` for timestamps so data feels fresh per demo. *(drafted 2026-04-16 — 50 plant_status + 12 work_orders + 15 shift_log_entries, wrapped in BEGIN/COMMIT with TRUNCATE…RESTART IDENTITY. Awaiting Raj's review before running seed:plant.)*
+- [~] Wire `bun run seed:plant` script (executes `seeds/bruce-power.sql` via Supabase connection). *(uses `postgres` (postgres.js) driver against a new `SUPABASE_DB_URL` env var — the pooled Postgres connection string from Supabase Settings → Database. Rationale: supabase-js has no raw-SQL path, and keeping the .sql file as the single source of truth avoids parallel TS arrays drifting. Blockers before run: (a) `bun add postgres`, (b) Raj adds `SUPABASE_DB_URL` to `.env.local`.)*
 
 ### Phase 3 — RAG pipeline (Sat Apr 18)
 - [x] Create `lib/prompts.ts` — export `KNOWLEDGE_HUB_SYSTEM` (Appendix D.1 verbatim), `GENERATOR_SYSTEM` (D.4 verbatim), `PROMPT_VERSION` constant. *(done early in Phase 1; was originally Phase 3)*
