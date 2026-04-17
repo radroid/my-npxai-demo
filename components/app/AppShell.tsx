@@ -16,6 +16,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useState } from "react";
+import { RecentReports } from "@/components/generator/RecentReports";
+import { ThreadSidebar } from "@/components/knowledge-hub/ThreadSidebar";
 import { SignInButton } from "@/components/site/SignInButton";
 import { UserChip } from "@/components/site/UserChip";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { initialsFromEmail } from "@/lib/initials";
+import { useThreadStore } from "@/lib/thread-store";
 
 const PRIMARY_NAV = [
 	{ href: "/knowledge-hub", label: "Knowledge Hub", Icon: BookOpen },
@@ -69,7 +72,7 @@ export function AppShell({
 		<div className="flex h-dvh w-full gap-2 overflow-hidden bg-[var(--bg)] p-2 text-[var(--text)]">
 			<aside
 				aria-label="App sidebar"
-				className={`hidden shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] transition-[width] duration-200 md:flex ${
+				className={`hidden shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-[var(--surface)] transition-[width] duration-200 md:flex ${
 					collapsed ? "w-14" : "w-60"
 				}`}
 			>
@@ -83,7 +86,7 @@ export function AppShell({
 			<Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
 				<SheetContent
 					side="left"
-					className="w-72 border-r border-[var(--border)] bg-[var(--surface)] p-0"
+					className="w-72 border-r border-border bg-[var(--surface)] p-0"
 				>
 					<SheetTitle className="sr-only">Navigation</SheetTitle>
 					<AppSidebarContent
@@ -95,7 +98,7 @@ export function AppShell({
 			</Sheet>
 
 			<main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-				<header className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 mb-3 md:hidden">
+				<header className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border bg-[var(--surface)] px-3 mb-3 md:hidden">
 					<button
 						type="button"
 						aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -156,7 +159,7 @@ function AppSidebarContent({
 	return (
 		<div className="flex h-full flex-col">
 			<div
-				className={`flex shrink-0 border-b border-[var(--border)] ${
+				className={`flex shrink-0 border-b border-border ${
 					collapsed
 						? "flex-col items-center gap-2 px-2 py-2"
 						: "h-12 items-center justify-between px-3"
@@ -224,10 +227,14 @@ function AppSidebarContent({
 				})}
 			</nav>
 
-			<div className="flex-1" />
+			{collapsed ? (
+				<div className="flex-1" />
+			) : (
+				<ContextualRail pathname={pathname} onNavigate={onNavigate} />
+			)}
 
 			{collapsed ? (
-				<div className="flex flex-col items-center gap-2 border-t border-[var(--border)] p-2">
+				<div className="flex flex-col items-center gap-2 border-t border-border p-2">
 					<CollapsedThemeCycle />
 					{userEmail ? (
 						<CollapsedUserAvatar email={userEmail} />
@@ -236,7 +243,7 @@ function AppSidebarContent({
 					)}
 				</div>
 			) : (
-				<div className="border-t border-[var(--border)] p-3">
+				<div className="border-t border-border p-3">
 					<p className="mb-3 text-[11px] leading-snug text-[var(--text-muted)]">
 						Simulated data. Not for operational use.
 					</p>
@@ -246,6 +253,48 @@ function AppSidebarContent({
 					</div>
 				</div>
 			)}
+		</div>
+	);
+}
+
+// Pathname-aware contextual slot: fills the middle of the expanded sidebar
+// with content tied to the active app. Knowledge Hub → thread history,
+// Generator → recent reports. On other routes the rail collapses to an
+// empty spacer so the footer stays pinned to the bottom.
+function ContextualRail({
+	pathname,
+	onNavigate,
+}: {
+	pathname: string;
+	onNavigate?: () => void;
+}) {
+	const threadsLoaded = useThreadStore((s) => s.loaded);
+
+	let body: ReactNode = null;
+	let label: string | null = null;
+	if (pathname.startsWith("/knowledge-hub")) {
+		label = "Threads";
+		body = threadsLoaded ? (
+			<ThreadSidebar onNavigate={onNavigate} />
+		) : (
+			<p className="px-5 py-3 text-xs text-[var(--text-muted)]">
+				Loading threads…
+			</p>
+		);
+	} else if (pathname.startsWith("/generator")) {
+		body = <RecentReports onNavigate={onNavigate} />;
+	}
+
+	if (!body) return <div className="flex-1" />;
+
+	return (
+		<div className="flex min-h-0 flex-1 flex-col border-t border-border">
+			{label ? (
+				<div className="px-5 pt-3 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+					{label}
+				</div>
+			) : null}
+			<div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
 		</div>
 	);
 }
@@ -269,7 +318,7 @@ function CollapsedThemeCycle() {
 			aria-label={`Switch to ${label} theme`}
 			title={`Theme: ${active} → ${label}`}
 			onClick={() => setTheme(next)}
-			className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+			className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-[var(--surface-2)] text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 		>
 			<Icon className="h-3.5 w-3.5" aria-hidden="true" />
 		</button>

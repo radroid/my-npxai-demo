@@ -11,7 +11,7 @@ import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
 import { useThreadStore } from "@/lib/thread-store";
 
-export function ThreadSidebar() {
+export function ThreadSidebar({ onNavigate }: { onNavigate?: () => void }) {
 	const threads = useThreadStore((s) => s.threads);
 	const activeId = useThreadStore((s) => s.activeThreadId);
 	const setActiveThread = useThreadStore((s) => s.setActiveThread);
@@ -21,24 +21,27 @@ export function ThreadSidebar() {
 	// onFinish calls createThread(initialMessages) — avoids empty "New thread"
 	// rows piling up in the sidebar and, more importantly, avoids a remount
 	// while the user is mid-interaction.
-	const onNew = () => setActiveThread(null);
+	const onNew = () => {
+		setActiveThread(null);
+		onNavigate?.();
+	};
 
 	return (
-		<div className="flex h-full flex-col gap-1">
+		<div className="flex h-full flex-col gap-2 px-3 py-3">
 			<button
 				type="button"
 				onClick={onNew}
-				className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+				className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-[var(--surface)] px-2.5 text-xs text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 			>
-				<PlusIcon className="h-4 w-4" aria-hidden="true" />
+				<PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />
 				New thread
 			</button>
-			<ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-1 py-1">
+			<ul className="-mx-1 flex flex-col gap-0.5 overflow-x-hidden px-1">
 				{/* px-1 leaves room for the rename-input's ring-2 which would
-				    otherwise be clipped — overflow-y-auto alone coerces
+				    otherwise be clipped — the ancestor's overflow-y-auto coerces
 				    overflow-x to auto per CSS spec and crops the ring. */}
 				{threads.length === 0 ? (
-					<li className="px-2 py-6 text-center text-xs text-[var(--text-muted)]">
+					<li className="px-2 py-2 text-xs text-[var(--text-muted)]">
 						Threads you start will show up here.
 					</li>
 				) : (
@@ -48,6 +51,7 @@ export function ThreadSidebar() {
 							id={t.id}
 							title={t.title}
 							active={t.id === activeId}
+							onNavigate={onNavigate}
 						/>
 					))
 				)}
@@ -60,10 +64,12 @@ function ThreadRow({
 	id,
 	title,
 	active,
+	onNavigate,
 }: {
 	id: string;
 	title: string;
 	active: boolean;
+	onNavigate?: () => void;
 }) {
 	const setActiveThread = useThreadStore((s) => s.setActiveThread);
 	const renameThread = useThreadStore((s) => s.renameThread);
@@ -117,7 +123,10 @@ function ThreadRow({
 			) : (
 				<button
 					type="button"
-					onClick={() => setActiveThread(id)}
+					onClick={() => {
+						setActiveThread(id);
+						onNavigate?.();
+					}}
 					className={`min-w-0 flex-1 cursor-pointer truncate px-2.5 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] ${
 						active
 							? "font-medium text-[var(--text)]"

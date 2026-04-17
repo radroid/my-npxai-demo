@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReadySource } from "@/components/generator/ReportView";
+import { useGeneratorStore } from "@/lib/generator-store";
 import { saveAnonReport } from "@/lib/report-store";
 
 export type GeneratorMeta = {
@@ -36,7 +37,6 @@ export function useGenerateStream() {
 	const [meta, setMeta] = useState<GeneratorMeta | null>(null);
 	const [report, setReport] = useState<string>("");
 	const [readySource, setReadySource] = useState<ReadySource>("stream");
-	const [recentRefreshKey, setRecentRefreshKey] = useState(0);
 	const abortRef = useRef<AbortController | null>(null);
 
 	useEffect(() => () => abortRef.current?.abort(), []);
@@ -153,7 +153,7 @@ export function useGenerateStream() {
 						report_markdown: accumulated,
 					});
 				}
-				setRecentRefreshKey((k) => k + 1);
+				useGeneratorStore.getState().bumpRefresh();
 				setStatus("ready");
 			} catch (err) {
 				if ((err as Error)?.name === "AbortError") return;
@@ -184,7 +184,6 @@ export function useGenerateStream() {
 		meta,
 		report,
 		readySource,
-		recentRefreshKey,
 		generate,
 		loadExisting,
 	};

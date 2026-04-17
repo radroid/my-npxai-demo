@@ -3,10 +3,6 @@
 import { DownloadIcon, PlayIcon, Printer } from "lucide-react";
 import { type FC, useCallback, useEffect, useState } from "react";
 import {
-	type RecentReport,
-	RecentReports,
-} from "@/components/generator/RecentReports";
-import {
 	type ReadySource,
 	ReportView,
 } from "@/components/generator/ReportView";
@@ -22,27 +18,20 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useGeneratorStore } from "@/lib/generator-store";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { SHIFTS, STATIONS, UNITS } from "@/lib/validators";
 
 const OUTLINE_BUTTON =
-	"inline-flex items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]";
+	"inline-flex items-center justify-center gap-2 rounded-md border border-border bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]";
 
 export const GeneratorForm: FC = () => {
 	const [station, setStation] = useState<string>(STATIONS[0]);
 	const [unit, setUnit] = useState<string>("Unit 3");
 	const [shift, setShift] = useState<string>("Evening");
 	const [signedIn, setSignedIn] = useState(false);
-	const {
-		status,
-		error,
-		meta,
-		report,
-		readySource,
-		recentRefreshKey,
-		generate,
-		loadExisting,
-	} = useGenerateStream();
+	const { status, error, meta, report, readySource, generate, loadExisting } =
+		useGenerateStream();
 
 	useEffect(() => {
 		let cancelled = false;
@@ -62,6 +51,30 @@ export const GeneratorForm: FC = () => {
 		};
 	}, []);
 
+	// Sidebar's RecentReports rail sets pendingLoad in the generator store when
+	// a history row is clicked; we consume it here to drive the form + view.
+	const pendingLoad = useGeneratorStore((s) => s.pendingLoad);
+	const consumeLoad = useGeneratorStore((s) => s.consumeLoad);
+	useEffect(() => {
+		if (!pendingLoad) return;
+		setStation(pendingLoad.station);
+		setUnit(pendingLoad.unit);
+		setShift(pendingLoad.shift);
+		loadExisting({
+			meta: {
+				station: pendingLoad.station,
+				unit: pendingLoad.unit,
+				shift: pendingLoad.shift,
+				generated_at: pendingLoad.generated_at,
+				snapshot_hash: pendingLoad.snapshot_hash,
+				signed_in: signedIn,
+			},
+			report: pendingLoad.report_markdown ?? "",
+			source: "history" as ReadySource,
+		});
+		consumeLoad();
+	}, [pendingLoad, consumeLoad, loadExisting, signedIn]);
+
 	const handleSubmit = useCallback(
 		(e: React.FormEvent) => {
 			e.preventDefault();
@@ -74,32 +87,11 @@ export const GeneratorForm: FC = () => {
 		generate({ station, unit, shift }, { force: true });
 	}, [generate, station, unit, shift]);
 
-	const handleLoadRecent = useCallback(
-		(r: RecentReport) => {
-			setStation(r.station);
-			setUnit(r.unit);
-			setShift(r.shift);
-			loadExisting({
-				meta: {
-					station: r.station,
-					unit: r.unit,
-					shift: r.shift,
-					generated_at: r.generated_at,
-					snapshot_hash: r.snapshot_hash,
-					signed_in: signedIn,
-				},
-				report: r.report_markdown ?? "",
-				source: "history" as ReadySource,
-			});
-		},
-		[loadExisting, signedIn],
-	);
-
 	const isLoading =
 		status === "pulling" || status === "drafting" || status === "finalizing";
 
 	return (
-		<div className="h-full overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+		<div className="h-full overflow-auto rounded-xl border border-border bg-[var(--surface)]">
 			<div className="mx-auto grid w-full max-w-[1600px] gap-6 p-4 md:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
 				<aside className="flex flex-col gap-4">
 					<header>
@@ -113,7 +105,7 @@ export const GeneratorForm: FC = () => {
 					</header>
 					<form
 						onSubmit={handleSubmit}
-						className="flex flex-col gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+						className="flex flex-col gap-3 rounded-md border border-border bg-[var(--surface)] p-4"
 					>
 						<LabeledSelect
 							label="Station"
@@ -174,16 +166,11 @@ export const GeneratorForm: FC = () => {
 							</button>
 						</div>
 					) : null}
-					<RecentReports
-						signedIn={signedIn}
-						refreshKey={recentRefreshKey}
-						onLoad={handleLoadRecent}
-					/>
 				</aside>
 
 				<section
 					aria-live="polite"
-					className="min-h-[360px] rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 md:p-6 print:border-0 print:p-0"
+					className="min-h-[360px] rounded-md border border-border bg-[var(--surface)] p-4 md:p-6 print:border-0 print:p-0"
 				>
 					{status === "idle" && <EmptyState />}
 					{isLoading && (
@@ -238,7 +225,7 @@ function LabeledSelect({
 			<Select value={value} onValueChange={onChange}>
 				<SelectTrigger
 					id={id}
-					className="w-full border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--text)]"
+					className="w-full border-border bg-[var(--bg)] text-sm text-[var(--text)]"
 				>
 					<SelectValue />
 				</SelectTrigger>
