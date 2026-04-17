@@ -38,9 +38,10 @@ Running tally of code refactored section-by-section. Goal: cut lines of code wit
 
 | # | Section | Before (LOC) | After (LOC) | Δ | Why / notes |
 |---|---------|--------------|-------------|---|-------------|
-| 1 | `GeneratorForm.tsx` (split into 5 files) | 887 | 961 (274+150+107+239+191) | **+74** | Reorg, not a raw cut. Extracted `use-generate-stream.ts`, `StreamingView.tsx`, `ReportView.tsx`, `report-markdown.tsx`. Parent dropped 69% and is now comprehensible in one read. Import headers + function boundaries added ~74 lines. Accepted as a readability/maintenance win; downstream sections should produce raw cuts. |
+| 1 | `GeneratorForm.tsx` (split into 5 files) | 887 | 961 (274+150+107+239+191) | **+74** | Reorg, not a raw cut. Extracted `use-generate-stream.ts`, `StreamingView.tsx`, `ReportView.tsx`, `report-markdown.tsx`. Parent dropped 69% and is now comprehensible in one read, but net LOC grew. Landed on `main` before course-correction; remaining sections run on refactor branch with strict ≥5% cut criterion. |
+| 2 | `components/assistant-ui/thread.tsx` | 446 | 413 | **−33 (−7.4%)** | Three genuine redundancies: (a) citation-sources derivation loop → `.find()` + `??`, (b) hoisted the duplicated `as unknown as { composer: … }` cast out of 5 starter-button click handlers, (c) 11 pure-JSX FC bodies collapsed from `() => { return (…); }` to implicit-return `() => (…)`. No UI / class / prop changes. |
 
 ## Totals
 - Lines before: 3674 (campaign-in-scope files)
-- Lines after: 3748 (after §1)
-- Net delta: +74
+- Lines after: 3715 (after §2)
+- Net delta: +41 (−33 from §2 offset some of §1's +74)
