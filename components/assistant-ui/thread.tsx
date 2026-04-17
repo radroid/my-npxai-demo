@@ -33,6 +33,10 @@ import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { Reasoning } from "@/components/assistant-ui/reasoning";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
+import {
+	SourcesPanel,
+	type SourcesPanelProps,
+} from "@/components/knowledge-hub/SourcesPanel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -211,10 +215,20 @@ const AssistantMessage: FC = () => {
 			<div className="aui-assistant-message-content wrap-break-word px-2 text-foreground leading-relaxed">
 				<MessagePrimitive.Parts>
 					{({ part }) => {
+						const typedPart = part as unknown as {
+							type: string;
+							data?: unknown;
+						};
 						if (part.type === "text") return <MarkdownText />;
 						if (part.type === "reasoning") return <Reasoning {...part} />;
 						if (part.type === "tool-call")
 							return part.toolUI ?? <ToolFallback {...part} />;
+						if (typedPart.type === "data-sources")
+							return (
+								<SourcesPanel
+									data={typedPart.data as SourcesPanelProps["data"]}
+								/>
+							);
 						return null;
 					}}
 				</MessagePrimitive.Parts>

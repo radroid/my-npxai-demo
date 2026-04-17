@@ -20,11 +20,11 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Run Appendix A.3 (RLS + revokes) — **critical: without this, anon has direct table access**
 - [x] Run Appendix A.4 (RPC functions + grants)
 - [x] Run Appendix A.6 (profiles table + auth trigger + `get_user_tier` RPC)
-- [ ] Supabase dashboard → Auth → Providers → Email: enable the provider and confirm magic-link / Email OTP is the sign-in mode *(Agent note 2026-04-17: `supabase config push` confirmed `[auth.email] enable_signup = true` and `[auth] enable_signup = true` on the remote. Site URL + `/auth/callback` redirects also pushed via CLI, covering localhost:3000/3001 and https://npx.curlycloud.dev. Safe to flip once you've done one manual magic-link round-trip.)*
+- [x] Supabase dashboard → Auth → Providers → Email: enable the provider and confirm magic-link / Email OTP is the sign-in mode *(Raj confirmed complete 2026-04-17 night)*
 - [x] Run `migrations/001-switch-to-hnsw.sql` in Supabase SQL editor — replaces the ivfflat index with HNSW. *(applied 2026-04-16 evening; `bun run scripts/smoke-rag.ts` confirmed 6/6 probes returning the correct REGDOC in top-3)*
-- [ ] Create a **public** GitHub repo for this project and push `main` to it. The outreach drafts in Appendix I.2 reference `{REPO_URL}`, so visibility = public. Branch strategy: push-to-main only, no preview branches this sprint.
-- [ ] Cloudflare dashboard → Workers & Pages → Create → Connect to Git → select this repo. Build command: `bunx opennextjs-cloudflare build`. Deploy command: auto (CF runs `opennextjs-cloudflare deploy`). Project name: `npxai-demo` (matches `wrangler.jsonc`). *(Agent note 2026-04-17: you confirmed repo + Cloudflare Git integration are set up and push-to-main builds. First build failed with `NEXT_PUBLIC_ASSISTANT_BASE_URL is not defined` from the starter's `app/assistant.tsx`; fixed in commit below — swapped `/` to a placeholder landing and deleted the starter's Assistant Cloud bits + unused `/api/chat`. Next push should build clean.)*
-- [ ] Cloudflare dashboard → Workers & Pages → npxai-demo → Settings → Variables and Secrets → add the 5 runtime env vars from your `.env.local` (OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN). Do **not** set `SUPABASE_SERVICE_ROLE_KEY` — it's ingestion-only and runs locally.
+- [~] Create a **public** GitHub repo for this project and push `main` to it. *(Repo exists + push-to-main works — Raj 2026-04-17 night. Flipping to public is deferred until after the Loom recording per Raj's decision; until then outreach drafts referencing `{REPO_URL}` should hold.)*
+- [x] Cloudflare dashboard → Workers & Pages → Create → Connect to Git → select this repo. Build command: `bun run build:cloudflare`. Deploy command: auto. *(Raj confirmed 2026-04-17 night — dashboard Build command swapped per the earlier fix; Git integration live.)*
+- [x] Cloudflare dashboard → Workers & Pages → npxai-demo → Settings → Variables and Secrets → add the 5 runtime env vars from `.env.local` (OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN). SUPABASE_SERVICE_ROLE_KEY stays local-only. *(Raj confirmed 2026-04-17 night)*
 - [x] Supabase dashboard → Auth → URL Configuration: set Site URL (localhost now, swap to production URL on Phase 5) and add `/auth/callback` under Redirect URLs
 - [x] Supabase dashboard → Auth → Email Templates → **Magic Link** template: sanity-check the subject line + from address. Default is fine for the demo; personalize later if desired.
 - [x] Run `bunx wrangler login` to authenticate Cloudflare
@@ -43,7 +43,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 
 ### Phase 2 — Scaffolding (Fri Apr 17)
 - [x] Review agent's assistant-ui integration in browser, confirm dark navy theme looks right
-- [ ] Review agent's Appendix F seed data — now committed as `supabase/migrations/20260417015131_seed_bruce_power_fixtures.sql` and already applied to the hosted project (50 plant_status + 12 work_orders + 15 shift_log_entries). Confirm CANDU parameters / shift-log narrative ring true, or flag corrections for a follow-up migration.
+- [x] Review agent's Appendix F seed data — confirmed realistic; follow-up migration (alarms + Night shift + Unit 3 SDS-1 clarification) pushed 2026-04-17.
 - [x] Test the sign-in modal once agent wires it up: enter your Gmail → receive magic link → click → land on Knowledge Hub → confirm nav shows you signed in. Flag any UX friction before outreach. *(Agent note 2026-04-17: email provider is already enabled on the remote per CLI check; redirect URLs include localhost:3000/3001/auth/callback and https://npx.curlycloud.dev/auth/callback. No longer blocked.)*
 
 > **Phase 1 verification (2026-04-16 evening):** Raj tested placeholder page loads (no console errors), auth trigger end-to-end (Supabase Add User → profiles row with correct tier for `@brucepower.com` and `@gmail.com`), and Supabase dashboard shows 1945 rows in `regdoc_chunks` with HNSW index in place. Phase 1 gate green. Two Phase-1 holds carried forward as non-blocking for Phase 2 agent work: Email provider enable (needed before sign-in modal testing); GitHub public repo + Cloudflare Git integration (needed before Phase 5 deploy).
@@ -53,20 +53,20 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Add `EVAL_BYPASS_KEY=<any-local-string>` to `.env.local` and restart the dev server, then run `bun run eval:kb`. *(Done 2026-04-17. Never ship with `EVAL_BYPASS_KEY` set in production.)*
 - [x] Run the 20-question eval battery — **20/20 (100%) passing, all 3 adversarial Qs pass** (2026-04-17). Iteration path: first run 15/20, then grader loosenings for Q3/Q4/Q5/Q7 (LLM uses different-but-correct wording than the planned keyword) + `stripHtmlTags` handler fix for Q19 (removes JS function-call leftovers after tag strip so the LLM sees the clean benign portion of the query).
 - [x] Judge RAG quality against the MVP bar (≥14/20) and ship bar (≥17/20) — **ship bar green**, no hybrid search needed. *(If the corpus grows in Phase 4+ we may revisit chunk-count tuning.)*
-- [ ] Apply the seed-augmentation migration to the linked Supabase project: review + push `supabase/migrations/20260417050356_augment_bruce_power_alarms_night_shift.sql` via `bunx supabase db push --linked`. Adds 1 live + 1 cleared alarm (exercises the Generator/UI `alarm` branch), 3 Night-shift WOs, 3 Night log entries + night→day handover, and clarifies the Unit 3 SDS-1 retest log wording. Expected post-apply counts: plant_status 52 / work_orders 15 / shift_log_entries 24. *(Agent note 2026-04-17: migration file written locally; sandbox denied the remote push, so Raj is the only one who can apply it.)*
+- [x] Apply the seed-augmentation migration to the linked Supabase project: pushed via `bunx supabase db push --linked` 2026-04-17 night. Post-apply counts now 52 / 15 / 24.
 
 ### Phase 4 — Full build (Sun Apr 19)
-- [ ] Review Knowledge Hub polish (citations, badges, starter questions, mobile)
-- [ ] Approve Generator output format for shift turnover reports
-- [ ] Review the Appendix G design system (colors, type, states, a11y). If OK, no action; agent will implement. If NPX has specific brand assets (logo SVG, exact palette from their site), hand them over to override tokens.
+- [x] Review Knowledge Hub polish — design system signed off; agent implementing against Appendix G tokens *(Raj 2026-04-17 night)*
+- [x] Approve Generator output format for shift turnover reports — D.4 prompt structure approved *(Raj 2026-04-17 night)*
+- [x] Review the Appendix G design system (colors, type, states, a11y) — approved as-is, no brand-asset overrides *(Raj 2026-04-17 night)*
 
 ### Phase 5 — Polish + ship (Mon Apr 20)
-- [ ] After deploy, update Supabase dashboard → Auth → URL Configuration → Site URL to the production URL (and add it to Redirect URLs). Otherwise magic links will redirect to localhost.
-- [ ] Cross-device manual test (iPhone + tablet + desktop) — exercise both anon path and signed-in path
-- [ ] Trigger deploy by pushing `main` to GitHub (Cloudflare Git integration auto-deploys per decisions log 2026-04-16). Verify live URL + TLS cert.
-- [ ] Set up basic analytics (so you know when NPX team visits)
-- [ ] **Record 90-second Loom video** — follow shot list + script in Appendix I.1. Do the pre-warm query + two takes. Replace `{LOOM_URL}` etc. in the outreach drafts once uploaded.
-- [ ] Personalize the Appendix I.2 outreach drafts (Kshitij, Bharath, Margaret, info@ email) — tune tone in your voice, add {LOOM_URL} / {DEMO_URL} / {REPO_URL}
+- [x] After deploy, update Supabase dashboard → Auth → URL Configuration → Site URL to the production URL (and add it to Redirect URLs) *(Raj 2026-04-17 night — production URL configured)*
+- [x] Cross-device manual test (iPhone + tablet + desktop) — exercise both anon path and signed-in path *(Raj 2026-04-17 night)*
+- [x] Trigger deploy by pushing `main` to GitHub (Cloudflare Git integration auto-deploys). Verify live URL + TLS cert *(Raj 2026-04-17 night)*
+- [x] Set up basic analytics (so you know when NPX team visits) *(Raj 2026-04-17 night)*
+- [ ] **Record 90-second Loom video** — follow shot list + script in Appendix I.1. Do the pre-warm query + two takes. Replace `{LOOM_URL}` etc. in the outreach drafts once uploaded. *(Only remaining human task. Flip repo to public immediately after recording per Raj.)*
+- [x] Personalize the Appendix I.2 outreach drafts (Kshitij, Bharath, Margaret, info@ email) — tune tone in your voice, add {LOOM_URL} / {DEMO_URL} / {REPO_URL} *(Raj 2026-04-17 night — drafts personalized; {LOOM_URL} stub stays until Loom landed)*
 
 ### Tuesday Apr 21 — Outreach
 - [ ] 9 AM — LinkedIn DM to Kshitij Ahuja

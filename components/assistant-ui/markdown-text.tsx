@@ -9,7 +9,7 @@ import {
 	useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import { type FC, memo, useState } from "react";
+import { Children, type FC, memo, type ReactNode, useState } from "react";
 import remarkGfm from "remark-gfm";
 
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
@@ -66,6 +66,46 @@ const useCopyToClipboard = ({
 	return { isCopied, copyToClipboard };
 };
 
+// Matches Appendix D.5 citation regex. Used to find inline [REGDOC-X.X.X]
+// or [REGDOC-X.X.X §Y.Z] patterns in the streamed markdown and render them
+// as pill chips instead of plain text.
+const CITATION_RE = /\[REGDOC-\d+(?:\.\d+){1,3}(?:\s+§[\d.]+)?\]/g;
+
+function CitationChip({ label }: { label: string }) {
+	return (
+		<span
+			data-citation="true"
+			className="mx-0.5 inline-flex items-center rounded-full border border-[--requirement]/40 bg-[--requirement]/10 px-1.5 py-0 font-mono text-[0.7em] text-[--requirement] leading-[1.4] align-baseline"
+			title={`CNSC citation: ${label.slice(1, -1)}`}
+		>
+			{label.slice(1, -1)}
+		</span>
+	);
+}
+
+// Walks component children, splits any string node on the citation regex,
+// and wraps matches in <CitationChip />. Non-string nodes pass through.
+function renderWithCitations(children: ReactNode): ReactNode {
+	const out: ReactNode[] = [];
+	let chipKey = 0;
+	Children.forEach(children, (child, idx) => {
+		if (typeof child !== "string") {
+			out.push(child);
+			return;
+		}
+		const parts = child.split(CITATION_RE);
+		const matches = child.match(CITATION_RE) ?? [];
+		parts.forEach((segment, i) => {
+			if (segment) out.push(segment);
+			const m = matches[i];
+			if (m) {
+				out.push(<CitationChip key={`c-${idx}-${chipKey++}`} label={m} />);
+			}
+		});
+	});
+	return out;
+}
+
 const defaultComponents = memoizeMarkdownComponents({
 	h1: ({ className, ...props }) => (
 		<h1
@@ -121,14 +161,16 @@ const defaultComponents = memoizeMarkdownComponents({
 			{...props}
 		/>
 	),
-	p: ({ className, ...props }) => (
+	p: ({ className, children, ...props }) => (
 		<p
 			className={cn(
 				"aui-md-p my-2.5 leading-normal first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</p>
 	),
 	a: ({ className, ...props }) => (
 		<a
@@ -208,8 +250,10 @@ const defaultComponents = memoizeMarkdownComponents({
 			{...props}
 		/>
 	),
-	li: ({ className, ...props }) => (
-		<li className={cn("aui-md-li leading-normal", className)} {...props} />
+	li: ({ className, children, ...props }) => (
+		<li className={cn("aui-md-li leading-normal", className)} {...props}>
+			{renderWithCitations(children)}
+		</li>
 	),
 	sup: ({ className, ...props }) => (
 		<sup
