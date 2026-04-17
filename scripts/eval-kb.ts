@@ -9,6 +9,8 @@
 // Usage:
 //   bun run eval:kb                    # localhost:3001 (or $EVAL_BASE_URL)
 //   EVAL_BASE_URL=https://npx.curlycloud.dev bun run eval:kb
+//   bun run eval:kb --suite hard       # hard corpus-stress battery only
+//   bun run eval:kb --suite all        # ship + hard suites together
 //   bun run eval:kb --only 17,18,19    # run a subset
 //   bun run eval:kb --debug            # print raw response text on failures
 
@@ -21,6 +23,7 @@ import {
 
 interface EvalCase {
 	id: number;
+	suite?: "ship" | "hard";
 	category: string;
 	question: string;
 	expected_behavior: "answer" | "fallback" | "out_of_scope" | "refuse";
@@ -52,8 +55,9 @@ interface EvalResult {
 const BASE_URL = process.env.EVAL_BASE_URL ?? "http://localhost:3001";
 const ENDPOINT = `${BASE_URL}/api/knowledge-hub/query`;
 const LATENCY_SOFT_CAP_MS = 10_000;
+const SHIP_PASS_THRESHOLD = 17;
 
-const CITATION_RE = /\[REGDOC-\d+(?:\.\d+){1,3}(?:\s+§[\d.]+)?\]/g;
+const CITATION_RE = /\[(?:REGDOC-\d+(?:\.\d+){1,3}|NSCA)(?:\s+§[\d.]+)?\]/g;
 const SECTION_RE = /§([\d.]+)/;
 
 function parseOnly(argv: string[]): Set<number> | null {
@@ -69,6 +73,14 @@ function parseOnly(argv: string[]): Set<number> | null {
 	);
 }
 
+function parseSuite(argv: string[]): "ship" | "hard" | "all" {
+	const idx = argv.indexOf("--suite");
+	if (idx === -1) return "ship";
+	const value = argv[idx + 1]?.trim().toLowerCase();
+	if (value === "hard" || value === "all" || value === "ship") return value;
+	return "ship";
+}
+
 function loadCases(): EvalCase[] {
 	const filePath = path.resolve(process.cwd(), "evals/knowledge-hub.jsonl");
 	const raw = fs.readFileSync(filePath, "utf8");
@@ -77,7 +89,11 @@ function loadCases(): EvalCase[] {
 		.filter((line) => line.trim().length > 0)
 		.map((line, idx) => {
 			try {
-				return JSON.parse(line) as EvalCase;
+				const parsed = JSON.parse(line) as EvalCase;
+				return {
+					...parsed,
+					suite: parsed.suite === "hard" ? "hard" : "ship",
+				};
 			} catch (err) {
 				throw new Error(
 					`Bad JSONL at line ${idx + 1}: ${(err as Error).message}`,
@@ -148,7 +164,7 @@ function extractCitations(
 	const out: Array<{ regdoc: string; section: string | null }> = [];
 	for (const match of text.matchAll(CITATION_RE)) {
 		const full = match[0];
-		const regdocMatch = full.match(/REGDOC-\d+(?:\.\d+){1,3}/);
+		const regdocMatch = full.match(/REGDOC-\d+(?:\.\d+){1,3}|NSCA/);
 		if (!regdocMatch) continue;
 		const regdoc = regdocMatch[0];
 		const secMatch = full.match(SECTION_RE);
@@ -336,12 +352,18 @@ function printDebug(id: number, text: string): void {
 
 async function main(): Promise<void> {
 	const only = parseOnly(process.argv);
-	const cases = loadCases().filter((c) => !only || only.has(c.id));
+	const suite = parseSuite(process.argv);
+	const cases = loadCases().filter((c) => {
+		if (suite !== "all" && c.suite !== suite) return false;
+		return !only || only.has(c.id);
+	});
 
 	console.log(`\nEndpoint: ${ENDPOINT}`);
+	console.log(`Suite:    ${suite}`);
 	console.log(`Cases:    ${cases.length}${only ? " (filtered)" : ""}\n`);
 
 	const results: EvalResult[] = [];
+	const caseById = new Map(cases.map((c) => [c.id, c]));
 	for (const c of cases) {
 		try {
 			const { status, body, latencyMs } = await callEndpoint(c.question);
@@ -374,22 +396,59 @@ async function main(): Promise<void> {
 
 	const passed = results.filter((r) => r.pass).length;
 	const total = results.length;
-	const adversarial = results.filter((r) => r.category === "adversarial");
-	const adversarialPass = adversarial.every((r) => r.pass);
+	const shipResults = results.filter(
+		(r) => caseById.get(r.id)?.suite === "ship",
+	);
+	const hardResults = results.filter(
+		(r) => caseById.get(r.id)?.suite === "hard",
+	);
+	const shipPassed = shipResults.filter((r) => r.pass).length;
+	const shipAdversarial = shipResults.filter(
+		(r) => r.category === "adversarial",
+	);
+	const shipAdversarialPass =
+		shipAdversarial.length > 0 && shipAdversarial.every((r) => r.pass);
+	const shipBarPass =
+		shipPassed >= SHIP_PASS_THRESHOLD && shipAdversarialPass;
+	const hardPassed = hardResults.filter((r) => r.pass).length;
+	const hardBarPass = hardResults.length === 0 || hardPassed === hardResults.length;
 
 	console.log(`\n───────────────────────────────────────────`);
-	console.log(
-		`Passed:       ${passed}/${total}  (${Math.round((passed / total) * 100)}%)`,
-	);
-	console.log(
-		`Adversarial:  ${adversarial.filter((r) => r.pass).length}/${adversarial.length}${adversarialPass ? " ✅" : " ❌ blocker"}`,
-	);
-	console.log(`MVP bar:      ≥14/20  ${passed >= 14 ? "✅" : "❌"}`);
-	console.log(
-		`Ship bar:     ≥17/20 + all adversarial  ${
-			passed >= 17 && adversarialPass ? "✅" : "❌"
-		}`,
-	);
+	if (total > 0) {
+		console.log(
+			`Passed:       ${passed}/${total}  (${Math.round((passed / total) * 100)}%)`,
+		);
+	} else {
+		console.log("Passed:       0/0");
+	}
+	if (suite === "ship") {
+		console.log(
+			`Adversarial:  ${shipAdversarial.filter((r) => r.pass).length}/${shipAdversarial.length}${shipAdversarialPass ? " ✅" : " ❌ blocker"}`,
+		);
+		console.log(`MVP bar:      ≥14/20  ${passed >= 14 ? "✅" : "❌"}`);
+		console.log(
+			`Ship bar:     ≥17/20 + all adversarial  ${shipBarPass ? "✅" : "❌"}`,
+		);
+	} else if (suite === "hard") {
+		console.log(`Hard bar:     all ${total} must pass  ${hardBarPass ? "✅" : "❌"}`);
+	} else {
+		console.log(
+			`Ship suite:   ${shipPassed}/${shipResults.length}  ${
+				shipBarPass ? "✅ ship bar" : "❌ ship bar"
+			}`,
+		);
+		console.log(
+			`Hard suite:   ${hardPassed}/${hardResults.length}  ${
+				hardBarPass ? "✅ hard bar" : "❌ hard bar"
+			}`,
+		);
+		console.log(
+			`Ship bar:     ≥17/20 + all adversarial  ${shipBarPass ? "✅" : "❌"}`,
+		);
+		console.log(
+			`Hard bar:     all hard cases must pass  ${hardBarPass ? "✅" : "❌"}`,
+		);
+	}
 	console.log(`───────────────────────────────────────────\n`);
 
 	if (only) {
@@ -397,7 +456,13 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	if (!(passed >= 17 && adversarialPass)) {
+	if (suite === "ship" && !shipBarPass) {
+		process.exit(1);
+	}
+	if (suite === "hard" && !hardBarPass) {
+		process.exit(1);
+	}
+	if (suite === "all" && !(shipBarPass && hardBarPass)) {
 		process.exit(1);
 	}
 }
