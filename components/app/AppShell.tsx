@@ -27,7 +27,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { initialsFromEmail } from "@/lib/initials";
 
 const PRIMARY_NAV = [
@@ -85,6 +85,7 @@ export function AppShell({
 					side="left"
 					className="w-72 border-r border-[var(--border)] bg-[var(--surface)] p-0"
 				>
+					<SheetTitle className="sr-only">Navigation</SheetTitle>
 					<AppSidebarContent
 						userEmail={userEmail}
 						collapsed={false}
@@ -94,7 +95,7 @@ export function AppShell({
 			</Sheet>
 
 			<main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-				<header className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 md:hidden">
+				<header className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 mb-3 md:hidden">
 					<button
 						type="button"
 						aria-label={mobileOpen ? "Close menu" : "Open menu"}
