@@ -77,7 +77,7 @@ console.log(
 );
 if (passed < PROBES.length) {
 	console.log(
-		"If this failed after ingestion, run migrations/001-switch-to-hnsw.sql in the Supabase SQL editor and retry.",
+		"If this failed after ingestion, confirm regdoc_chunks_embedding_idx is an HNSW index (SELECT indexdef FROM pg_indexes WHERE tablename='regdoc_chunks'). If it's ivfflat, drop it and recreate USING hnsw(embedding vector_cosine_ops).",
 	);
 	process.exit(1);
 }
