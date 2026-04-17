@@ -17,12 +17,30 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 // Each probe: query, and which REGDOC we expect in the top-3.
 const PROBES: Array<{ q: string; expect: string }> = [
-	{ q: "What are the CNSC requirements for shift turnover at a reactor facility?", expect: "REGDOC-2.3.4" },
-	{ q: "What is the minimum staff complement for a nuclear power plant?", expect: "REGDOC-2.2.5" },
-	{ q: "What does REGDOC-2.2.2 say about personnel training programs?", expect: "REGDOC-2.2.2" },
-	{ q: "What does REGDOC-2.6.3 require for aging management?", expect: "REGDOC-2.6.3" },
-	{ q: "How should an accident management program be structured?", expect: "REGDOC-2.3.2" },
-	{ q: "What are CNSC radiation protection requirements for workers?", expect: "REGDOC-2.7.1" },
+	{
+		q: "What are the CNSC requirements for shift turnover at a reactor facility?",
+		expect: "REGDOC-2.3.4",
+	},
+	{
+		q: "What is the minimum staff complement for a nuclear power plant?",
+		expect: "REGDOC-2.2.5",
+	},
+	{
+		q: "What does REGDOC-2.2.2 say about personnel training programs?",
+		expect: "REGDOC-2.2.2",
+	},
+	{
+		q: "What does REGDOC-2.6.3 require for aging management?",
+		expect: "REGDOC-2.6.3",
+	},
+	{
+		q: "How should an accident management program be structured?",
+		expect: "REGDOC-2.3.2",
+	},
+	{
+		q: "What are CNSC radiation protection requirements for workers?",
+		expect: "REGDOC-2.7.1",
+	},
 ];
 
 let passed = 0;
@@ -41,13 +59,22 @@ for (const probe of PROBES) {
 		console.log(`❌ "${probe.q.slice(0, 40)}…"  rpc error: ${error.message}`);
 		continue;
 	}
-	const topRegdocs = (matches ?? []).map((m: { regdoc_id: string }) => m.regdoc_id);
+	const topRegdocs = (matches ?? []).map(
+		(m: { regdoc_id: string }) => m.regdoc_id,
+	);
+	const topSims = (matches ?? []).map((m: { similarity: number }) =>
+		m.similarity.toFixed(3),
+	);
 	const ok = topRegdocs.includes(probe.expect);
-	console.log(`${ok ? "✅" : "❌"}  expect ${probe.expect}  got [${topRegdocs.join(", ")}]`);
+	console.log(
+		`${ok ? "✅" : "❌"}  expect ${probe.expect}  got [${topRegdocs.join(", ")}] sims=[${topSims.join(",")}]`,
+	);
 	console.log(`     "${probe.q.slice(0, 70)}"`);
 	if (ok) passed++;
 }
-console.log(`\n${passed}/${PROBES.length} probes found their expected REGDOC in top-3`);
+console.log(
+	`\n${passed}/${PROBES.length} probes found their expected REGDOC in top-3`,
+);
 if (passed < PROBES.length) {
 	console.log(
 		"If this failed after ingestion, run migrations/001-switch-to-hnsw.sql in the Supabase SQL editor and retry.",

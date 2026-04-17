@@ -12,7 +12,10 @@ import { OUTPUT_MAX_TOKENS, QUERY_CHAR_CAP, type Tier } from "./validators";
 
 const GLOBAL_DAILY_CAP = 500;
 
-const LIMITS: Record<string, Record<Tier, { minute: number; hour: number; day: number }>> = {
+const LIMITS: Record<
+	string,
+	Record<Tier, { minute: number; hour: number; day: number }>
+> = {
 	"knowledge-hub/query": {
 		anon: { minute: 3, hour: 10, day: 5 },
 		signed_in: { minute: 10, hour: 40, day: 50 },
@@ -40,7 +43,11 @@ export function getRedis(): Redis {
 }
 
 const limiterCache = new Map<string, Ratelimit>();
-function getLimiter(prefix: string, limit: number, window: "1 m" | "1 h" | "24 h"): Ratelimit {
+function getLimiter(
+	prefix: string,
+	limit: number,
+	window: "1 m" | "1 h" | "24 h",
+): Ratelimit {
 	const key = `${prefix}:${window}`;
 	const cached = limiterCache.get(key);
 	if (cached) return cached;
@@ -74,6 +81,9 @@ export interface GuardContext {
 	rateLimitRemaining: number;
 	inputCharCap: number;
 	outputMaxTokens: number;
+	// Handler attaches route-specific fields (prompt_version, retrieval_*, etc.)
+	// so the post-handler logRequest() emits a single rich line per Appendix H.6.
+	logFields: Record<string, unknown>;
 }
 
 export interface GuardedHandlerArgs {
@@ -82,9 +92,7 @@ export interface GuardedHandlerArgs {
 	supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
 }
 
-export type GuardedHandler = (
-	args: GuardedHandlerArgs,
-) => Promise<Response>;
+export type GuardedHandler = (args: GuardedHandlerArgs) => Promise<Response>;
 
 export interface WithGuardOptions {
 	route: keyof typeof LIMITS;
@@ -118,9 +126,15 @@ export function withGuard(
 
 		const clientIp = resolveClientIp(req);
 		const ipHash = await hashIp(clientIp);
-		const identifier = user
-			? `user:${user.id}:${tier}`
-			: `anon:${ipHash}`;
+		const identifier = user ? `user:${user.id}:${tier}` : `anon:${ipHash}`;
+
+		// Eval-only bypass: if EVAL_BYPASS_KEY is set server-side and the
+		// x-eval-bypass request header matches, skip rate limit + circuit
+		// breaker so the 20-question battery can run in one shot. Opt-in only
+		// — unset the env var in production so bypass is impossible.
+		const bypassKey = process.env.EVAL_BYPASS_KEY;
+		const bypassed =
+			Boolean(bypassKey) && req.headers.get("x-eval-bypass") === bypassKey;
 
 		// Rate limits (per-minute / per-hour / per-day) — check cheapest first.
 		const limits = LIMITS[opts.route][tier];
@@ -132,6 +146,7 @@ export function withGuard(
 		const prefix = `rl:${opts.route}`;
 		let remaining = Number.POSITIVE_INFINITY;
 		for (const [max, window] of checks) {
+			if (bypassed) break;
 			const rl = getLimiter(prefix, max, window);
 			const result = await rl.limit(identifier);
 			if (result.remaining < remaining) remaining = result.remaining;
@@ -158,9 +173,11 @@ export function withGuard(
 			}
 		}
 
-		// Global daily circuit breaker
+		// Global daily circuit breaker (skipped when bypassed)
 		const dayKey = `openai:calls:${new Date().toISOString().slice(0, 10)}`;
-		const currentCalls = Number((await getRedis().get<number>(dayKey)) ?? 0);
+		const currentCalls = bypassed
+			? 0
+			: Number((await getRedis().get<number>(dayKey)) ?? 0);
 		if (currentCalls >= GLOBAL_DAILY_CAP) {
 			logGuardEvent({
 				route: opts.route,
@@ -188,6 +205,7 @@ export function withGuard(
 			rateLimitRemaining: Number.isFinite(remaining) ? remaining : 0,
 			inputCharCap: QUERY_CHAR_CAP[tier],
 			outputMaxTokens: OUTPUT_MAX_TOKENS[tier],
+			logFields: {},
 		};
 
 		let response: Response;
@@ -209,6 +227,7 @@ export function withGuard(
 			rl_remaining: ctx.rateLimitRemaining,
 			tier,
 			user_hash: userHash,
+			...ctx.logFields,
 		});
 		return response;
 	};
