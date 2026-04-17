@@ -1,4 +1,11 @@
--- Bruce Power simulated plant data — Appendix F fixtures for the Generator.
+-- Seed: Bruce Power simulated plant data — Appendix F fixtures for the Generator.
+--
+-- This is a DATA-ONLY migration (no schema changes) applied via
+-- `supabase db push`. Supabase CLI records it in
+-- supabase_migrations.schema_migrations once applied, so it will not
+-- re-run on subsequent pushes. To refresh fixtures later, create a new
+-- timestamped migration with the same TRUNCATE + INSERT body, or run
+-- this file directly via `supabase db psql < <path>`.
 --
 -- Scope: Bruce A Units 1-4 plus Unit 0 (common services). Operating states
 -- chosen per F.1 so the Generator produces varied, demo-worthy output:
@@ -132,7 +139,7 @@ INSERT INTO shift_log_entries (unit, timestamp, operator_role, entry, category, 
 
 COMMIT;
 
--- Verification queries (paste into Supabase SQL editor after seeding):
+-- Post-apply verification (run via `supabase db psql`):
 --   SELECT count(*) FROM plant_status;      -- expect 50
 --   SELECT count(*) FROM work_orders;       -- expect 12
 --   SELECT count(*) FROM shift_log_entries; -- expect 15
