@@ -6,6 +6,6 @@
 		}
 	},
 	"files": {
-		"includes": ["**", "!supabase/templates"]
+		"includes": ["**", "!supabase/templates", "!resources"]
 	}
 }
