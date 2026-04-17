@@ -14,7 +14,7 @@ import {
 	buildContextEnvelope,
 	type RetrievedChunk,
 } from "@/lib/context-envelope";
-import { recordOpenAICall, withGuard } from "@/lib/guard";
+import { getRedis, recordOpenAICall, withGuard } from "@/lib/guard";
 import { logGuardEvent } from "@/lib/logger";
 import { getOpenAIClient, OPENAI_MODELS } from "@/lib/openai";
 import { StreamingGuard } from "@/lib/output-guard";
@@ -43,6 +43,44 @@ const LOW_SIM_DISCLAIMER = 0.35;
 // LLM to cite from chunks that are actually on-topic.
 const MATCH_COUNT = 8;
 const MIN_CHUNK_SIM = 0.35;
+// Successful LLM answers cache by query hash for 30 minutes. Saves OpenAI
+// spend on the demo's canonical Appendix E starter questions which NPX
+// evaluators + the eval battery hit repeatedly. Fallback / OOS branches are
+// NOT cached — they're cheap (no LLM call) and should stay responsive to
+// any drift in the corpus.
+const CACHE_TTL_SECONDS = 30 * 60;
+
+interface CachedAnswer {
+	text: string;
+	chunks: Array<{
+		id: number;
+		regdoc_id: string;
+		section_number: string | null;
+		section_title: string | null;
+		url: string | null;
+		similarity: number;
+		requirement_type: "requirement" | "guidance" | null;
+		snippet: string;
+	}>;
+	prompt_version: string;
+	cached_at: string;
+}
+
+async function sha256Hex(input: string): Promise<string> {
+	const buf = await crypto.subtle.digest(
+		"SHA-256",
+		new TextEncoder().encode(input),
+	);
+	return Array.from(new Uint8Array(buf))
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+}
+
+function cacheKey(query: string): Promise<string> {
+	return sha256Hex(`kh:${PROMPT_VERSION}:${query.toLowerCase()}`).then(
+		(h) => `kh:cache:${h.slice(0, 24)}`,
+	);
+}
 
 interface UIMessagePart {
 	type: string;
@@ -128,6 +166,34 @@ export const POST = withGuard(
 			});
 		}
 
+		// Cache hit check — skips embed + RPC + LLM for repeat queries.
+		const redis = getRedis();
+		const cKey = await cacheKey(query);
+		const cached = (await redis.get<CachedAnswer>(cKey)) ?? null;
+		if (cached?.text) {
+			ctx.logFields.cache = "hit";
+			ctx.logFields.fallback_taken = false;
+			ctx.logFields.output_tokens = 0;
+			const cachedStream = createUIMessageStream({
+				execute: async ({ writer }) => {
+					const msgId = crypto.randomUUID();
+					writer.write({ type: "text-start", id: msgId });
+					writer.write({
+						type: "text-delta",
+						id: msgId,
+						delta: cached.text,
+					});
+					writer.write({
+						type: "data-sources",
+						data: { chunks: cached.chunks },
+					});
+					writer.write({ type: "text-end", id: msgId });
+				},
+			});
+			return createUIMessageStreamResponse({ stream: cachedStream });
+		}
+		ctx.logFields.cache = "miss";
+
 		const openai = getOpenAIClient();
 
 		let embedding: number[];
@@ -205,6 +271,8 @@ export const POST = withGuard(
 				const envelope = buildContextEnvelope(chunks, query);
 				const guard = new StreamingGuard();
 				let outputTokens = 0;
+				let accumulated = "";
+				let outputGuardTripped = false;
 
 				const emit = (delta: string): { terminate: boolean } => {
 					const r = guard.push(delta);
@@ -214,7 +282,9 @@ export const POST = withGuard(
 							id: msgId,
 							delta: r.safeTokens,
 						});
+						accumulated += r.safeTokens;
 					}
+					if (r.terminate) outputGuardTripped = true;
 					if (r.terminate && r.reason) {
 						logGuardEvent({
 							route: "knowledge-hub/query",
@@ -263,25 +333,37 @@ export const POST = withGuard(
 					});
 				}
 
+				const sourceChunks = chunks.map((c) => ({
+					id: c.id,
+					regdoc_id: c.regdoc_id,
+					section_number: c.section_number,
+					section_title: c.section_title,
+					url: c.url,
+					similarity: Number(c.similarity.toFixed(4)),
+					requirement_type: c.requirement_type,
+					snippet: c.chunk_text.slice(0, 260),
+				}));
 				writer.write({
 					type: "data-sources",
-					data: {
-						chunks: chunks.map((c) => ({
-							id: c.id,
-							regdoc_id: c.regdoc_id,
-							section_number: c.section_number,
-							section_title: c.section_title,
-							url: c.url,
-							similarity: Number(c.similarity.toFixed(4)),
-							requirement_type: c.requirement_type,
-							snippet: c.chunk_text.slice(0, 260),
-						})),
-					},
+					data: { chunks: sourceChunks },
 				});
 				writer.write({ type: "text-end", id: msgId });
 
 				ctx.logFields.fallback_taken = false;
 				ctx.logFields.output_tokens = outputTokens;
+
+				// Cache only clean, successful answers (not output-guard truncations).
+				if (!outputGuardTripped && accumulated.trim().length > 60) {
+					const payload: CachedAnswer = {
+						text: accumulated,
+						chunks: sourceChunks,
+						prompt_version: PROMPT_VERSION,
+						cached_at: new Date().toISOString(),
+					};
+					redis
+						.set(cKey, payload, { ex: CACHE_TTL_SECONDS })
+						.catch((err) => console.error("kh_cache_write_error", err));
+				}
 			},
 		});
 
