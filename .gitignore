@@ -46,6 +46,7 @@ next-env.d.ts
 
 # local planning docs
 SPRINT_PLAN.md
+OVERNIGHT.md
 
 # scrapped docs
 scraped_regdocs/

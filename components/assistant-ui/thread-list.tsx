@@ -4,7 +4,12 @@ import {
 	ThreadListItemPrimitive,
 	ThreadListPrimitive,
 } from "@assistant-ui/react";
-import { ArchiveIcon, MoreHorizontalIcon, PlusIcon } from "lucide-react";
+import {
+	ArchiveIcon,
+	MoreHorizontalIcon,
+	PlusIcon,
+	Trash2Icon,
+} from "lucide-react";
 import type { FC } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,7 +67,7 @@ const ThreadListItem: FC = () => {
 	return (
 		<ThreadListItemPrimitive.Root className="aui-thread-list-item group flex h-9 items-center gap-2 rounded-lg transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none data-active:bg-muted">
 			<ThreadListItemPrimitive.Trigger className="aui-thread-list-item-trigger flex h-full min-w-0 flex-1 items-center truncate px-3 text-start text-sm">
-				<ThreadListItemPrimitive.Title fallback="New Chat" />
+				<ThreadListItemPrimitive.Title fallback="New thread" />
 			</ThreadListItemPrimitive.Trigger>
 			<ThreadListItemMore />
 		</ThreadListItemPrimitive.Root>
@@ -93,6 +98,12 @@ const ThreadListItemMore: FC = () => {
 						Archive
 					</ThreadListItemMorePrimitive.Item>
 				</ThreadListItemPrimitive.Archive>
+				<ThreadListItemPrimitive.Delete asChild>
+					<ThreadListItemMorePrimitive.Item className="aui-thread-list-item-more-item flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-[var(--danger)] outline-none hover:bg-accent focus:bg-accent">
+						<Trash2Icon className="size-4" />
+						Delete
+					</ThreadListItemMorePrimitive.Item>
+				</ThreadListItemPrimitive.Delete>
 			</ThreadListItemMorePrimitive.Content>
 		</ThreadListItemMorePrimitive.Root>
 	);

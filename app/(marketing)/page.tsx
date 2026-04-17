@@ -9,6 +9,7 @@ import {
 	ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { AuroraHero } from "@/components/site/AuroraHero";
 import { NewsletterCapture } from "@/components/site/NewsletterCapture";
 
 const FEATURES = [
@@ -70,9 +71,10 @@ const WHY = [
 
 export default function HomePage() {
 	return (
-		<div className="mx-auto flex max-w-6xl flex-col gap-24 px-4 py-16 md:px-6 md:py-20">
-			{/* Hero */}
-			<section className="flex flex-col items-center gap-6 text-center">
+		<div className="flex flex-col gap-24 pb-24">
+			{/* Hero — aurora is scoped to this section only. */}
+			<AuroraHero>
+				<section className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-20 text-center md:px-6 md:py-28">
 				<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
 					NPXai demo · built by Raj Dholakia
 				</p>
@@ -109,10 +111,11 @@ export default function HomePage() {
 						Open the Shift Generator
 					</Link>
 				</div>
-			</section>
+				</section>
+			</AuroraHero>
 
 			{/* Showcase */}
-			<section id="showcase" className="flex flex-col gap-6">
+			<section id="showcase" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6">
 				<header className="flex flex-col gap-2">
 					<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
 						What's in the demo
@@ -151,7 +154,7 @@ export default function HomePage() {
 			</section>
 
 			{/* Why */}
-			<section id="why" className="flex flex-col gap-6">
+			<section id="why" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6">
 				<header className="flex flex-col gap-2">
 					<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
 						Why NPX AI?
@@ -188,7 +191,7 @@ export default function HomePage() {
 			{/* Contact / newsletter */}
 			<section
 				id="contact"
-				className="flex flex-col items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center md:p-12"
+				className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center md:p-12"
 			>
 				<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
 					Stay in touch

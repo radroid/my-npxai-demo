@@ -241,3 +241,67 @@
 		}
 	}
 }
+
+/* Marketing-only aurora hero. GPU-friendly: only transform + opacity
+   animate, the underlying gradient is static. `prefers-reduced-motion`
+   (handled above) freezes the bands in a static pose. */
+@layer utilities {
+	.aurora-band {
+		position: absolute;
+		inset: -25% -10% auto -10%;
+		height: 140%;
+		filter: blur(72px);
+		opacity: 0.55;
+		will-change: transform, opacity;
+		mix-blend-mode: screen;
+	}
+
+	.aurora-band-a {
+		background: radial-gradient(
+			60% 55% at 30% 40%,
+			color-mix(in oklab, var(--accent-brand) 70%, transparent) 0%,
+			transparent 70%
+		);
+		animation: aurora-drift-a 22s ease-in-out infinite alternate;
+	}
+
+	.aurora-band-b {
+		background: radial-gradient(
+			55% 50% at 70% 35%,
+			color-mix(in oklab, #6366f1 60%, transparent) 0%,
+			transparent 65%
+		);
+		animation: aurora-drift-b 28s ease-in-out infinite alternate;
+		opacity: 0.42;
+	}
+
+	.aurora-band-c {
+		background: radial-gradient(
+			45% 40% at 50% 20%,
+			color-mix(in oklab, #2dd4bf 45%, transparent) 0%,
+			transparent 70%
+		);
+		animation: aurora-drift-c 34s ease-in-out infinite alternate;
+		opacity: 0.28;
+	}
+
+	:root:not(.dark) .aurora-band {
+		opacity: 0.28;
+		mix-blend-mode: multiply;
+	}
+	:root:not(.dark) .aurora-band-b { opacity: 0.22; }
+	:root:not(.dark) .aurora-band-c { opacity: 0.16; }
+}
+
+@keyframes aurora-drift-a {
+	0%   { transform: translate3d(-6%, -2%, 0) scale(1.05); }
+	100% { transform: translate3d( 8%,  3%, 0) scale(1.15); }
+}
+@keyframes aurora-drift-b {
+	0%   { transform: translate3d( 4%,  2%, 0) scale(1.1); }
+	100% { transform: translate3d(-8%, -4%, 0) scale(1.0); }
+}
+@keyframes aurora-drift-c {
+	0%   { transform: translate3d(-2%,  3%, 0) scale(0.95); }
+	100% { transform: translate3d( 6%, -5%, 0) scale(1.2); }
+}
