@@ -33,9 +33,14 @@ const LIMITS: Record<
 		npx_circle: { minute: 5, hour: 20, day: 40 },
 	},
 	"threads/title": {
-		anon: { minute: 3, hour: 10, day: 5 },
-		signed_in: { minute: 10, hour: 40, day: 50 },
-		npx_circle: { minute: 15, hour: 80, day: 100 },
+		// Auto-title is a single 20-token gpt-4o-mini call fired once per
+		// thread's first user+assistant pair. Its cost is negligible compared
+		// to the main query path — the limiter exists only to stop pathological
+		// loops, not to ration titles. Bumped well above any realistic ceiling
+		// so organic thread creation never runs out of titles.
+		anon: { minute: 10, hour: 60, day: 100 },
+		signed_in: { minute: 20, hour: 200, day: 1000 },
+		npx_circle: { minute: 30, hour: 400, day: 2000 },
 	},
 };
 

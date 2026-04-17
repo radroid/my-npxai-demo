@@ -37,7 +37,6 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { initialsFromEmail } from "@/lib/initials";
-import { useThreadStore } from "@/lib/thread-store";
 
 const PRIMARY_NAV = [
 	{ href: "/knowledge-hub", label: "Knowledge Hub", Icon: BookOpen },
@@ -271,17 +270,15 @@ function ContextualRail({
 	pathname: string;
 	onNavigate?: () => void;
 }) {
-	const threadsLoaded = useThreadStore((s) => s.loaded);
-
 	let body: ReactNode = null;
 	let label: string | null = null;
 	if (pathname.startsWith("/knowledge-hub")) {
 		label = "Threads";
-		body = threadsLoaded ? (
-			<ThreadSidebar onNavigate={onNavigate} />
-		) : (
-			<p className="px-5 py-3 text-xs text-fg-muted">Loading threads…</p>
-		);
+		// The thread list loads inside the assistant-ui runtime itself — the
+		// ThreadListPrimitive.Items iteration simply renders zero rows until
+		// the adapter's list() call resolves, and the sidebar already has an
+		// "empty" hint beneath it. No explicit loading gate needed.
+		body = <ThreadSidebar onNavigate={onNavigate} />;
 	} else if (pathname.startsWith("/generator")) {
 		body = <RecentReports onNavigate={onNavigate} />;
 	}

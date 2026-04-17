@@ -1,78 +1,20 @@
 "use client";
 
-import type { UIMessage } from "@ai-sdk/react";
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
-import {
-	AssistantChatTransport,
-	useChatRuntime,
-} from "@assistant-ui/react-ai-sdk";
-import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { useEffect } from "react";
+// The assistant-ui runtime provider lives in (app)/layout.tsx now, so this
+// component is just the Knowledge Hub page body — header, SourcesDataUI, the
+// Thread, and a component that fires the post-first-turn autoTitle. Keeping
+// the provider out of here avoids "requires an AuiProvider" errors in the
+// ThreadSidebar (which is rendered by AppShell, above this component).
+
+import { useAui, useAuiState } from "@assistant-ui/react";
+import { useEffect, useRef } from "react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { SourcesDataUI } from "@/components/knowledge-hub/SourcesDataUI";
-import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { useThreadStore } from "@/lib/thread-store";
 
 export function KnowledgeHubShell() {
-	const activeId = useThreadStore((s) => s.activeThreadId);
-	const runtimeKey = useThreadStore((s) => s.runtimeKey);
-	const messagesByThread = useThreadStore((s) => s.messagesByThread);
-	const syncMessages = useThreadStore((s) => s.syncMessages);
-	const createThread = useThreadStore((s) => s.createThread);
-	const setMode = useThreadStore((s) => s.setMode);
-	const autoTitle = useThreadStore((s) => s.autoTitle);
-
-	// Detect session → tell the store which mode to run in. This triggers the
-	// one-shot thread-list fetch for signed-in users, and (if a persisted
-	// activeThreadId survived the mode transition) the initial loadMessages
-	// for that thread. setActiveThread drives all subsequent message loads.
-	useEffect(() => {
-		let cancelled = false;
-		(async () => {
-			try {
-				const supabase = getSupabaseBrowserClient();
-				const {
-					data: { session },
-				} = await supabase.auth.getSession();
-				if (cancelled) return;
-				await setMode(session?.user ? "signed_in" : "anon");
-			} catch {
-				if (!cancelled) await setMode("anon");
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [setMode]);
-
-	// The runtime's message tree is seeded from the store on mount. `runtimeKey`
-	// (not `activeId`) drives remount so the onFinish null→tid transition keeps
-	// the live runtime intact — see the rationale on `runtimeKey` in the store.
-	const seededMessages = activeId ? (messagesByThread[activeId] ?? []) : [];
-
 	return (
-		<AssistantRuntimeProvider
-			key={runtimeKey}
-			runtime={useThreadRuntime(
-				runtimeKey,
-				seededMessages,
-				async (messages) => {
-					// AI SDK's onFinish fires with the full authoritative `messages`
-					// list (user turns included). If this is the first turn on a fresh
-					// composer, create the thread *with* the messages so the single
-					// `set` seeds `messagesByThread` before React remounts on the key
-					// change — otherwise the remount sees an empty prop and blanks out.
-					const tid = activeId;
-					let targetId = tid;
-					if (!targetId) {
-						targetId = await createThread(undefined, messages);
-					} else {
-						await syncMessages(targetId, messages);
-					}
-					void autoTitle(targetId, messages);
-				},
-			)}
-		>
+		<>
+			<AutoTitle />
 			<SourcesDataUI />
 			<section className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-bg">
 				<div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
@@ -84,26 +26,50 @@ export function KnowledgeHubShell() {
 					<Thread />
 				</div>
 			</section>
-		</AssistantRuntimeProvider>
+		</>
 	);
 }
 
-// Extracted so the runtime is recreated only when the bound id or seeds change
-// (memoization is handled inside useChatRuntime — remount is via the parent `key`).
-function useThreadRuntime(
-	id: string,
-	messages: UIMessage[],
-	onFinish: (messages: UIMessage[]) => void | Promise<void>,
-) {
-	return useChatRuntime({
-		id,
-		messages,
-		sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-		transport: new AssistantChatTransport({
-			api: "/api/knowledge-hub/query",
-		}),
-		onFinish: ({ messages: all }) => {
-			void onFinish(all);
-		},
-	});
+// Auto-title the thread once the first user+assistant pair lands. Watches
+// the thread state inside the runtime (so it picks up tool-call runs,
+// retries, etc. naturally) and fires the one-shot /api/threads/title call
+// exactly once per thread, keyed on its id. Rename goes through the
+// thread-list runtime so the adapter's rename path runs and the sidebar
+// updates without any bespoke syncing.
+function AutoTitle() {
+	const aui = useAui();
+	const isRunning = useAuiState((s) => s.thread.isRunning);
+	const messages = useAuiState((s) => s.thread.messages);
+	const threadItemId = useAuiState((s) => s.threadListItem.id);
+	const threadItemTitle = useAuiState((s) => s.threadListItem.title);
+	const firedRef = useRef<Set<string>>(new Set());
+
+	useEffect(() => {
+		if (isRunning) return;
+		if (!threadItemId) return;
+		if (threadItemTitle && threadItemTitle !== "New thread") return;
+		const hasUser = messages.some((m) => m.role === "user");
+		const hasAssistant = messages.some((m) => m.role === "assistant");
+		if (!hasUser || !hasAssistant) return;
+		if (firedRef.current.has(threadItemId)) return;
+		firedRef.current.add(threadItemId);
+		void (async () => {
+			try {
+				const res = await fetch("/api/threads/title", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ messages }),
+				});
+				if (!res.ok) return;
+				const { title } = (await res.json()) as { title?: string };
+				if (!title?.trim()) return;
+				if (aui.threadListItem.source === null) return;
+				await aui.threadListItem().rename(title.trim());
+			} catch {
+				// Best-effort — the thread keeps its default title otherwise.
+			}
+		})();
+	}, [aui, isRunning, messages, threadItemId, threadItemTitle]);
+
+	return null;
 }

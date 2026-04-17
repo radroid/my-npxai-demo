@@ -1,84 +1,78 @@
 "use client";
 
-// Custom thread sidebar for the Knowledge Hub (Phase 6B.persistence).
-// Replaces assistant-ui's <ThreadList /> because that primitive is backed by
-// an in-memory InMemoryThreadList — it resets on refresh and doesn't mirror
-// server state. This sidebar reads from the hybrid thread-store (localStorage
-// for anon, Supabase for signed-in) and dispatches switch / rename / delete
-// through the store's actions.
+// Knowledge Hub thread sidebar — reads the thread list from the assistant-ui
+// runtime via ThreadListPrimitive + useAuiState, dispatches switch/rename/
+// delete through the ThreadListItem runtime so they flow into our custom
+// RemoteThreadListAdapter (Supabase for signed-in, localStorage for anon).
+// Replaces the prior direct-Zustand-store reads; no more runtimeKey remount
+// on click.
 
+import {
+	ThreadListItemPrimitive,
+	ThreadListPrimitive,
+	useAui,
+	useAuiState,
+} from "@assistant-ui/react";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
-import { useThreadStore } from "@/lib/thread-store";
 
 export function ThreadSidebar({ onNavigate }: { onNavigate?: () => void }) {
-	const threads = useThreadStore((s) => s.threads);
-	const activeId = useThreadStore((s) => s.activeThreadId);
-	const setActiveThread = useThreadStore((s) => s.setActiveThread);
-
-	// "+ New thread" clears the active thread. The server row mints lazily via
-	// createThread inside the onFinish handler on the first send — no eager
-	// POST here, which avoids zombie rows for users who abandon the composer.
-	const onNew = () => {
-		setActiveThread(null);
-		onNavigate?.();
-	};
-
 	return (
-		<div className="flex h-full flex-col gap-2 px-3 py-3">
-			<button
-				type="button"
-				onClick={onNew}
-				className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-xs text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-			>
-				<PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />
-				New thread
-			</button>
+		<ThreadListPrimitive.Root className="flex h-full flex-col gap-2 px-3 py-3">
+			<ThreadListPrimitive.New asChild>
+				<button
+					type="button"
+					onClick={() => onNavigate?.()}
+					className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-xs text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+				>
+					<PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />
+					New thread
+				</button>
+			</ThreadListPrimitive.New>
 			<ul className="-mx-1 flex flex-col gap-0.5 overflow-x-hidden px-1">
 				{/* px-1 leaves room for the rename-input's ring-2 which would
 				    otherwise be clipped — the ancestor's overflow-y-auto coerces
 				    overflow-x to auto per CSS spec and crops the ring. */}
-				{threads.length === 0 ? (
-					<li className="px-2 py-2 text-xs text-fg-muted">
-						Threads you start will show up here.
-					</li>
-				) : (
-					threads.map((t) => (
-						<ThreadRow
-							key={t.id}
-							id={t.id}
-							title={t.title}
-							active={t.id === activeId}
-							onNavigate={onNavigate}
-						/>
-					))
-				)}
+				<ThreadListPrimitive.Items>
+					{() => <ThreadRow onNavigate={onNavigate} />}
+				</ThreadListPrimitive.Items>
+				<EmptyHint />
 			</ul>
-		</div>
+		</ThreadListPrimitive.Root>
 	);
 }
 
-function ThreadRow({
-	id,
-	title,
-	active,
-	onNavigate,
-}: {
-	id: string;
-	title: string;
-	active: boolean;
-	onNavigate?: () => void;
-}) {
-	const setActiveThread = useThreadStore((s) => s.setActiveThread);
-	const renameThread = useThreadStore((s) => s.renameThread);
-	const deleteThread = useThreadStore((s) => s.deleteThread);
+// Placeholder row shown when the thread list is empty. The Items primitive
+// simply renders nothing when length === 0, so we probe the list state via
+// useAuiState and render the hint at the list level.
+function EmptyHint() {
+	const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
+	if (hasThreads) return null;
+	return (
+		<li className="px-2 py-2 text-xs text-fg-muted">
+			Threads you start will show up here.
+		</li>
+	);
+}
+
+function ThreadRow({ onNavigate }: { onNavigate?: () => void }) {
+	const aui = useAui();
+	const title = useAuiState((s) => s.threadListItem.title) ?? "New thread";
+	// Items are scoped by index inside ThreadListPrimitive.Items, so
+	// s.threadListItem refers to THIS row. Compare its id against the main
+	// thread id elsewhere in the state tree to know if it's the active one.
+	const isActive = useAuiState(
+		(s) => s.threadListItem.id === s.threads.mainThreadId,
+	);
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState(title);
 
 	const commit = async () => {
 		const trimmed = draft.trim();
-		if (trimmed && trimmed !== title) await renameThread(id, trimmed);
 		setEditing(false);
+		if (!trimmed || trimmed === title) return;
+		if (aui.threadListItem.source === null) return;
+		await aui.threadListItem().rename(trimmed);
 	};
 
 	const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -91,78 +85,76 @@ function ThreadRow({
 		}
 	};
 
-	const onDelete = async () => {
-		await deleteThread(id);
-	};
-
 	return (
-		<li
-			className={`group relative flex items-center gap-1 rounded-md ${
-				active
-					? "bg-surface-2"
-					: "hover:bg-surface-2/50 focus-within:bg-surface-2/50"
-			}`}
-		>
-			{editing ? (
-				<input
-					// biome-ignore lint/a11y/noAutofocus: rename flow — focusing the input IS the user's intent after clicking Rename
-					autoFocus
-					value={draft}
-					onChange={(e) => setDraft(e.target.value)}
-					onFocus={(e) => e.currentTarget.select()}
-					onBlur={() => void commit()}
-					onKeyDown={onKey}
-					// mx-0.5 leaves breathing room so ring-2 isn't clipped by the
-					// sidebar's scroll container (overflow-y-auto on the ancestor
-					// forces overflow-x: auto per CSS spec).
-					className="mx-0.5 min-w-0 flex-1 rounded-md border border-brand bg-bg px-2.5 py-1.5 text-sm text-fg shadow-sm outline-none ring-2 ring-brand/30 focus-visible:ring-2 focus-visible:ring-brand"
-					aria-label="Rename thread"
-				/>
-			) : (
-				<button
-					type="button"
-					onClick={() => {
-						setActiveThread(id);
-						onNavigate?.();
-					}}
-					className={`min-w-0 flex-1 cursor-pointer truncate px-2.5 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-						active ? "font-medium text-fg" : "text-fg-muted hover:text-fg"
-					}`}
-					title={title}
-				>
-					<span
-						// Remount when the title text changes so the fade-in animation
-						// replays — this is the "thread renamed" cue for auto-titling.
-						key={title}
-						className="fade-in slide-in-from-left-1 inline-block animate-in duration-300"
-					>
-						{title}
-					</span>
-				</button>
-			)}
-			{!editing ? (
-				<div className="mr-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-					<button
-						type="button"
+		<ThreadListItemPrimitive.Root asChild>
+			<li
+				className={`group relative flex items-center gap-1 rounded-md ${
+					isActive
+						? "bg-surface-2"
+						: "hover:bg-surface-2/50 focus-within:bg-surface-2/50"
+				}`}
+			>
+				{editing ? (
+					<input
+						// biome-ignore lint/a11y/noAutofocus: rename flow — focusing the input IS the user's intent after clicking Rename
+						autoFocus
+						value={draft}
+						onChange={(e) => setDraft(e.target.value)}
+						onFocus={(e) => e.currentTarget.select()}
+						onBlur={() => void commit()}
+						onKeyDown={onKey}
+						// mx-0.5 leaves breathing room so ring-2 isn't clipped by the
+						// sidebar's scroll container (overflow-y-auto on the ancestor
+						// forces overflow-x: auto per CSS spec).
+						className="mx-0.5 min-w-0 flex-1 rounded-md border border-brand bg-bg px-2.5 py-1.5 text-sm text-fg shadow-sm outline-none ring-2 ring-brand/30 focus-visible:ring-2 focus-visible:ring-brand"
 						aria-label="Rename thread"
-						onClick={() => {
-							setDraft(title);
-							setEditing(true);
-						}}
-						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface hover:text-fg focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-					>
-						<PencilIcon className="h-3.5 w-3.5" aria-hidden="true" />
-					</button>
-					<button
-						type="button"
-						aria-label="Delete thread"
-						onClick={() => void onDelete()}
-						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface hover:text-danger focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-					>
-						<Trash2Icon className="h-3.5 w-3.5" aria-hidden="true" />
-					</button>
-				</div>
-			) : null}
-		</li>
+					/>
+				) : (
+					<ThreadListItemPrimitive.Trigger asChild>
+						<button
+							type="button"
+							onClick={() => onNavigate?.()}
+							className={`min-w-0 flex-1 cursor-pointer truncate px-2.5 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+								isActive ? "font-medium text-fg" : "text-fg-muted hover:text-fg"
+							}`}
+							title={title}
+						>
+							<span
+								// Remount when the title text changes so the fade-in animation
+								// replays — this is the "thread renamed" cue for auto-titling.
+								key={title}
+								className="fade-in slide-in-from-left-1 inline-block animate-in duration-300"
+							>
+								{title}
+							</span>
+						</button>
+					</ThreadListItemPrimitive.Trigger>
+				)}
+				{!editing ? (
+					<div className="mr-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+						<button
+							type="button"
+							aria-label="Rename thread"
+							onClick={() => {
+								setDraft(title);
+								setEditing(true);
+							}}
+							className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface hover:text-fg focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+						>
+							<PencilIcon className="h-3.5 w-3.5" aria-hidden="true" />
+						</button>
+						<ThreadListItemPrimitive.Delete asChild>
+							<button
+								type="button"
+								aria-label="Delete thread"
+								className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface hover:text-danger focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+							>
+								<Trash2Icon className="h-3.5 w-3.5" aria-hidden="true" />
+							</button>
+						</ThreadListItemPrimitive.Delete>
+					</div>
+				) : null}
+			</li>
+		</ThreadListItemPrimitive.Root>
 	);
 }
