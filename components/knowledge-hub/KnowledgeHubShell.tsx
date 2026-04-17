@@ -25,6 +25,7 @@ export function KnowledgeHubShell() {
 	const setActiveThread = useThreadStore((s) => s.setActiveThread);
 	const setMode = useThreadStore((s) => s.setMode);
 	const loadMessages = useThreadStore((s) => s.loadMessages);
+	const autoTitle = useThreadStore((s) => s.autoTitle);
 	const loaded = useThreadStore((s) => s.loaded);
 
 	// Detect session → tell the store which mode to run in. This triggers the
@@ -72,11 +73,13 @@ export function KnowledgeHubShell() {
 				// `set` seeds `messagesByThread` before React remounts on the key
 				// change — otherwise the remount sees an empty prop and blanks out.
 				const tid = activeId;
-				if (!tid) {
-					await createThread(undefined, messages);
-					return;
+				let targetId = tid;
+				if (!targetId) {
+					targetId = await createThread(undefined, messages);
+				} else {
+					await syncMessages(targetId, messages);
 				}
-				await syncMessages(tid, messages);
+				void autoTitle(targetId, messages);
 			})}
 		>
 			<SourcesDataUI />

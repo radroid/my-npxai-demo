@@ -287,11 +287,11 @@ const ThinkingPill: FC = () => {
 };
 
 // Blinking caret appended to the tail of the currently streaming assistant
-// message. The eye tracks the caret, which masks the natural burstiness of
-// token arrival — perceived smoothness improves without touching cadence.
-// Only renders while this specific message is `running`; historical messages
-// get status "complete" and the caret hides.
+// message. Gated on thread.isRunning so a completed message can never keep
+// the caret around — message.status alone occasionally lagged behind the
+// final stream event and left a stray blinker after text was fully rendered.
 const StreamingCaret: FC = () => {
+	const threadRunning = useAuiState((s) => s.thread.isRunning);
 	const status = useAuiState((s) => s.message.status);
 	const parts = useAuiState((s) => s.message.parts);
 	const hasText = useMemo(() => {
@@ -300,7 +300,7 @@ const StreamingCaret: FC = () => {
 			ps?.some((p) => p?.type === "text" && p.text && p.text.length > 0),
 		);
 	}, [parts]);
-	if (status?.type !== "running" || !hasText) return null;
+	if (!threadRunning || status?.type !== "running" || !hasText) return null;
 	return (
 		<span
 			aria-hidden="true"

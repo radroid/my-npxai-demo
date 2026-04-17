@@ -37,6 +37,10 @@ interface ThreadStoreState {
 	renameThread: (id: string, title: string) => Promise<void>;
 	deleteThread: (id: string) => Promise<void>;
 	loadMessages: (id: string) => Promise<void>;
+	// Fire-and-forget: asks /api/threads/title for a concise title built from
+	// the first user+assistant pair and applies it via renameThread. No-ops
+	// if the thread already has a non-default title.
+	autoTitle: (id: string, messages: UIMessage[]) => Promise<void>;
 }
 
 function newId(): string {
@@ -204,6 +208,23 @@ export const useThreadStore = create<ThreadStoreState>()(
 				set((s) => ({
 					messagesByThread: { ...s.messagesByThread, [id]: msgs },
 				}));
+			},
+
+			autoTitle: async (id, messages) => {
+				const current = get().threads.find((t) => t.id === id);
+				if (!current) return;
+				if (current.title && current.title !== "New thread") return;
+				const hasUser = messages.some((m) => m.role === "user");
+				const hasAssistant = messages.some((m) => m.role === "assistant");
+				if (!hasUser || !hasAssistant) return;
+				const res = await api<{ title: string }>("/api/threads/title", {
+					method: "POST",
+					body: JSON.stringify({ messages }),
+				});
+				if ("error" in res) return;
+				const title = res.title.trim();
+				if (!title) return;
+				await get().renameThread(id, title);
 			},
 		}),
 		{

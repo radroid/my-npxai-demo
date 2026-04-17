@@ -7,14 +7,8 @@
 // for anon, Supabase for signed-in) and dispatches switch / rename / delete
 // through the store's actions.
 
-import { MoreHorizontal, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useThreadStore } from "@/lib/thread-store";
 
 export function ThreadSidebar() {
@@ -124,38 +118,39 @@ function ThreadRow({
 					}`}
 					title={title}
 				>
-					{title}
+					<span
+						// Remount when the title text changes so the fade-in animation
+						// replays — this is the "thread renamed" cue for auto-titling.
+						key={title}
+						className="fade-in slide-in-from-left-1 inline-block animate-in duration-300"
+					>
+						{title}
+					</span>
 				</button>
 			)}
-			<DropdownMenu>
-				<DropdownMenuTrigger asChild>
+			{!editing ? (
+				<div className="mr-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
 					<button
 						type="button"
-						aria-label="Thread actions"
-						className="mr-1 inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-[var(--text-muted)] opacity-0 transition-opacity hover:bg-[var(--surface)] hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] group-hover:opacity-100 data-[state=open]:opacity-100"
-					>
-						<MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-					</button>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="end" className="min-w-36">
-					<DropdownMenuItem
+						aria-label="Rename thread"
 						onClick={() => {
 							setDraft(title);
 							setEditing(true);
 						}}
+						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 					>
 						<PencilIcon className="h-3.5 w-3.5" aria-hidden="true" />
-						Rename
-					</DropdownMenuItem>
-					<DropdownMenuItem
+					</button>
+					<button
+						type="button"
+						aria-label="Delete thread"
 						onClick={() => void onDelete()}
-						className="text-[var(--danger)] focus:text-[var(--danger)]"
+						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--danger)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 					>
 						<Trash2Icon className="h-3.5 w-3.5" aria-hidden="true" />
-						Delete
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
+					</button>
+				</div>
+			) : null}
 		</li>
 	);
 }

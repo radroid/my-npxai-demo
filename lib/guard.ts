@@ -32,6 +32,11 @@ const LIMITS: Record<
 		signed_in: { minute: 3, hour: 12, day: 20 },
 		npx_circle: { minute: 5, hour: 20, day: 40 },
 	},
+	"threads/title": {
+		anon: { minute: 3, hour: 10, day: 5 },
+		signed_in: { minute: 10, hour: 40, day: 50 },
+		npx_circle: { minute: 15, hour: 80, day: 100 },
+	},
 };
 
 let redisSingleton: Redis | undefined;
