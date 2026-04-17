@@ -54,7 +54,7 @@ export default function InsightsPage() {
 				{SIGNALS.map((s) => (
 					<article
 						key={s.title}
-						className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5"
+						className="flex flex-col gap-2 rounded-lg border border-border bg-[var(--surface)] p-5"
 					>
 						<s.icon
 							className="size-5 text-[var(--accent-brand)]"
@@ -68,7 +68,7 @@ export default function InsightsPage() {
 				))}
 			</section>
 
-			<section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+			<section className="rounded-lg border border-border bg-[var(--surface)] p-6">
 				<h2 className="font-semibold text-[var(--text)] text-xl">
 					What would it take to build this for real?
 				</h2>
@@ -97,14 +97,14 @@ export default function InsightsPage() {
 			<div className="flex items-center gap-3 text-sm">
 				<Link
 					href="/knowledge-hub"
-					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
+					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					See the Knowledge Hub <ArrowRightIcon className="size-4" />
 				</Link>
 				<span className="text-[var(--text-muted)]">·</span>
 				<Link
 					href="/generator"
-					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
+					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					See the Generator <ArrowRightIcon className="size-4" />
 				</Link>

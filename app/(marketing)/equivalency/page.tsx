@@ -55,7 +55,7 @@ export default function EquivalencyPage() {
 				{PILLARS.map((p) => (
 					<article
 						key={p.title}
-						className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5"
+						className="flex flex-col gap-2 rounded-lg border border-border bg-[var(--surface)] p-5"
 					>
 						<p.icon
 							className="size-5 text-[var(--accent-brand)]"
@@ -69,7 +69,7 @@ export default function EquivalencyPage() {
 				))}
 			</section>
 
-			<section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+			<section className="rounded-lg border border-border bg-[var(--surface)] p-6">
 				<h2 className="font-semibold text-[var(--text)] text-xl">
 					Why this pairs with the Knowledge Hub
 				</h2>
@@ -87,14 +87,14 @@ export default function EquivalencyPage() {
 			<div className="flex items-center gap-3 text-sm">
 				<Link
 					href="/knowledge-hub"
-					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
+					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					See the Knowledge Hub <ArrowRightIcon className="size-4" />
 				</Link>
 				<span className="text-[var(--text-muted)]">·</span>
 				<Link
 					href="/insights"
-					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
+					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					See Insights <ArrowRightIcon className="size-4" />
 				</Link>

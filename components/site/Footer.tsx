@@ -3,7 +3,7 @@ import Link from "next/link";
 export function Footer() {
 	const year = new Date().getUTCFullYear();
 	return (
-		<footer className="mt-16 border-t border-[var(--border)] bg-[var(--bg)]">
+		<footer className="mt-16 border-t border-border bg-[var(--bg)]">
 			<div className="mx-auto flex max-w-6xl flex-col items-start gap-3 px-4 py-8 text-xs text-[var(--text-muted)] md:flex-row md:items-center md:justify-between md:px-6">
 				<p>
 					Built by{" "}

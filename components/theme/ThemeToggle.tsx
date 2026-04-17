@@ -27,7 +27,7 @@ export function ThemeToggle({ size = "md" }: { size?: ToggleSize }) {
 	return (
 		<fieldset
 			aria-label="Color theme"
-			className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border)] bg-[var(--surface-2)] p-0.5"
+			className="inline-flex items-center gap-0.5 rounded-full border border-border bg-[var(--surface-2)] p-0.5"
 		>
 			{OPTIONS.map(({ value, label, Icon }) => {
 				const isActive = active === value;

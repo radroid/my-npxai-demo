@@ -77,7 +77,7 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 					</button>
 				)}
 			</DialogTrigger>
-			<DialogContent className="border-[var(--border)] bg-[var(--surface)] text-[var(--text)] sm:max-w-md max-sm:h-full max-sm:max-w-full max-sm:rounded-none">
+			<DialogContent className="border-border bg-[var(--surface)] text-[var(--text)] sm:max-w-md max-sm:h-full max-sm:max-w-full max-sm:rounded-none">
 				<DialogHeader>
 					<DialogTitle className="text-[var(--text)]">{COPY.title}</DialogTitle>
 					<DialogDescription className="text-[var(--text-muted)]">
@@ -89,7 +89,7 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 					<div
 						aria-live="polite"
 						id={statusId}
-						className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text)]"
+						className="rounded-md border border-border bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text)]"
 					>
 						{COPY.success}
 					</div>
@@ -111,7 +111,7 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 							onChange={(e) => setEmail(e.target.value)}
 							placeholder={COPY.emailPlaceholder}
 							disabled={status === "loading"}
-							className="h-10 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:opacity-60"
+							className="h-10 rounded-md border border-border bg-[var(--bg)] px-3 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:opacity-60"
 						/>
 
 						{status === "error" ? (

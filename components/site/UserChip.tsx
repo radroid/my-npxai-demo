@@ -14,7 +14,7 @@ export function UserChip({ email }: { email: string }) {
 				aria-expanded={open}
 				aria-haspopup="menu"
 				onClick={() => setOpen((v) => !v)}
-				className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] pr-3 pl-1 text-xs font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
+				className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-border bg-[var(--surface-2)] pr-3 pl-1 text-xs font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
 			>
 				<span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-brand)] text-[10px] font-semibold text-white">
 					{initialsFromEmail(email)}
@@ -25,7 +25,7 @@ export function UserChip({ email }: { email: string }) {
 			{open ? (
 				<div
 					role="menu"
-					className="absolute right-0 mt-2 min-w-48 rounded-md border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+					className="absolute right-0 mt-2 min-w-48 rounded-md border border-border bg-[var(--surface)] py-1 shadow-lg"
 				>
 					<form action="/auth/signout" method="post">
 						<button

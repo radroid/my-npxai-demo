@@ -287,7 +287,7 @@ const ThinkingPill: FC = () => {
 		<div
 			role="status"
 			aria-live="polite"
-			className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-xs text-[var(--text-muted)]"
+			className="inline-flex items-center gap-2 rounded-full border border-border bg-[var(--surface-2)] px-3 py-1.5 text-xs text-[var(--text-muted)]"
 		>
 			<span
 				aria-hidden="true"

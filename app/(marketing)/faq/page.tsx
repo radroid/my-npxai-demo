@@ -64,7 +64,7 @@ export default function FAQPage() {
 				{FAQS.map((f) => (
 					<div
 						key={f.q}
-						className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5"
+						className="rounded-lg border border-border bg-[var(--surface)] p-5"
 					>
 						<dt className="font-semibold text-[var(--text)]">{f.q}</dt>
 						<dd className="mt-2 text-sm text-[var(--text-muted)] leading-relaxed">
@@ -77,7 +77,7 @@ export default function FAQPage() {
 				Something missing? The{" "}
 				<Link
 					href="/"
-					className="text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
+					className="text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					homepage contact section
 				</Link>{" "}

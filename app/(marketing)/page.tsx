@@ -87,7 +87,7 @@ export default function HomePage() {
 						Developer roles at{" "}
 						<a
 							href="https://npxai.com"
-							className="text-[var(--text)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
+							className="text-[var(--text)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 							target="_blank"
 							rel="noopener noreferrer"
 						>
@@ -99,14 +99,14 @@ export default function HomePage() {
 					<div className="mt-2 flex flex-col gap-3 sm:flex-row">
 						<Link
 							href="/knowledge-hub"
-							className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-6 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+							className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-6 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
 						>
 							Try the Knowledge Hub
 							<ArrowRightIcon className="size-4" aria-hidden="true" />
 						</Link>
 						<Link
 							href="/generator"
-							className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-6 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+							className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-[var(--surface)] px-6 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
 						>
 							Open the Shift Generator
 						</Link>
@@ -132,7 +132,7 @@ export default function HomePage() {
 						<Link
 							key={f.href}
 							href={f.href}
-							className="group flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 transition-colors hover:border-[var(--accent-brand)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+							className="group flex flex-col gap-3 rounded-lg border border-border bg-[var(--surface)] p-5 transition-colors hover:border-[var(--accent-brand)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
 						>
 							<div className="flex items-center justify-between">
 								<span className="inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -181,7 +181,7 @@ export default function HomePage() {
 					{WHY.map((w) => (
 						<div
 							key={w.title}
-							className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5"
+							className="flex flex-col gap-2 rounded-lg border border-border bg-[var(--surface)] p-5"
 						>
 							<w.icon
 								className="size-5 text-[var(--accent-brand)]"
@@ -199,7 +199,7 @@ export default function HomePage() {
 			{/* Contact / newsletter */}
 			<section
 				id="contact"
-				className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center md:p-12"
+				className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 rounded-xl border border-border bg-[var(--surface)] p-8 text-center md:p-12"
 			>
 				<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
 					Stay in touch

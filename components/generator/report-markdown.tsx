@@ -47,7 +47,7 @@ const PRIORITY_CHIP_CLS: Record<string, string> = {
 		"border-[var(--guidance)]/40 bg-[var(--guidance)]/10 text-[var(--guidance)]",
 };
 const PRIORITY_CHIP_DEFAULT =
-	"border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]";
+	"border-border bg-[var(--surface)] text-[var(--text-muted)]";
 
 function PriorityBadge({ level }: { level: string }) {
 	return (
@@ -207,9 +207,9 @@ export function ReportBody({ report }: { report: string }) {
 				table: styled("table", "my-3 w-full border-collapse text-xs"),
 				th: styled(
 					"th",
-					"border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-left font-medium",
+					"border border-border bg-[var(--surface-2)] px-2 py-1 text-left font-medium",
 				),
-				td: styled("td", "border border-[var(--border)] px-2 py-1"),
+				td: styled("td", "border border-border px-2 py-1"),
 			}}
 		>
 			{report}
