@@ -107,9 +107,10 @@ function ThreadRow({
 					autoFocus
 					value={draft}
 					onChange={(e) => setDraft(e.target.value)}
+					onFocus={(e) => e.currentTarget.select()}
 					onBlur={() => void commit()}
 					onKeyDown={onKey}
-					className="min-w-0 flex-1 rounded-md bg-transparent px-2.5 py-1.5 text-sm text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					className="min-w-0 flex-1 rounded-md border border-[var(--accent-brand)] bg-[var(--bg)] px-2.5 py-1.5 text-sm text-[var(--text)] shadow-sm outline-none ring-2 ring-[var(--accent-brand)]/30 focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 					aria-label="Rename thread"
 				/>
 			) : (

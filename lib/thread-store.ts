@@ -28,7 +28,7 @@ interface ThreadStoreState {
 
 	setMode: (mode: "anon" | "signed_in") => Promise<void>;
 	setActiveThread: (id: string | null) => void;
-	createThread: (title?: string) => Promise<string>;
+	createThread: (title?: string, initialMessages?: UIMessage[]) => Promise<string>;
 	// Sync the full message list for a thread. Called from onFinish with the
 	// AI-SDK's authoritative `messages` array. Local state is replaced; the
 	// server receives only the tail of new messages (typically the user+assistant
@@ -94,7 +94,7 @@ export const useThreadStore = create<ThreadStoreState>()(
 
 			setActiveThread: (id) => set({ activeThreadId: id }),
 
-			createThread: async (title = "New thread") => {
+			createThread: async (title = "New thread", initialMessages = []) => {
 				const state = get();
 				if (state.mode === "signed_in") {
 					const res = await api<{ id: string; created_at: string }>(
@@ -107,11 +107,24 @@ export const useThreadStore = create<ThreadStoreState>()(
 						title,
 						updatedAt: Date.parse(res.created_at),
 					};
+					// Seed activeThreadId + messagesByThread in one set. A second set
+					// would let React remount AssistantRuntimeProvider on the key
+					// change before messages arrive — thread blanks, next send throws
+					// a duplicate-id when the prop finally lands.
 					set((s) => ({
 						threads: [t, ...s.threads],
-						messagesByThread: { ...s.messagesByThread, [t.id]: [] },
+						messagesByThread: {
+							...s.messagesByThread,
+							[t.id]: initialMessages,
+						},
 						activeThreadId: t.id,
 					}));
+					for (const m of initialMessages) {
+						void api(`/api/threads/${t.id}/messages`, {
+							method: "POST",
+							body: JSON.stringify({ role: m.role, content: m }),
+						});
+					}
 					return t.id;
 				}
 				// Anon path — local id, local persist middleware handles storage.
@@ -119,7 +132,7 @@ export const useThreadStore = create<ThreadStoreState>()(
 				const t: ThreadSummary = { id, title, updatedAt: Date.now() };
 				set((s) => ({
 					threads: [t, ...s.threads],
-					messagesByThread: { ...s.messagesByThread, [id]: [] },
+					messagesByThread: { ...s.messagesByThread, [id]: initialMessages },
 					activeThreadId: id,
 				}));
 				return id;

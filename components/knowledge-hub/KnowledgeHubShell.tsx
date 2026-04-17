@@ -68,9 +68,14 @@ export function KnowledgeHubShell() {
 			runtime={useThreadRuntime(runtimeId, seededMessages, async (messages) => {
 				// AI SDK's onFinish fires with the full authoritative `messages`
 				// list (user turns included). If this is the first turn on a fresh
-				// composer, create the thread now so we have an id to save against.
-				let tid = activeId;
-				if (!tid) tid = await createThread();
+				// composer, create the thread *with* the messages so the single
+				// `set` seeds `messagesByThread` before React remounts on the key
+				// change — otherwise the remount sees an empty prop and blanks out.
+				const tid = activeId;
+				if (!tid) {
+					await createThread(undefined, messages);
+					return;
+				}
 				await syncMessages(tid, messages);
 			})}
 		>

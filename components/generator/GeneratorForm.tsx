@@ -100,7 +100,7 @@ export const GeneratorForm: FC = () => {
 
 	return (
 		<div className="h-full overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-			<div className="mx-auto grid w-full max-w-5xl gap-6 p-4 md:p-6 lg:grid-cols-[320px_1fr]">
+			<div className="mx-auto grid w-full max-w-[1600px] gap-6 p-4 md:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
 				<aside className="flex flex-col gap-4">
 					<header>
 						<h1 className="text-xl font-semibold text-[var(--text)]">
