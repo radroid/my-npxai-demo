@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
@@ -102,6 +103,9 @@ const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
 				<DialogTitle className="aui-sr-only sr-only">
 					Image Attachment Preview
 				</DialogTitle>
+				<DialogDescription className="sr-only">
+					Enlarged view of the attached image.
+				</DialogDescription>
 				<div className="aui-attachment-preview relative mx-auto flex max-h-[80dvh] w-full items-center justify-center overflow-hidden bg-background">
 					<AttachmentPreview src={src} />
 				</div>

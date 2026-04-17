@@ -29,7 +29,12 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetTitle,
+} from "@/components/ui/sheet";
 import { initialsFromEmail } from "@/lib/initials";
 import { useThreadStore } from "@/lib/thread-store";
 
@@ -89,6 +94,9 @@ export function AppShell({
 					className="w-72 border-r border-border bg-surface p-0"
 				>
 					<SheetTitle className="sr-only">Navigation</SheetTitle>
+					<SheetDescription className="sr-only">
+						Primary navigation and account controls.
+					</SheetDescription>
 					<AppSidebarContent
 						userEmail={userEmail}
 						collapsed={false}
