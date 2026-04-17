@@ -14,15 +14,25 @@ import { useThreadStore } from "@/lib/thread-store";
 export function ThreadSidebar({ onNavigate }: { onNavigate?: () => void }) {
 	const threads = useThreadStore((s) => s.threads);
 	const activeId = useThreadStore((s) => s.activeThreadId);
+	const mode = useThreadStore((s) => s.mode);
 	const setActiveThread = useThreadStore((s) => s.setActiveThread);
+	const createThread = useThreadStore((s) => s.createThread);
 
-	// "+ New thread" just clears activeId and bumps runtimeKey (setActiveThread
-	// handles the bump). The thread itself isn't written until the first send's
-	// onFinish calls createThread(initialMessages) — avoids empty "New thread"
-	// rows piling up in the sidebar and, more importantly, avoids a remount
-	// while the user is mid-interaction.
-	const onNew = () => {
-		setActiveThread(null);
+	// "+ New thread" eagerly creates a server-backed thread for signed-in users
+	// so the runtime + composer have a stable target from the very first
+	// keystroke (pre-init rationale in KnowledgeHubShell). Anon users still
+	// take the cheap setActiveThread(null) path — their thread ids are
+	// local-only, so the onFinish create-on-first-send flow carries no cost.
+	const onNew = async () => {
+		if (mode === "signed_in") {
+			try {
+				await createThread("New thread");
+			} catch {
+				setActiveThread(null);
+			}
+		} else {
+			setActiveThread(null);
+		}
 		onNavigate?.();
 	};
 

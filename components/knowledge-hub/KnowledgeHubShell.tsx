@@ -7,7 +7,7 @@ import {
 	useChatRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { SourcesDataUI } from "@/components/knowledge-hub/SourcesDataUI";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -17,9 +17,13 @@ export function KnowledgeHubShell() {
 	const activeId = useThreadStore((s) => s.activeThreadId);
 	const runtimeKey = useThreadStore((s) => s.runtimeKey);
 	const messagesByThread = useThreadStore((s) => s.messagesByThread);
+	const threads = useThreadStore((s) => s.threads);
+	const mode = useThreadStore((s) => s.mode);
+	const loaded = useThreadStore((s) => s.loaded);
 	const syncMessages = useThreadStore((s) => s.syncMessages);
 	const createThread = useThreadStore((s) => s.createThread);
 	const setMode = useThreadStore((s) => s.setMode);
+	const setActiveThread = useThreadStore((s) => s.setActiveThread);
 	const loadMessages = useThreadStore((s) => s.loadMessages);
 	const autoTitle = useThreadStore((s) => s.autoTitle);
 
@@ -49,6 +53,37 @@ export function KnowledgeHubShell() {
 	useEffect(() => {
 		if (activeId) void loadMessages(activeId);
 	}, [activeId, loadMessages]);
+
+	// Pre-initialize a thread for signed-in users so the runtime has a stable
+	// server-side target from the first keystroke. Without this, the first turn
+	// after mount hits the onFinish→createThread path, which runs in parallel
+	// with the AI-SDK's own switchToNewThread and leaves the user staring at
+	// the welcome screen until the whole response streams back (Issue #1,
+	// 2026-04-17). Empty threads from this code path are swept by the daily
+	// cleanup_empty_chat_threads pg_cron job — see the migration of the same
+	// day. Anon users keep the old create-on-first-send behaviour because
+	// their thread ids are local-only and carry no cross-session cost.
+	const preInitInFlightRef = useRef(false);
+	useEffect(() => {
+		if (!loaded) return;
+		if (mode !== "signed_in") return;
+		if (activeId) return;
+		if (preInitInFlightRef.current) return;
+		if (threads.length > 0) {
+			// Returning user landed without an active thread — snap to their
+			// most recent instead of minting a fresh zombie.
+			setActiveThread(threads[0].id);
+			return;
+		}
+		preInitInFlightRef.current = true;
+		(async () => {
+			try {
+				await createThread("New thread");
+			} finally {
+				preInitInFlightRef.current = false;
+			}
+		})();
+	}, [loaded, mode, activeId, threads, setActiveThread, createThread]);
 
 	// The runtime's message tree is seeded from the store on mount. `runtimeKey`
 	// (not `activeId`) drives remount so the onFinish null→tid transition keeps
