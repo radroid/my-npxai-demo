@@ -23,7 +23,7 @@ import {
 	RefreshCwIcon,
 	SquareIcon,
 } from "lucide-react";
-import { type FC, useMemo } from "react";
+import { type FC, useEffect, useMemo, useState } from "react";
 import {
 	ComposerAddAttachment,
 	ComposerAttachments,
@@ -235,6 +235,80 @@ const MessageError: FC = () => (
 
 const EMPTY_CITATION_SOURCES: CitationSource[] = [];
 
+// Thinking verbs shown while the model is processing but before the first
+// token arrives. Regulatory-flavored to match the Knowledge Hub tone —
+// matches what the pipeline is actually doing in each phase.
+const THINKING_VERBS = [
+	"Searching REGDOCs",
+	"Retrieving citations",
+	"Cross-referencing sections",
+	"Grounding answer",
+	"Drafting",
+	"Synthesizing",
+];
+
+const ThinkingPill: FC = () => {
+	const status = useAuiState((s) => s.message.status);
+	const parts = useAuiState((s) => s.message.parts);
+	const [idx, setIdx] = useState(0);
+
+	const isRunning = status?.type === "running";
+	const hasText = useMemo(() => {
+		const ps = parts as unknown as Array<{ type?: string; text?: string }>;
+		return Boolean(
+			ps?.some((p) => p?.type === "text" && p.text && p.text.length > 0),
+		);
+	}, [parts]);
+
+	useEffect(() => {
+		if (!isRunning || hasText) return;
+		const id = setInterval(
+			() => setIdx((i) => (i + 1) % THINKING_VERBS.length),
+			1200,
+		);
+		return () => clearInterval(id);
+	}, [isRunning, hasText]);
+
+	if (!isRunning || hasText) return null;
+
+	return (
+		<div
+			role="status"
+			aria-live="polite"
+			className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-xs text-[var(--text-muted)]"
+		>
+			<span
+				aria-hidden="true"
+				className="h-1.5 w-1.5 animate-breathe rounded-full bg-[var(--accent-brand)]"
+			/>
+			<span>{THINKING_VERBS[idx]}…</span>
+		</div>
+	);
+};
+
+// Blinking caret appended to the tail of the currently streaming assistant
+// message. The eye tracks the caret, which masks the natural burstiness of
+// token arrival — perceived smoothness improves without touching cadence.
+// Only renders while this specific message is `running`; historical messages
+// get status "complete" and the caret hides.
+const StreamingCaret: FC = () => {
+	const status = useAuiState((s) => s.message.status);
+	const parts = useAuiState((s) => s.message.parts);
+	const hasText = useMemo(() => {
+		const ps = parts as unknown as Array<{ type?: string; text?: string }>;
+		return Boolean(
+			ps?.some((p) => p?.type === "text" && p.text && p.text.length > 0),
+		);
+	}, [parts]);
+	if (status?.type !== "running" || !hasText) return null;
+	return (
+		<span
+			aria-hidden="true"
+			className="generator-caret inline-block h-[1em] w-[2px] translate-y-[2px] bg-[var(--accent-brand)] align-baseline"
+		/>
+	);
+};
+
 const AssistantMessage: FC = () => {
 	// Subscribe to the stable `parts` reference only; deriving citationSources
 	// inside a selector closure returns a new [] literal on every call and
@@ -259,6 +333,7 @@ const AssistantMessage: FC = () => {
 				data-role="assistant"
 			>
 				<div className="aui-assistant-message-content wrap-break-word px-2 text-foreground leading-relaxed">
+					<ThinkingPill />
 					<MessagePrimitive.Parts>
 						{({ part }) => {
 							if (part.type === "text") return <MarkdownText />;
@@ -270,6 +345,7 @@ const AssistantMessage: FC = () => {
 							return null;
 						}}
 					</MessagePrimitive.Parts>
+					<StreamingCaret />
 					<MessageError />
 				</div>
 
