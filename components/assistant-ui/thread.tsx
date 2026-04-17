@@ -34,10 +34,6 @@ import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { Reasoning } from "@/components/assistant-ui/reasoning";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
-import {
-	SourcesPanel,
-	type SourcesPanelProps,
-} from "@/components/knowledge-hub/SourcesPanel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -157,20 +153,18 @@ const StarterQuestions: FC = () => {
 					key={s.prompt}
 					type="button"
 					onClick={() => {
-						const apiAny = api as unknown as {
-							composer?: { setText?: (t: string) => void; send?: () => void };
-							thread?: {
-								composer?: { setText?: (t: string) => void; send?: () => void };
-								append?: (msg: { role: "user"; content: string }) => void;
-							};
-						};
-						const composer = apiAny.thread?.composer ?? apiAny.composer ?? null;
-						if (composer?.setText && composer.send) {
-							composer.setText(s.prompt);
-							composer.send();
-						} else if (apiAny.thread?.append) {
-							apiAny.thread.append({ role: "user", content: s.prompt });
-						}
+						// Per assistant-ui v0.12+ migration: `aui.composer()` returns
+						// the ComposerRuntime scope with setText + send.
+						const composer = (
+							api as unknown as {
+								composer: () => {
+									setText: (t: string) => void;
+									send: () => void;
+								};
+							}
+						).composer();
+						composer.setText(s.prompt);
+						composer.send();
 					}}
 					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
 				>
@@ -292,20 +286,12 @@ const AssistantMessage: FC = () => {
 			<div className="aui-assistant-message-content wrap-break-word px-2 text-foreground leading-relaxed">
 				<MessagePrimitive.Parts>
 					{({ part }) => {
-						const typedPart = part as unknown as {
-							type: string;
-							data?: unknown;
-						};
 						if (part.type === "text") return <MarkdownText />;
 						if (part.type === "reasoning") return <Reasoning {...part} />;
 						if (part.type === "tool-call")
 							return part.toolUI ?? <ToolFallback {...part} />;
-						if (typedPart.type === "data-sources")
-							return (
-								<SourcesPanel
-									data={typedPart.data as SourcesPanelProps["data"]}
-								/>
-							);
+						// `data` parts (including our data-sources payload) are
+						// handled via makeAssistantDataUI in KnowledgeHubShell.
 						return null;
 					}}
 				</MessagePrimitive.Parts>

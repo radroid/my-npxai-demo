@@ -8,6 +8,7 @@ import {
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
+import { SourcesDataUI } from "@/components/knowledge-hub/SourcesDataUI";
 import {
 	Sidebar,
 	SidebarContent,
@@ -35,6 +36,7 @@ export function KnowledgeHubShell() {
 
 	return (
 		<AssistantRuntimeProvider runtime={runtime}>
+			<SourcesDataUI />
 			<SidebarProvider>
 				<div className="flex h-[calc(100dvh-3.5rem)] w-full">
 					<Sidebar
