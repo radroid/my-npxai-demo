@@ -21,7 +21,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Run Appendix A.4 (RPC functions + grants)
 - [x] Run Appendix A.6 (profiles table + auth trigger + `get_user_tier` RPC)
 - [ ] Supabase dashboard → Auth → Providers → Email: enable the provider and confirm magic-link / Email OTP is the sign-in mode
-- [ ] Run `migrations/001-switch-to-hnsw.sql` in Supabase SQL editor — replaces the ivfflat index with HNSW. Required after the initial ingestion run because ivfflat with `lists=100` over 1945 rows misses most relevant chunks. Verify with `bun run scripts/smoke-rag.ts` from your terminal afterward — expect ≥ 5/6 probes pass.
+- [x] Run `migrations/001-switch-to-hnsw.sql` in Supabase SQL editor — replaces the ivfflat index with HNSW. *(applied 2026-04-16 evening; `bun run scripts/smoke-rag.ts` confirmed 6/6 probes returning the correct REGDOC in top-3)*
 - [ ] Create a **public** GitHub repo for this project and push `main` to it. The outreach drafts in Appendix I.2 reference `{REPO_URL}`, so visibility = public. Branch strategy: push-to-main only, no preview branches this sprint.
 - [ ] Cloudflare dashboard → Workers & Pages → Create → Connect to Git → select this repo. Build command: `bunx opennextjs-cloudflare build`. Deploy command: auto (CF runs `opennextjs-cloudflare deploy`). Project name: `npxai-demo` (matches `wrangler.jsonc`).
 - [ ] Cloudflare dashboard → Workers & Pages → npxai-demo → Settings → Variables and Secrets → add the 5 runtime env vars from your `.env.local` (OPENAI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN). Do **not** set `SUPABASE_SERVICE_ROLE_KEY` — it's ingestion-only and runs locally.
@@ -44,7 +44,9 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 ### Phase 2 — Scaffolding (Fri Apr 17)
 - [ ] Review agent's assistant-ui integration in browser, confirm dark navy theme looks right
 - [ ] Review agent's Appendix F seed data — confirm CANDU parameters, values, and shift-log narrative ring true, or flag corrections. If approved, no action needed; agent will run `bun run seed:plant` to apply.
-- [ ] Test the sign-in modal once agent wires it up: enter your Gmail → receive magic link → click → land on Knowledge Hub → confirm nav shows you signed in. Flag any UX friction before outreach.
+- [ ] Test the sign-in modal once agent wires it up: enter your Gmail → receive magic link → click → land on Knowledge Hub → confirm nav shows you signed in. Flag any UX friction before outreach. **Blocker:** Email provider enable task above must be done first.
+
+> **Phase 1 verification (2026-04-16 evening):** Raj tested placeholder page loads (no console errors), auth trigger end-to-end (Supabase Add User → profiles row with correct tier for `@brucepower.com` and `@gmail.com`), and Supabase dashboard shows 1945 rows in `regdoc_chunks` with HNSW index in place. Phase 1 gate green. Two Phase-1 holds carried forward as non-blocking for Phase 2 agent work: Email provider enable (needed before sign-in modal testing); GitHub public repo + Cloudflare Git integration (needed before Phase 5 deploy).
 
 ### Phase 3 — RAG pipeline (Sat Apr 18)
 - [ ] Verify Cowork scraping completed; confirm chunk count in Supabase
