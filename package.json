@@ -4,9 +4,9 @@
 	"private": true,
 	"packageManager": "bun@1.3.2",
 	"scripts": {
-		"dev": "next dev --turbopack",
+		"dev": "next dev --turbopack -p 3001",
 		"build": "next build",
-		"start": "next start",
+		"start": "next start -p 3001",
 		"lint": "biome check app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",
 		"format": "biome format app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",
 		"format:fix": "biome format --write app components hooks lib next.config.ts package.json postcss.config.mjs tsconfig.json",

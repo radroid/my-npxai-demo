@@ -139,7 +139,7 @@ CREATE TABLE shift_log_entries (
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3001](http://localhost:3001). (Dev + start scripts pin port 3001 so the eval/tier-test scripts hit the right origin by default.)
 
 ### 5. Deploy
 
