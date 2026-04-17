@@ -41,7 +41,7 @@ for (const probe of PROBES) {
 		console.log(`❌ "${probe.q.slice(0, 40)}…"  rpc error: ${error.message}`);
 		continue;
 	}
-	const topRegdocs = (matches ?? []).map((m) => m.regdoc_id);
+	const topRegdocs = (matches ?? []).map((m: { regdoc_id: string }) => m.regdoc_id);
 	const ok = topRegdocs.includes(probe.expect);
 	console.log(`${ok ? "✅" : "❌"}  expect ${probe.expect}  got [${topRegdocs.join(", ")}]`);
 	console.log(`     "${probe.q.slice(0, 70)}"`);

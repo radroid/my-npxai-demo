@@ -115,9 +115,9 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Wire assistant-ui (`ThreadListSidebar` + `Thread`) into `app/knowledge-hub/page.tsx`
 - [ ] Build custom runtime adapter pointing to `/api/knowledge-hub/query`
 - [ ] Test send/receive round-trip with a mock response
-- [ ] Build top nav component (Logo + Why NPX AI? | Features | FAQ | Contact | Sign In / profile chip when authed)
+- [x] Build top nav component — `components/site/TopNav.tsx` (server, reads `auth.getUser()` and swaps between `SignInButton` + `UserChip`), `components/site/SignInButton.tsx` (client stub for iter 3), `components/site/UserChip.tsx` (client, initials + email + sign-out dropdown). Sticky header with backdrop-blur, navy tokens only, `focus-visible` rings.
 - [ ] Build sign-in modal per Appendix J.6 — email input, `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } })`, loading/success/error states, a11y (role="dialog", focus trap, `aria-live` status, returns focus on close), full-screen on mobile
-- [ ] Build footer component with "Built by Raj Dholakia as a demonstration for NPX Innovation"
+- [x] Build footer component — `components/site/Footer.tsx`, "Built by Raj Dholakia as a demonstration for NPX Innovation" with LinkedIn + npxai.com links, simulated-data disclaimer, wired into `app/layout.tsx` below `<main>`.
 - [x] Write Appendix F seed migration — applied 2026-04-17 as `supabase/migrations/20260417015131_seed_bruce_power_fixtures.sql` (50 plant_status + 12 work_orders + 15 shift_log_entries, BEGIN/COMMIT, TRUNCATE…RESTART IDENTITY). Applied via `supabase db push --linked`; row counts verified through `supabase db query`. *(Replaces the earlier plan to write `seeds/bruce-power.sql` + a `bun run seed:plant` runner — dropped after Raj established the CLI-first rule 2026-04-17. Going forward all DB work is CLI-driven.)*
 
 ### Phase 3 — RAG pipeline (Sat Apr 18)

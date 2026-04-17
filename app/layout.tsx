@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { Footer } from "@/components/site/Footer";
+import { TopNav } from "@/components/site/TopNav";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -31,7 +33,13 @@ export default function RootLayout({
 			<body
 				className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
 			>
-				<TooltipProvider>{children}</TooltipProvider>
+				<TooltipProvider>
+					<div className="flex min-h-screen flex-col">
+						<TopNav />
+						<main className="flex-1">{children}</main>
+						<Footer />
+					</div>
+				</TooltipProvider>
 			</body>
 		</html>
 	);
