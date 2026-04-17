@@ -4,5 +4,8 @@
 		"parser": {
 			"tailwindDirectives": true
 		}
+	},
+	"files": {
+		"includes": ["**", "!supabase/templates"]
 	}
 }
