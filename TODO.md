@@ -42,7 +42,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Confirm `.env.local` exists so the agent can wire up the backend (never paste keys into chat — just confirm presence)
 
 ### Phase 2 — Scaffolding (Fri Apr 17)
-- [ ] Review agent's assistant-ui integration in browser, confirm dark navy theme looks right
+- [x] Review agent's assistant-ui integration in browser, confirm dark navy theme looks right
 - [ ] Review agent's Appendix F seed data — now committed as `supabase/migrations/20260417015131_seed_bruce_power_fixtures.sql` and already applied to the hosted project (50 plant_status + 12 work_orders + 15 shift_log_entries). Confirm CANDU parameters / shift-log narrative ring true, or flag corrections for a follow-up migration.
 - [x] Test the sign-in modal once agent wires it up: enter your Gmail → receive magic link → click → land on Knowledge Hub → confirm nav shows you signed in. Flag any UX friction before outreach. *(Agent note 2026-04-17: email provider is already enabled on the remote per CLI check; redirect URLs include localhost:3000/3001/auth/callback and https://npx.curlycloud.dev/auth/callback. No longer blocked.)*
 
