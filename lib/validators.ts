@@ -53,23 +53,6 @@ export function detectJailbreakMarkers(text: string): string[] {
 	);
 }
 
-export function knowledgeHubQuerySchema(tier: Tier) {
-	return z.object({
-		query: z
-			.string()
-			.transform(sanitizeQueryText)
-			.pipe(
-				z
-					.string()
-					.min(1, "Query cannot be empty")
-					.max(
-						QUERY_CHAR_CAP[tier],
-						`Query exceeds ${QUERY_CHAR_CAP[tier]} character limit for your tier`,
-					),
-			),
-	});
-}
-
 export const STATIONS = ["Bruce A"] as const;
 export const UNITS = [
 	"Unit 0",
@@ -85,5 +68,3 @@ export const generatorInputSchema = z.object({
 	unit: z.enum(UNITS),
 	shift: z.enum(SHIFTS),
 });
-
-export type GeneratorInput = z.infer<typeof generatorInputSchema>;
