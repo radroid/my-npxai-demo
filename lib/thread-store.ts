@@ -173,30 +173,26 @@ export const useThreadStore = create<ThreadStoreState>()(
 
 			setActiveThread: (id) => {
 				const state = get();
-				// Clicking the already-active thread: no id change. Still kick off
-				// loadMessages in case a prior fetch failed and the user is retrying.
-				// loadMessages is cache-gated, so this is a no-op on the happy path.
+				// Same-id click is a no-op — but still kick loadMessages in case a
+				// prior fetch failed and the user is retrying. Cache-gated, so the
+				// happy path is free.
 				if (state.activeThreadId === id) {
 					if (id && state.mode === "signed_in") void get().loadMessages(id);
 					return;
 				}
-				// If we need to fetch (signed-in, no cached messages), defer the
-				// runtimeKey bump until loadMessages arrives — it bumps itself when
-				// the fetched thread is still active. The provider keeps the previous
-				// thread's content visible during the fetch instead of flashing an
-				// empty welcome screen for ~500ms and then repopulating.
-				const needsFetch =
-					id !== null &&
-					state.mode === "signed_in" &&
-					(state.messagesByThread[id]?.length ?? 0) === 0;
-				if (needsFetch) {
-					set({ activeThreadId: id });
-					void get().loadMessages(id);
-					return;
-				}
-				// Null (new thread), anon, or cache hit — bump runtimeKey now so the
-				// provider remounts immediately with whatever seed is available.
+				// Always bump runtimeKey on a real thread switch so the
+				// AssistantRuntimeProvider remounts cleanly with the new thread's
+				// seed. An earlier attempt deferred the bump until loadMessages
+				// arrived (to avoid a ~500ms flash of the welcome screen) but that
+				// left useChat bound to the previous thread's state while activeId
+				// had moved on — the composer's state tree went into a half-switched
+				// state and the input stopped accepting keystrokes. loadMessages
+				// also bumps runtimeKey when it resolves, so with this immediate
+				// bump there is a second remount once messages arrive (cheap and
+				// correct). The brief flash goes away entirely with the P1 adapter
+				// refactor.
 				set({ activeThreadId: id, runtimeKey: newId() });
+				if (id && state.mode === "signed_in") void get().loadMessages(id);
 			},
 
 			createThread: async (title = "New thread", initialMessages = []) => {
