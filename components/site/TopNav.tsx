@@ -1,5 +1,6 @@
 import { BookOpen, FileText } from "lucide-react";
 import Link from "next/link";
+import { BrandMark } from "@/components/site/BrandMark";
 import { ConceptsMenu } from "@/components/site/ConceptsMenu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { createSupabaseServerClient } from "@/lib/supabase";
@@ -30,10 +31,7 @@ export async function TopNav() {
 					href="/"
 					className="flex items-center gap-2 text-sm font-semibold tracking-tight text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-md"
 				>
-					<span
-						aria-hidden="true"
-						className="inline-block h-6 w-6 rounded-md bg-brand"
-					/>
+					<BrandMark className="h-6 w-6" />
 					<span>NPXai Demo</span>
 				</Link>
 

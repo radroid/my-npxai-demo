@@ -18,6 +18,7 @@ import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useState } from "react";
 import { RecentReports } from "@/components/generator/RecentReports";
 import { ThreadSidebar } from "@/components/knowledge-hub/ThreadSidebar";
+import { BrandMark } from "@/components/site/BrandMark";
 import { SignInButton } from "@/components/site/SignInButton";
 import { UserChip } from "@/components/site/UserChip";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -119,10 +120,7 @@ export function AppShell({
 						href="/"
 						className="flex items-center gap-2 text-sm font-semibold tracking-tight text-fg"
 					>
-						<span
-							aria-hidden="true"
-							className="inline-block h-5 w-5 rounded-md bg-brand"
-						/>
+						<BrandMark className="h-5 w-5" />
 						<span>NPXai Demo</span>
 					</Link>
 				</header>
@@ -178,9 +176,9 @@ function AppSidebarContent({
 						href="/"
 						aria-label="NPXai Demo — home"
 						title="NPXai Demo"
-						className="flex size-7 items-center justify-center rounded-md bg-brand font-semibold text-[12px] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+						className="flex size-7 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 					>
-						N
+						<BrandMark className="h-7 w-7" />
 					</Link>
 				) : (
 					<Link
@@ -188,10 +186,7 @@ function AppSidebarContent({
 						onClick={onNavigate}
 						className="flex items-center gap-2 rounded-md text-sm font-semibold tracking-tight text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 					>
-						<span
-							aria-hidden="true"
-							className="inline-block h-6 w-6 rounded-md bg-brand"
-						/>
+						<BrandMark className="h-6 w-6" />
 						<span>NPXai Demo</span>
 					</Link>
 				)}
