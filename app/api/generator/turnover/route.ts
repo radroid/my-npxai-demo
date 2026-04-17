@@ -1,15 +1,9 @@
 // Generator — shift turnover report (Appendix D.4 + F.5 "money shot" path).
-// withGuard wraps rate-limit + circuit breaker (Appendix B), validates
-// closed-enum body via generatorInputSchema (B.2), pulls the per-unit
-// snapshot via get_turnover_snapshot RPC (A.4 SECURITY DEFINER, anon client),
-// then streams gpt-4o-mini via SSE through StreamingGuard so the client sees
-// tokens as they arrive instead of waiting 5–15s for the full JSON response.
-//
-// Generated-report persistence (Phase 6C): if the user is signed in, we
-// hash the snapshot payload and dedupe against `generated_reports`. A
-// matching row short-circuits OpenAI (emit a `cached` SSE event with the
-// stored markdown). After streaming completes, the final text is saved via
-// the save_report RPC. Anon users persist locally in the browser only.
+// withGuard (B rate-limit + breaker) → generatorInputSchema enum validation →
+// get_turnover_snapshot RPC (A.4 SECURITY DEFINER) → SSE stream of gpt-4o-mini
+// via StreamingGuard. Phase 6C persistence: signed-in users dedupe by snapshot
+// hash against generated_reports (find_report_by_hash short-circuits OpenAI;
+// save_report persists post-stream). Anon users persist in the browser only.
 
 import { NextResponse } from "next/server";
 import { recordOpenAICall, withGuard } from "@/lib/guard";
@@ -82,15 +76,13 @@ export const POST = withGuard(
 			`${station}|${unit}|${shift}|${snapshotJson}`,
 		);
 
-		// Who's asking? The anon client reads the cookie-bound session; if the
-		// user is signed in, auth.uid() is non-null inside the RPCs below.
+		// auth.uid() is non-null inside the RPCs below when the cookie session is signed in.
 		const {
 			data: { user },
 		} = await supabase.auth.getUser();
 		const isSignedIn = Boolean(user?.id);
 
-		// Dedupe lookup for signed-in users (best-effort — an unapplied
-		// migration or a missing RPC must not break generation).
+		// Dedupe lookup — best-effort: missing RPC / unapplied migration must not break generation.
 		type CachedHit = {
 			id: string;
 			report_markdown: string;
@@ -108,7 +100,6 @@ export const POST = withGuard(
 				},
 			);
 			if (hitErr) {
-				// Log + fall through. Typical cause: migration not applied yet.
 				console.warn("find_report_by_hash_warn", hitErr.message);
 			} else if (Array.isArray(hit) && hit.length > 0) {
 				cachedHit = hit[0] as CachedHit;
@@ -120,33 +111,26 @@ export const POST = withGuard(
 
 		const stream = new ReadableStream<Uint8Array>({
 			async start(controller) {
-				controller.enqueue(
-					encoder.encode(
-						sseFrame("meta", {
-							station,
-							unit,
-							shift,
-							generated_at: generatedAt,
-							snapshot_hash: snapshotHash,
-							signed_in: isSignedIn,
-						}),
-					),
-				);
+				const send = (event: SseEvent, data: unknown) =>
+					controller.enqueue(encoder.encode(sseFrame(event, data)));
+
+				send("meta", {
+					station,
+					unit,
+					shift,
+					generated_at: generatedAt,
+					snapshot_hash: snapshotHash,
+					signed_in: isSignedIn,
+				});
 
 				// Fast path: cached report exists, short-circuit OpenAI.
 				if (cachedHit) {
-					controller.enqueue(
-						encoder.encode(
-							sseFrame("cached", {
-								id: cachedHit.id,
-								report: cachedHit.report_markdown,
-								generated_at: cachedHit.generated_at,
-							}),
-						),
-					);
-					controller.enqueue(
-						encoder.encode(sseFrame("done", { cached: true })),
-					);
+					send("cached", {
+						id: cachedHit.id,
+						report: cachedHit.report_markdown,
+						generated_at: cachedHit.generated_at,
+					});
+					send("done", { cached: true });
 					controller.close();
 					return;
 				}
@@ -185,9 +169,7 @@ ${JSON.stringify(snapshot, null, 2)}
 						const result = guard.push(token);
 						if (result.safeTokens) {
 							accumulated += result.safeTokens;
-							controller.enqueue(
-								encoder.encode(sseFrame("token", result.safeTokens)),
-							);
+							send("token", result.safeTokens);
 						}
 						if (result.terminate) {
 							if (result.reason) {
@@ -229,22 +211,14 @@ ${JSON.stringify(snapshot, null, 2)}
 						}
 					}
 
-					controller.enqueue(
-						encoder.encode(
-							sseFrame("done", {
-								cached: false,
-								saved_id: savedId,
-								snapshot_hash: snapshotHash,
-							}),
-						),
-					);
+					send("done", {
+						cached: false,
+						saved_id: savedId,
+						snapshot_hash: snapshotHash,
+					});
 				} catch (err) {
 					console.error("generator_openai_error", err);
-					controller.enqueue(
-						encoder.encode(
-							sseFrame("error", { message: "Report generation failed." }),
-						),
-					);
+					send("error", { message: "Report generation failed." });
 				} finally {
 					controller.close();
 				}
