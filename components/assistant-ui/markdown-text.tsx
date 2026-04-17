@@ -101,11 +101,7 @@ function CitationChip({ label }: { label: string }) {
 	}
 
 	return (
-		<span
-			data-citation="true"
-			className={baseClass}
-			title={tooltip}
-		>
+		<span data-citation="true" className={baseClass} title={tooltip}>
 			{inner}
 		</span>
 	);
@@ -127,7 +123,8 @@ function renderWithCitations(children: ReactNode): ReactNode {
 			if (segment) out.push(segment);
 			const m = matches[i];
 			if (m) {
-				out.push(<CitationChip key={`c-${idx}-${chipKey++}`} label={m} />);
+				// biome-ignore lint/suspicious/noArrayIndexKey: chips are generated in render order and the chip text itself is not unique within a single message
+				out.push(<CitationChip key={`c-${idx}-${chipKey++}-${m}`} label={m} />);
 			}
 		});
 	});

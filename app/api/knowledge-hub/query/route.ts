@@ -179,9 +179,9 @@ export const POST = withGuard(
 		const redis = getRedis();
 		const cKey = await cacheKey(query);
 		if (isRegenerate) {
-			redis.del(cKey).catch((err) =>
-				console.error("kh_cache_invalidate_error", err),
-			);
+			redis
+				.del(cKey)
+				.catch((err) => console.error("kh_cache_invalidate_error", err));
 		}
 		const cached = isRegenerate
 			? null

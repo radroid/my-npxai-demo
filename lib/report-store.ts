@@ -17,7 +17,9 @@ const STORAGE_KEY = "npxai-demo-anon-reports";
 const MAX_ANON_REPORTS = 5;
 
 function isBrowser(): boolean {
-	return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+	return (
+		typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+	);
 }
 
 export function readAnonReports(): StoredReport[] {

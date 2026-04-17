@@ -14,6 +14,7 @@ export const OUTPUT_MAX_TOKENS: Record<Tier, number> = {
 	npx_circle: 1500,
 };
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control chars is the point
 const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g;
 
 export const JAILBREAK_PATTERNS: RegExp[] = [

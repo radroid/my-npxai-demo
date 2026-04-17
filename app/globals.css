@@ -106,102 +106,102 @@
 	/* Light theme — NPX palette inverted for daylight reading. WCAG AA
 	   verified against text on surface, accents on surface, severity
 	   callouts on surface. */
-	--bg: #F4F6FA;
-	--surface: #FFFFFF;
-	--surface-2: #EEF1F7;
-	--border: #DCE1EC;
-	--border-strong: #C2CAD9;
-	--text: #0A1830;
-	--text-muted: #4F5C78;
-	--accent-brand: #1E6FD9;
-	--accent-brand-hover: #1B5FB6;
-	--requirement: #1E6FD9;
-	--guidance: #A67200;
-	--success: #0A7A46;
-	--warning: #C2570A;
-	--danger: #B42318;
+	--bg: #f4f6fa;
+	--surface: #ffffff;
+	--surface-2: #eef1f7;
+	--border: #dce1ec;
+	--border-strong: #c2cad9;
+	--text: #0a1830;
+	--text-muted: #4f5c78;
+	--accent-brand: #1e6fd9;
+	--accent-brand-hover: #1b5fb6;
+	--requirement: #1e6fd9;
+	--guidance: #a67200;
+	--success: #0a7a46;
+	--warning: #c2570a;
+	--danger: #b42318;
 
 	/* Map shadcn tokens onto the light palette. */
-	--background: #F4F6FA;
-	--foreground: #0A1830;
-	--card: #FFFFFF;
-	--card-foreground: #0A1830;
-	--popover: #FFFFFF;
-	--popover-foreground: #0A1830;
-	--primary: #1E6FD9;
-	--primary-foreground: #FFFFFF;
-	--secondary: #EEF1F7;
-	--secondary-foreground: #0A1830;
-	--muted: #EEF1F7;
-	--muted-foreground: #4F5C78;
-	--accent: #EEF1F7;
-	--accent-foreground: #0A1830;
-	--destructive: #B42318;
-	--input: #DCE1EC;
-	--ring: #1E6FD9;
-	--chart-1: #1E6FD9;
-	--chart-2: #0A7A46;
-	--chart-3: #A67200;
-	--chart-4: #B42318;
-	--chart-5: #4F5C78;
-	--sidebar: #FFFFFF;
-	--sidebar-foreground: #0A1830;
-	--sidebar-primary: #1E6FD9;
-	--sidebar-primary-foreground: #FFFFFF;
-	--sidebar-accent: #EEF1F7;
-	--sidebar-accent-foreground: #0A1830;
-	--sidebar-border: #DCE1EC;
-	--sidebar-ring: #1E6FD9;
+	--background: #f4f6fa;
+	--foreground: #0a1830;
+	--card: #ffffff;
+	--card-foreground: #0a1830;
+	--popover: #ffffff;
+	--popover-foreground: #0a1830;
+	--primary: #1e6fd9;
+	--primary-foreground: #ffffff;
+	--secondary: #eef1f7;
+	--secondary-foreground: #0a1830;
+	--muted: #eef1f7;
+	--muted-foreground: #4f5c78;
+	--accent: #eef1f7;
+	--accent-foreground: #0a1830;
+	--destructive: #b42318;
+	--input: #dce1ec;
+	--ring: #1e6fd9;
+	--chart-1: #1e6fd9;
+	--chart-2: #0a7a46;
+	--chart-3: #a67200;
+	--chart-4: #b42318;
+	--chart-5: #4f5c78;
+	--sidebar: #ffffff;
+	--sidebar-foreground: #0a1830;
+	--sidebar-primary: #1e6fd9;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #eef1f7;
+	--sidebar-accent-foreground: #0a1830;
+	--sidebar-border: #dce1ec;
+	--sidebar-ring: #1e6fd9;
 }
 
 .dark {
-	--bg: #0A1830;
-	--surface: #0F2440;
-	--surface-2: #162E52;
-	--border-strong: #24385C;
-	--text: #E6ECF5;
-	--text-muted: #94A3C3;
-	--accent-brand: #4EA8FF;
-	--accent-brand-hover: #72BDFF;
-	--requirement: #4EA8FF;
-	--guidance: #F5B94E;
-	--success: #4ADE80;
-	--warning: #F59E0B;
-	--danger: #EF4444;
+	--bg: #0a1830;
+	--surface: #0f2440;
+	--surface-2: #162e52;
+	--border-strong: #24385c;
+	--text: #e6ecf5;
+	--text-muted: #94a3c3;
+	--accent-brand: #4ea8ff;
+	--accent-brand-hover: #72bdff;
+	--requirement: #4ea8ff;
+	--guidance: #f5b94e;
+	--success: #4ade80;
+	--warning: #f59e0b;
+	--danger: #ef4444;
 
 	/* Map shadcn tokens onto the NPX palette so existing primitives
 	   (sidebar, tooltip, card) inherit the brand look without rewrites. */
-	--background: #0A1830;
-	--foreground: #E6ECF5;
-	--card: #0F2440;
-	--card-foreground: #E6ECF5;
-	--popover: #0F2440;
-	--popover-foreground: #E6ECF5;
-	--primary: #4EA8FF;
-	--primary-foreground: #0A1830;
-	--secondary: #162E52;
-	--secondary-foreground: #E6ECF5;
-	--muted: #162E52;
-	--muted-foreground: #94A3C3;
-	--accent: #162E52;
-	--accent-foreground: #E6ECF5;
-	--destructive: #EF4444;
-	--border: #24385C;
-	--input: #24385C;
-	--ring: #4EA8FF;
-	--chart-1: #4EA8FF;
-	--chart-2: #4ADE80;
-	--chart-3: #F5B94E;
-	--chart-4: #EF4444;
-	--chart-5: #94A3C3;
-	--sidebar: #0F2440;
-	--sidebar-foreground: #E6ECF5;
-	--sidebar-primary: #4EA8FF;
-	--sidebar-primary-foreground: #0A1830;
-	--sidebar-accent: #162E52;
-	--sidebar-accent-foreground: #E6ECF5;
-	--sidebar-border: #24385C;
-	--sidebar-ring: #4EA8FF;
+	--background: #0a1830;
+	--foreground: #e6ecf5;
+	--card: #0f2440;
+	--card-foreground: #e6ecf5;
+	--popover: #0f2440;
+	--popover-foreground: #e6ecf5;
+	--primary: #4ea8ff;
+	--primary-foreground: #0a1830;
+	--secondary: #162e52;
+	--secondary-foreground: #e6ecf5;
+	--muted: #162e52;
+	--muted-foreground: #94a3c3;
+	--accent: #162e52;
+	--accent-foreground: #e6ecf5;
+	--destructive: #ef4444;
+	--border: #24385c;
+	--input: #24385c;
+	--ring: #4ea8ff;
+	--chart-1: #4ea8ff;
+	--chart-2: #4ade80;
+	--chart-3: #f5b94e;
+	--chart-4: #ef4444;
+	--chart-5: #94a3c3;
+	--sidebar: #0f2440;
+	--sidebar-foreground: #e6ecf5;
+	--sidebar-primary: #4ea8ff;
+	--sidebar-primary-foreground: #0a1830;
+	--sidebar-accent: #162e52;
+	--sidebar-accent-foreground: #e6ecf5;
+	--sidebar-border: #24385c;
+	--sidebar-ring: #4ea8ff;
 }
 
 @layer base {
@@ -234,9 +234,13 @@
 		*,
 		*::before,
 		*::after {
+			/* biome-ignore lint/complexity/noImportantStyles: overriding third-party animations system-wide requires !important */
 			animation-duration: 0.01ms !important;
+			/* biome-ignore lint/complexity/noImportantStyles: overriding third-party animations system-wide requires !important */
 			animation-iteration-count: 1 !important;
+			/* biome-ignore lint/complexity/noImportantStyles: overriding third-party transitions system-wide requires !important */
 			transition-duration: 0.01ms !important;
+			/* biome-ignore lint/complexity/noImportantStyles: overriding smooth-scroll system-wide requires !important */
 			scroll-behavior: auto !important;
 		}
 	}
@@ -289,19 +293,35 @@
 		opacity: 0.28;
 		mix-blend-mode: multiply;
 	}
-	:root:not(.dark) .aurora-band-b { opacity: 0.22; }
-	:root:not(.dark) .aurora-band-c { opacity: 0.16; }
+	:root:not(.dark) .aurora-band-b {
+		opacity: 0.22;
+	}
+	:root:not(.dark) .aurora-band-c {
+		opacity: 0.16;
+	}
 }
 
 @keyframes aurora-drift-a {
-	0%   { transform: translate3d(-6%, -2%, 0) scale(1.05); }
-	100% { transform: translate3d( 8%,  3%, 0) scale(1.15); }
+	0% {
+		transform: translate3d(-6%, -2%, 0) scale(1.05);
+	}
+	100% {
+		transform: translate3d(8%, 3%, 0) scale(1.15);
+	}
 }
 @keyframes aurora-drift-b {
-	0%   { transform: translate3d( 4%,  2%, 0) scale(1.1); }
-	100% { transform: translate3d(-8%, -4%, 0) scale(1.0); }
+	0% {
+		transform: translate3d(4%, 2%, 0) scale(1.1);
+	}
+	100% {
+		transform: translate3d(-8%, -4%, 0) scale(1);
+	}
 }
 @keyframes aurora-drift-c {
-	0%   { transform: translate3d(-2%,  3%, 0) scale(0.95); }
-	100% { transform: translate3d( 6%, -5%, 0) scale(1.2); }
+	0% {
+		transform: translate3d(-2%, 3%, 0) scale(0.95);
+	}
+	100% {
+		transform: translate3d(6%, -5%, 0) scale(1.2);
+	}
 }

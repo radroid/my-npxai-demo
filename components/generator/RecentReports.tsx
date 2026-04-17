@@ -2,12 +2,12 @@
 
 import { Clock3, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import {
 	deleteAnonReport,
 	readAnonReports,
 	relativeTime,
 } from "@/lib/report-store";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export type RecentReport = {
 	id: string;
@@ -60,6 +60,7 @@ export function RecentReports({
 		}
 	}, [signedIn]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is a bump counter — changing it is the signal to refetch
 	useEffect(() => {
 		load();
 	}, [load, refreshKey]);

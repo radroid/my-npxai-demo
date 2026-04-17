@@ -6,7 +6,6 @@ import {
 	ComposerPrimitive,
 	ErrorPrimitive,
 	MessagePrimitive,
-	SuggestionPrimitive,
 	ThreadPrimitive,
 	useAssistantApi,
 	useAuiState,
@@ -178,36 +177,6 @@ const StarterQuestions: FC = () => {
 					</span>
 				</button>
 			))}
-		</div>
-	);
-};
-
-// Legacy generic suggestions (runtime-driven). Unused by Knowledge Hub but
-// preserved so other surfaces using <Thread /> can still opt in.
-// biome-ignore lint/correctness/noUnusedVariables: shared primitive, kept for future surfaces
-const _ThreadSuggestions: FC = () => {
-	return (
-		<div className="aui-thread-welcome-suggestions grid w-full @md:grid-cols-2 gap-2 pb-4">
-			<ThreadPrimitive.Suggestions>
-				{() => <_ThreadSuggestionItem />}
-			</ThreadPrimitive.Suggestions>
-		</div>
-	);
-};
-
-// biome-ignore lint/correctness/noUnusedVariables: shared primitive, kept for future surfaces
-const _ThreadSuggestionItem: FC = () => {
-	return (
-		<div className="aui-thread-welcome-suggestion-display fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both duration-200">
-			<SuggestionPrimitive.Trigger send asChild>
-				<Button
-					variant="ghost"
-					className="aui-thread-welcome-suggestion h-auto w-full @md:flex-col flex-wrap items-start justify-start gap-1 rounded-3xl border bg-background px-4 py-3 text-left text-sm transition-colors hover:bg-muted"
-				>
-					<SuggestionPrimitive.Title className="aui-thread-welcome-suggestion-text-1 font-medium" />
-					<SuggestionPrimitive.Description className="aui-thread-welcome-suggestion-text-2 text-muted-foreground empty:hidden" />
-				</Button>
-			</SuggestionPrimitive.Trigger>
 		</div>
 	);
 };

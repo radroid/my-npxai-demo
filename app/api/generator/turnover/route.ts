@@ -144,7 +144,9 @@ export const POST = withGuard(
 							}),
 						),
 					);
-					controller.enqueue(encoder.encode(sseFrame("done", { cached: true })));
+					controller.enqueue(
+						encoder.encode(sseFrame("done", { cached: true })),
+					);
 					controller.close();
 					return;
 				}

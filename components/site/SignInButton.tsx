@@ -95,7 +95,10 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 					</div>
 				) : (
 					<form onSubmit={onSubmit} className="flex flex-col gap-3">
-						<label htmlFor={emailId} className="text-sm text-[var(--text-muted)]">
+						<label
+							htmlFor={emailId}
+							className="text-sm text-[var(--text-muted)]"
+						>
 							{COPY.emailLabel}
 						</label>
 						<input

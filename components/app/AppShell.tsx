@@ -12,9 +12,9 @@ import {
 	Sun,
 	X,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useState } from "react";
 import { SignInButton } from "@/components/site/SignInButton";
 import { UserChip } from "@/components/site/UserChip";
@@ -28,6 +28,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { initialsFromEmail } from "@/lib/initials";
 
 type PrimaryNavItem = {
 	href: string;
@@ -146,7 +147,9 @@ function AppSidebarContent({
 			    between top and bottom when the user flips the panel. */}
 			<div
 				className={`flex shrink-0 border-b border-[var(--border)] ${
-					collapsed ? "flex-col items-center gap-2 px-2 py-2" : "h-12 items-center justify-between px-3"
+					collapsed
+						? "flex-col items-center gap-2 px-2 py-2"
+						: "h-12 items-center justify-between px-3"
 				}`}
 			>
 				{collapsed ? (
@@ -308,12 +311,7 @@ function CollapsedSignIn() {
 }
 
 function CollapsedUserAvatar({ email }: { email: string }) {
-	const local = email.split("@")[0] ?? "";
-	const parts = local.split(/[._-]+/).filter(Boolean);
-	const initials =
-		parts.length >= 2
-			? (parts[0]![0]! + parts[1]![0]!).toUpperCase()
-			: (local.slice(0, 2) || "??").toUpperCase();
+	const initials = initialsFromEmail(email);
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>

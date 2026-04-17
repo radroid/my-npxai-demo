@@ -32,7 +32,10 @@ interface ThreadStore {
 	activeThreadId: string | null;
 	createThread: (title?: string) => string;
 	setActiveThread: (id: string | null) => void;
-	appendMessage: (threadId: string, message: Omit<ThreadMessage, "id" | "createdAt">) => void;
+	appendMessage: (
+		threadId: string,
+		message: Omit<ThreadMessage, "id" | "createdAt">,
+	) => void;
 	renameThread: (id: string, title: string) => void;
 	deleteThread: (id: string) => void;
 }

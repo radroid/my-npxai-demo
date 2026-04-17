@@ -75,47 +75,50 @@ export default function HomePage() {
 			{/* Hero — aurora is scoped to this section only. */}
 			<AuroraHero>
 				<section className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-20 text-center md:px-6 md:py-28">
-				<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-					NPXai demo · built by Raj Dholakia
-				</p>
-				<h1 className="max-w-3xl text-balance font-semibold text-4xl leading-tight tracking-tight text-[var(--text)] md:text-5xl lg:text-6xl">
-					A CNSC Knowledge Hub and a CANDU shift generator — live, cited, and on
-					the edge.
-				</h1>
-				<p className="max-w-2xl text-balance text-base text-[var(--text-muted)] md:text-lg">
-					A working application for the Senior Full-Stack and Intermediate AI
-					Developer roles at{" "}
-					<a
-						href="https://npxai.com"
-						className="text-[var(--text)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						NPX Innovation
-					</a>
-					. Retrieval-augmented Q&amp;A over 19 REGDOCs, plus a shift-turnover
-					generator that reads from simulated Bruce Power plant data.
-				</p>
-				<div className="mt-2 flex flex-col gap-3 sm:flex-row">
-					<Link
-						href="/knowledge-hub"
-						className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-6 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-					>
-						Try the Knowledge Hub
-						<ArrowRightIcon className="size-4" aria-hidden="true" />
-					</Link>
-					<Link
-						href="/generator"
-						className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-6 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-					>
-						Open the Shift Generator
-					</Link>
-				</div>
+					<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+						NPXai demo · built by Raj Dholakia
+					</p>
+					<h1 className="max-w-3xl text-balance font-semibold text-4xl leading-tight tracking-tight text-[var(--text)] md:text-5xl lg:text-6xl">
+						A CNSC Knowledge Hub and a CANDU shift generator — live, cited, and
+						on the edge.
+					</h1>
+					<p className="max-w-2xl text-balance text-base text-[var(--text-muted)] md:text-lg">
+						A working application for the Senior Full-Stack and Intermediate AI
+						Developer roles at{" "}
+						<a
+							href="https://npxai.com"
+							className="text-[var(--text)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-sm"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							NPX Innovation
+						</a>
+						. Retrieval-augmented Q&amp;A over 19 REGDOCs, plus a shift-turnover
+						generator that reads from simulated Bruce Power plant data.
+					</p>
+					<div className="mt-2 flex flex-col gap-3 sm:flex-row">
+						<Link
+							href="/knowledge-hub"
+							className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-6 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+						>
+							Try the Knowledge Hub
+							<ArrowRightIcon className="size-4" aria-hidden="true" />
+						</Link>
+						<Link
+							href="/generator"
+							className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-6 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+						>
+							Open the Shift Generator
+						</Link>
+					</div>
 				</section>
 			</AuroraHero>
 
 			{/* Showcase */}
-			<section id="showcase" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6">
+			<section
+				id="showcase"
+				className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6"
+			>
 				<header className="flex flex-col gap-2">
 					<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
 						What's in the demo
@@ -141,7 +144,9 @@ export default function HomePage() {
 									aria-hidden="true"
 								/>
 							</div>
-							<h3 className="font-semibold text-[var(--text)] text-lg">{f.title}</h3>
+							<h3 className="font-semibold text-[var(--text)] text-lg">
+								{f.title}
+							</h3>
 							<p className="text-sm text-[var(--text-muted)] leading-relaxed">
 								{f.blurb}
 							</p>
@@ -154,7 +159,10 @@ export default function HomePage() {
 			</section>
 
 			{/* Why */}
-			<section id="why" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6">
+			<section
+				id="why"
+				className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6"
+			>
 				<header className="flex flex-col gap-2">
 					<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
 						Why NPX AI?

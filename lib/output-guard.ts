@@ -38,7 +38,11 @@ export class StreamingGuard {
 	private buffer = "";
 	private tripped = false;
 
-	push(token: string): { safeTokens: string; terminate: boolean; reason?: string } {
+	push(token: string): {
+		safeTokens: string;
+		terminate: boolean;
+		reason?: string;
+	} {
 		if (this.tripped) return { safeTokens: "", terminate: true };
 		this.buffer += token;
 		const result = scanOutput(this.buffer);

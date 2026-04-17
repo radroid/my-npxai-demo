@@ -44,7 +44,6 @@ export function KnowledgeHubShell() {
 			<div className="flex h-full w-full gap-2">
 				{!collapsed ? (
 					<aside
-						role="complementary"
 						aria-label="Thread history"
 						className="hidden w-64 shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:flex"
 					>
@@ -53,7 +52,9 @@ export function KnowledgeHubShell() {
 								<p className="text-sm font-semibold text-[var(--text)]">
 									Knowledge Hub
 								</p>
-								<p className="text-xs text-[var(--text-muted)]">CNSC REGDOC Q&amp;A</p>
+								<p className="text-xs text-[var(--text-muted)]">
+									CNSC REGDOC Q&amp;A
+								</p>
 							</div>
 							<button
 								type="button"

@@ -19,7 +19,10 @@ import {
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { RecentReports, type RecentReport } from "@/components/generator/RecentReports";
+import {
+	type RecentReport,
+	RecentReports,
+} from "@/components/generator/RecentReports";
 import {
 	Select,
 	SelectContent,
@@ -53,6 +56,7 @@ type ReadySource = "stream" | "cached" | "history";
 // Priority markers the D.4 prompt embeds inline: [CRITICAL] / [ATTENTION] / [ROUTINE].
 // Rendered as colored badges inline; when a paragraph STARTS with a marker we also
 // render it as a full-width severity block so operators can scan for attention items.
+const SKELETON_WIDTHS = [82, 68, 95, 73, 60, 88] as const;
 const PRIORITY_RE = /\[(CRITICAL|ATTENTION|ROUTINE)\]/g;
 const LEADING_PRIORITY_RE = /^\s*\[(CRITICAL|ATTENTION|ROUTINE)\]\s*/;
 
@@ -74,14 +78,18 @@ const SEVERITY_TONES: Record<string, SeverityTone> = {
 	ATTENTION: {
 		container:
 			"border-l-4 border-[var(--guidance)] bg-[var(--guidance)]/10 pl-3 pr-3 py-2 rounded-r-md",
-		icon: <AlertTriangle className="size-4 text-[var(--guidance)]" aria-hidden />,
+		icon: (
+			<AlertTriangle className="size-4 text-[var(--guidance)]" aria-hidden />
+		),
 		label: "ATTENTION",
 		labelClass: "text-[var(--guidance)]",
 	},
 	ROUTINE: {
 		container:
 			"border-l-4 border-[var(--border-strong)] bg-[var(--surface-2)] pl-3 pr-3 py-2 rounded-r-md",
-		icon: <CheckCircle2 className="size-4 text-[var(--text-muted)]" aria-hidden />,
+		icon: (
+			<CheckCircle2 className="size-4 text-[var(--text-muted)]" aria-hidden />
+		),
 		label: "ROUTINE",
 		labelClass: "text-[var(--text-muted)]",
 	},
@@ -122,7 +130,8 @@ function processChildren(children: ReactNode): ReactNode {
 	if (Array.isArray(children)) {
 		return children.map((c, i) =>
 			typeof c === "string" ? (
-				<span key={i}>{renderWithPriorities(c)}</span>
+				// biome-ignore lint/suspicious/noArrayIndexKey: children order is stable within a markdown node
+				<span key={`seg-${i}-${c.length}`}>{renderWithPriorities(c)}</span>
 			) : (
 				c
 			),
@@ -276,7 +285,12 @@ export const GeneratorForm: FC = () => {
 				}
 
 				// Stream completed cleanly — persist for anon users, refresh the rail.
-				if (!cachedHit && currentMeta && accumulated && !currentMeta.signed_in) {
+				if (
+					!cachedHit &&
+					currentMeta &&
+					accumulated &&
+					!currentMeta.signed_in
+				) {
 					saveAnonReport({
 						station: currentMeta.station,
 						unit: currentMeta.unit,
@@ -310,24 +324,27 @@ export const GeneratorForm: FC = () => {
 		generate({ force: true });
 	}, [generate]);
 
-	const handleLoadRecent = useCallback((r: RecentReport) => {
-		abortRef.current?.abort();
-		setStatus("ready");
-		setError(null);
-		setReport(r.report_markdown ?? "");
-		setMeta({
-			station: r.station,
-			unit: r.unit,
-			shift: r.shift,
-			generated_at: r.generated_at,
-			snapshot_hash: r.snapshot_hash,
-			signed_in: signedIn,
-		});
-		setStation(r.station);
-		setUnit(r.unit);
-		setShift(r.shift);
-		setReadySource("history");
-	}, [signedIn]);
+	const handleLoadRecent = useCallback(
+		(r: RecentReport) => {
+			abortRef.current?.abort();
+			setStatus("ready");
+			setError(null);
+			setReport(r.report_markdown ?? "");
+			setMeta({
+				station: r.station,
+				unit: r.unit,
+				shift: r.shift,
+				generated_at: r.generated_at,
+				snapshot_hash: r.snapshot_hash,
+				signed_in: signedIn,
+			});
+			setStation(r.station);
+			setUnit(r.unit);
+			setShift(r.shift);
+			setReadySource("history");
+		},
+		[signedIn],
+	);
 
 	const isLoading =
 		status === "pulling" || status === "drafting" || status === "finalizing";
@@ -335,111 +352,111 @@ export const GeneratorForm: FC = () => {
 	return (
 		<div className="h-full overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
 			<div className="mx-auto grid w-full max-w-5xl gap-6 p-4 md:p-6 lg:grid-cols-[320px_1fr]">
-			<aside className="flex flex-col gap-4">
-				<header>
-					<h1 className="text-xl font-semibold text-[var(--text)]">
-						Shift Turnover Generator
-					</h1>
-					<p className="mt-1 text-xs text-[var(--text-muted)]">
-						CANDU shift turnover reports per CNSC REGDOC-2.3.4, generated from
-						simulated Bruce Power plant data.
-					</p>
-				</header>
-				<form
-					onSubmit={handleSubmit}
-					className="flex flex-col gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
-				>
-					<LabeledSelect
-						label="Station"
-						value={station}
-						onChange={setStation}
-						options={STATIONS as unknown as readonly string[]}
-					/>
-					<LabeledSelect
-						label="Unit"
-						value={unit}
-						onChange={setUnit}
-						options={UNITS as unknown as readonly string[]}
-					/>
-					<LabeledSelect
-						label="Incoming shift"
-						value={shift}
-						onChange={setShift}
-						options={SHIFTS as unknown as readonly string[]}
-					/>
-					<button
-						type="submit"
-						disabled={isLoading}
-						className="mt-1 inline-flex items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:cursor-not-allowed disabled:opacity-60"
+				<aside className="flex flex-col gap-4">
+					<header>
+						<h1 className="text-xl font-semibold text-[var(--text)]">
+							Shift Turnover Generator
+						</h1>
+						<p className="mt-1 text-xs text-[var(--text-muted)]">
+							CANDU shift turnover reports per CNSC REGDOC-2.3.4, generated from
+							simulated Bruce Power plant data.
+						</p>
+					</header>
+					<form
+						onSubmit={handleSubmit}
+						className="flex flex-col gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
 					>
-						{isLoading ? (
-							<>
-								<span
-									aria-hidden="true"
-									className="size-3 animate-breathe rounded-full bg-white"
-								/>
-								Generating…
-							</>
-						) : (
-							<>
-								<PlayIcon className="size-4" aria-hidden="true" />
-								Generate report
-							</>
-						)}
-					</button>
-				</form>
-				{status === "ready" && report ? (
-					<div className="flex flex-wrap gap-2">
+						<LabeledSelect
+							label="Station"
+							value={station}
+							onChange={setStation}
+							options={STATIONS as unknown as readonly string[]}
+						/>
+						<LabeledSelect
+							label="Unit"
+							value={unit}
+							onChange={setUnit}
+							options={UNITS as unknown as readonly string[]}
+						/>
+						<LabeledSelect
+							label="Incoming shift"
+							value={shift}
+							onChange={setShift}
+							options={SHIFTS as unknown as readonly string[]}
+						/>
 						<button
-							type="button"
-							onClick={() => copyToClipboard(report)}
-							className="inline-flex items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+							type="submit"
+							disabled={isLoading}
+							className="mt-1 inline-flex items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:cursor-not-allowed disabled:opacity-60"
 						>
-							<DownloadIcon className="size-3" aria-hidden="true" />
-							Copy Markdown
+							{isLoading ? (
+								<>
+									<span
+										aria-hidden="true"
+										className="size-3 animate-breathe rounded-full bg-white"
+									/>
+									Generating…
+								</>
+							) : (
+								<>
+									<PlayIcon className="size-4" aria-hidden="true" />
+									Generate report
+								</>
+							)}
 						</button>
-						<button
-							type="button"
-							onClick={() => typeof window !== "undefined" && window.print()}
-							className="inline-flex items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
-						>
-							<Printer className="size-3" aria-hidden="true" />
-							Print / PDF
-						</button>
-					</div>
-				) : null}
-				<RecentReports
-					signedIn={signedIn}
-					refreshKey={recentRefreshKey}
-					onLoad={handleLoadRecent}
-				/>
-			</aside>
+					</form>
+					{status === "ready" && report ? (
+						<div className="flex flex-wrap gap-2">
+							<button
+								type="button"
+								onClick={() => copyToClipboard(report)}
+								className="inline-flex items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+							>
+								<DownloadIcon className="size-3" aria-hidden="true" />
+								Copy Markdown
+							</button>
+							<button
+								type="button"
+								onClick={() => typeof window !== "undefined" && window.print()}
+								className="inline-flex items-center justify-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+							>
+								<Printer className="size-3" aria-hidden="true" />
+								Print / PDF
+							</button>
+						</div>
+					) : null}
+					<RecentReports
+						signedIn={signedIn}
+						refreshKey={recentRefreshKey}
+						onLoad={handleLoadRecent}
+					/>
+				</aside>
 
-			<section
-				aria-live="polite"
-				className="min-h-[360px] rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 md:p-6 print:border-0 print:p-0"
-			>
-				{status === "idle" && <EmptyState />}
-				{isLoading && (
-					<StreamingView phase={status} report={report} meta={meta} />
-				)}
-				{status === "error" && (
-					<div
-						role="alert"
-						className="rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
-					>
-						{error}
-					</div>
-				)}
-				{status === "ready" && meta && (
-					<ReportView
-						meta={meta}
-						report={report}
-						source={readySource}
-						onRegenerate={handleRegenerate}
-					/>
-				)}
-			</section>
+				<section
+					aria-live="polite"
+					className="min-h-[360px] rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 md:p-6 print:border-0 print:p-0"
+				>
+					{status === "idle" && <EmptyState />}
+					{isLoading && (
+						<StreamingView phase={status} report={report} meta={meta} />
+					)}
+					{status === "error" && (
+						<div
+							role="alert"
+							className="rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
+						>
+							{error}
+						</div>
+					)}
+					{status === "ready" && meta && (
+						<ReportView
+							meta={meta}
+							report={report}
+							source={readySource}
+							onRegenerate={handleRegenerate}
+						/>
+					)}
+				</section>
 			</div>
 		</div>
 	);
@@ -490,20 +507,22 @@ function EmptyState() {
 			<p className="font-medium text-[var(--text)]">No report yet</p>
 			<p className="mt-1 max-w-md text-xs text-[var(--text-muted)]">
 				Pick a unit + shift and click{" "}
-				<span className="font-medium text-[var(--text)]">Generate report</span>. Unit
-				3 Evening is the demo's richest dataset — outage in progress, 3 active
-				clearances, multiple work orders.
+				<span className="font-medium text-[var(--text)]">Generate report</span>.
+				Unit 3 Evening is the demo's richest dataset — outage in progress, 3
+				active clearances, multiple work orders.
 			</p>
 		</div>
 	);
 }
 
-const PHASE_LABELS: Record<Exclude<Status, "idle" | "ready" | "error">, string> =
-	{
-		pulling: "Pulling plant snapshot",
-		drafting: "Drafting turnover",
-		finalizing: "Finalizing",
-	};
+const PHASE_LABELS: Record<
+	Exclude<Status, "idle" | "ready" | "error">,
+	string
+> = {
+	pulling: "Pulling plant snapshot",
+	drafting: "Drafting turnover",
+	finalizing: "Finalizing",
+};
 
 function StreamingView({
 	phase,
@@ -514,9 +533,11 @@ function StreamingView({
 	report: string;
 	meta: GeneratorMeta | null;
 }) {
-	const phaseKey = (phase === "idle" || phase === "ready" || phase === "error"
-		? "pulling"
-		: phase) as keyof typeof PHASE_LABELS;
+	const phaseKey = (
+		phase === "idle" || phase === "ready" || phase === "error"
+			? "pulling"
+			: phase
+	) as keyof typeof PHASE_LABELS;
 	const phases: (keyof typeof PHASE_LABELS)[] = [
 		"pulling",
 		"drafting",
@@ -542,7 +563,9 @@ function StreamingView({
 					<li key={p} className="flex items-center gap-1.5">
 						<span
 							className={`inline-block size-1.5 rounded-full ${
-								i <= activeIdx ? "bg-[var(--accent-brand)]" : "bg-[var(--border)]"
+								i <= activeIdx
+									? "bg-[var(--accent-brand)]"
+									: "bg-[var(--border)]"
 							}`}
 							aria-hidden="true"
 						/>
@@ -569,11 +592,11 @@ function StreamingView({
 				</div>
 			) : (
 				<div className="space-y-2" aria-hidden="true">
-					{[...Array(6)].map((_, i) => (
+					{SKELETON_WIDTHS.map((w) => (
 						<div
-							key={i}
+							key={`sk-w${w}`}
 							className="h-3 w-full animate-breathe rounded bg-[var(--border)]/60"
-							style={{ width: `${60 + ((i * 13) % 35)}%` }}
+							style={{ width: `${w}%` }}
 						/>
 					))}
 				</div>
@@ -602,7 +625,10 @@ const SECTION_JUMP_LABELS = [
 // feel without pretending the data isn't already buffered server-side.
 function useDrainedText(
 	source: string,
-	{ baseCharsPerSec = 80, maxBehind = 400 }: { baseCharsPerSec?: number; maxBehind?: number } = {},
+	{
+		baseCharsPerSec = 80,
+		maxBehind = 400,
+	}: { baseCharsPerSec?: number; maxBehind?: number } = {},
 ): string {
 	const [displayed, setDisplayed] = useState("");
 	const sourceRef = useRef(source);
@@ -610,7 +636,8 @@ function useDrainedText(
 
 	useEffect(() => {
 		let rafId: number | null = null;
-		let last = typeof performance !== "undefined" ? performance.now() : Date.now();
+		let last =
+			typeof performance !== "undefined" ? performance.now() : Date.now();
 		function tick(now: number) {
 			const dt = now - last;
 			last = now;
@@ -664,9 +691,9 @@ function ReportView({
 
 	// Extract section h2's from the markdown to build the jump rail.
 	const presentSections = useMemo(() => {
-		const headings = Array.from(report.matchAll(/^##\s+(?:\d+\.\s+)?(.+)$/gm)).map(
-			(m) => m[1].trim(),
-		);
+		const headings = Array.from(
+			report.matchAll(/^##\s+(?:\d+\.\s+)?(.+)$/gm),
+		).map((m) => m[1].trim());
 		return SECTION_JUMP_LABELS.filter((label) =>
 			headings.some((h) => h.toLowerCase().includes(label.toLowerCase())),
 		);
