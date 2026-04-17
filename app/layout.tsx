@@ -17,10 +17,49 @@ const jetbrainsMono = JetBrains_Mono({
 	display: "swap",
 });
 
+const SITE_URL = "https://npx.curlycloud.dev";
+const SITE_TITLE = "NPXai Demo — CNSC Regulatory Knowledge Hub";
+const SITE_DESCRIPTION =
+	"A working demo for NPX Innovation: retrieval-augmented Q&A over 19 CNSC REGDOCs with inline citations, plus a CANDU shift turnover generator over simulated Bruce Power data.";
+
 export const metadata: Metadata = {
-	title: "NPXai Demo — CNSC Regulatory Knowledge Hub",
-	description:
-		"A demo app built for NPX Innovation: RAG-powered CNSC REGDOC Knowledge Hub and CANDU shift turnover generator.",
+	metadataBase: new URL(SITE_URL),
+	title: {
+		default: SITE_TITLE,
+		template: "%s — NPXai Demo",
+	},
+	description: SITE_DESCRIPTION,
+	applicationName: "NPXai Demo",
+	authors: [
+		{ name: "Raj Dholakia", url: "https://www.linkedin.com/in/rajdholakia" },
+	],
+	keywords: [
+		"NPX Innovation",
+		"CNSC",
+		"REGDOC",
+		"CANDU",
+		"nuclear regulatory",
+		"RAG",
+		"shift turnover",
+		"Bruce Power",
+	],
+	openGraph: {
+		type: "website",
+		url: SITE_URL,
+		title: SITE_TITLE,
+		description: SITE_DESCRIPTION,
+		siteName: "NPXai Demo",
+		locale: "en_CA",
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: SITE_TITLE,
+		description: SITE_DESCRIPTION,
+	},
+	robots: {
+		index: true,
+		follow: true,
+	},
 };
 
 export default function RootLayout({

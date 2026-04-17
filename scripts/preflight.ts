@@ -44,6 +44,8 @@ const checks: Array<[string, string[], boolean]> = [
 			"hooks",
 			"lib",
 			"scripts",
+			// Self-exclude: the regex pattern lives inside preflight.ts itself.
+			":(exclude)scripts/preflight.ts",
 		],
 		true,
 	],
