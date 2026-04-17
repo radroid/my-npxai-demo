@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { Footer } from "@/components/site/Footer";
-import { TopNav } from "@/components/site/TopNav";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -68,17 +67,18 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" suppressHydrationWarning>
 			<body
 				className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
 			>
-				<TooltipProvider>
-					<div className="flex min-h-screen flex-col">
-						<TopNav />
-						<div className="flex-1">{children}</div>
-						<Footer />
-					</div>
-				</TooltipProvider>
+				<ThemeProvider
+					attribute="class"
+					defaultTheme="system"
+					enableSystem
+					disableTransitionOnChange
+				>
+					<TooltipProvider>{children}</TooltipProvider>
+				</ThemeProvider>
 			</body>
 		</html>
 	);

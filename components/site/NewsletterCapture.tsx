@@ -34,12 +34,12 @@ export const NewsletterCapture: FC = () => {
 				value={email}
 				onChange={(e) => setEmail(e.target.value)}
 				placeholder="you@company.com"
-				className="flex-1 rounded-md border border-[--border] bg-[--surface] px-3 py-2 text-sm text-[--text] placeholder:text-[--text-muted] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+				className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 			/>
 			<button
 				type="submit"
 				disabled={status === "sent"}
-				className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[--accent-brand] px-4 text-sm font-medium text-white transition-colors hover:bg-[--accent-brand-hover] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] disabled:cursor-default disabled:opacity-80"
+				className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-4 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:cursor-default disabled:opacity-80"
 			>
 				{status === "sent" ? (
 					<>

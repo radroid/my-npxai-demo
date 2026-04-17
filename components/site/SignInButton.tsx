@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
@@ -26,7 +26,7 @@ const COPY = {
 	retry: "Try again",
 };
 
-export function SignInButton() {
+export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 	const [open, setOpen] = useState(false);
 	const [status, setStatus] = useState<Status>("idle");
 	const [email, setEmail] = useState("");
@@ -68,17 +68,19 @@ export function SignInButton() {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogTrigger asChild>
-				<button
-					type="button"
-					className="inline-flex h-8 items-center rounded-md bg-[--accent] px-3 text-xs font-medium text-[--bg] transition-colors hover:bg-[--accent-hover] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] focus-visible:ring-offset-2 focus-visible:ring-offset-[--surface]"
-				>
-					Sign in
-				</button>
+				{trigger ?? (
+					<button
+						type="button"
+						className="inline-flex h-8 cursor-pointer items-center rounded-md bg-[var(--accent-brand)] px-3 text-xs font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
+					>
+						Sign in
+					</button>
+				)}
 			</DialogTrigger>
-			<DialogContent className="border-[--border] bg-[--surface] text-[--text] sm:max-w-md max-sm:h-full max-sm:max-w-full max-sm:rounded-none">
+			<DialogContent className="border-[var(--border)] bg-[var(--surface)] text-[var(--text)] sm:max-w-md max-sm:h-full max-sm:max-w-full max-sm:rounded-none">
 				<DialogHeader>
-					<DialogTitle className="text-[--text]">{COPY.title}</DialogTitle>
-					<DialogDescription className="text-[--text-muted]">
+					<DialogTitle className="text-[var(--text)]">{COPY.title}</DialogTitle>
+					<DialogDescription className="text-[var(--text-muted)]">
 						{COPY.blurb}
 					</DialogDescription>
 				</DialogHeader>
@@ -87,13 +89,13 @@ export function SignInButton() {
 					<div
 						aria-live="polite"
 						id={statusId}
-						className="rounded-md border border-[--border] bg-[--surface-2] px-3 py-2 text-sm text-[--text]"
+						className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text)]"
 					>
 						{COPY.success}
 					</div>
 				) : (
 					<form onSubmit={onSubmit} className="flex flex-col gap-3">
-						<label htmlFor={emailId} className="text-sm text-[--text-muted]">
+						<label htmlFor={emailId} className="text-sm text-[var(--text-muted)]">
 							{COPY.emailLabel}
 						</label>
 						<input
@@ -106,7 +108,7 @@ export function SignInButton() {
 							onChange={(e) => setEmail(e.target.value)}
 							placeholder={COPY.emailPlaceholder}
 							disabled={status === "loading"}
-							className="h-10 rounded-md border border-[--border] bg-[--bg] px-3 text-sm text-[--text] placeholder:text-[--text-muted] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] disabled:opacity-60"
+							className="h-10 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:opacity-60"
 						/>
 
 						{status === "error" ? (
@@ -114,13 +116,13 @@ export function SignInButton() {
 								role="alert"
 								aria-live="polite"
 								id={statusId}
-								className="rounded-md border border-[--danger] bg-[--danger]/10 px-3 py-2 text-sm text-[--danger]"
+								className="rounded-md border border-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]"
 							>
 								<p>{COPY.error}</p>
 								<button
 									type="button"
 									onClick={reset}
-									className="mt-2 inline-flex items-center text-xs font-medium text-[--text] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] rounded-sm"
+									className="mt-2 inline-flex cursor-pointer items-center text-xs font-medium text-[var(--text)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] rounded-sm"
 								>
 									{COPY.retry}
 								</button>
@@ -131,7 +133,7 @@ export function SignInButton() {
 							type="submit"
 							disabled={status === "loading" || !email.trim()}
 							aria-describedby={status === "error" ? statusId : undefined}
-							className="mt-1 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[--accent] px-4 text-sm font-medium text-[--bg] transition-colors hover:bg-[--accent-hover] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] focus-visible:ring-offset-2 focus-visible:ring-offset-[--surface] disabled:cursor-not-allowed disabled:opacity-60"
+							className="mt-1 inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-4 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{status === "loading" ? (
 								<>
@@ -153,7 +155,7 @@ function Spinner() {
 	return (
 		<span
 			aria-hidden="true"
-			className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[--bg]/40 border-t-[--bg]"
+			className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
 		/>
 	);
 }

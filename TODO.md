@@ -68,7 +68,17 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] **Record 90-second Loom video** — follow shot list + script in Appendix I.1. Do the pre-warm query + two takes. Replace `{LOOM_URL}` etc. in the outreach drafts once uploaded. *(Only remaining human task. Flip repo to public immediately after recording per Raj.)*
 - [x] Personalize the Appendix I.2 outreach drafts (Kshitij, Bharath, Margaret, info@ email) — tune tone in your voice, add {LOOM_URL} / {DEMO_URL} / {REPO_URL} *(Raj 2026-04-17 night — drafts personalized; {LOOM_URL} stub stays until Loom landed)*
 
-### Tuesday Apr 21 — Outreach
+### Phase 6 — Frontend overhaul (opened 2026-04-17 night)
+- [ ] Apply the `generated_reports` migration to Supabase once the agent lands it (`bunx supabase db push --linked`)
+- [ ] Apply the `chat_threads` + `chat_messages` migration to Supabase once the agent lands it (`bunx supabase db push --linked`)
+- [ ] Gut-check the northern-lights hero animation at 1x + 1.5x viewport — reject if it distracts from the headline or tanks Lighthouse Performance
+- [ ] Confirm the operator-grade palette (agent extracts a Vercel/Linear/Palantir-referenced darker-navy variant, keeps one aurora cue from NPXai) before the swap lands
+- [ ] Eyeball the light-mode pass in daylight on a real device — dark-only was the prior default; this is the first time the app reads under direct sunlight
+- [ ] Decide whether the marketing landing copy stays as-is or gets rewritten to match the NPXai tone (agent can draft; final voice is yours)
+- [ ] End-to-end sign-in smoke **after** hybrid thread persistence ships: anon creates 2 threads → sign in → threads visible on server, rename works, second device sees the same threads
+- [ ] End-to-end Generator cache smoke: generate Unit 3 Evening → wait → regenerate (should be cached with "nothing has changed") → force-click Regenerate → confirm new OpenAI call fires
+
+### Tuesday Apr 21 — Outreach (paused behind Phase 6 completion)
 - [ ] 9 AM — LinkedIn DM to Kshitij Ahuja
 - [ ] 11 AM — LinkedIn DM to Bharath Nangia
 - [ ] 2 PM — Email info@npxinnovation.ca
@@ -183,6 +193,73 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Assist human with `git push origin main` and verify the Cloudflare Git integration build log is green (dashboard → Workers & Pages → npxai-demo → Deployments)
 - [ ] Post-deploy smoke test: `bun run eval:kb` (Appendix E) + Generator run for Unit 3 Evening (the demo "money shot" per Appendix F.5) + spot check other units/shifts
 - [ ] Post-deploy sign-in smoke: in an incognito window, open the prod URL → click Sign In → enter Raj's email → receive and click magic link → land on `/knowledge-hub` with session cookie set → issue one query and confirm `tier` appears in the request log (Appendix H.5 + J.10)
+
+### Phase 6 — Frontend overhaul (opened 2026-04-17 night)
+
+> Ordering is deliberate — see the 2026-04-17 "Phase 6 ordering" decision. Work top-to-bottom: 6A → 6D.light → 6C → 6B (KH UX, threads last) → 6D.brand → 6E → 6F.
+
+**6A · Architecture & chrome — split landing from app**
+- [ ] Introduce route groups: `app/(marketing)/` for landing + Insights + Equivalency + FAQ, `app/(app)/` for Knowledge Hub + Generator. Each group gets its own `layout.tsx`.
+- [ ] Remove the global `<TopNav />` and `<Footer />` from the app group; keep them on marketing. App group gets a compact header (logo + user chip + theme toggle) and no footer — move the simulated-data disclaimer to a single muted chip inside the app shell.
+- [ ] Build a shared `AppShell` in the app group — Vercel-dashboard-style fixed left sidebar with pinned surfaces (Knowledge Hub, Generator) at the top and contextual rails below (KH thread list / Generator recent reports) on their respective routes. Collapsible to icon-only rail.
+- [ ] Resolve the sidebar/nav/footer z-index + stacking chaos — KH sidebar should live inside `AppShell`, not compete with TopNav + the existing `!top-14 !h-[calc(100svh-3.5rem)]` overrides in `KnowledgeHubShell.tsx:45`.
+
+**6D · Theme scaffolding (light + dark tokens, shipped early so all later work consumes both)**
+- [ ] Install `next-themes`; wrap the root layout in `ThemeProvider` with `attribute="class"` + `defaultTheme="system"`.
+- [ ] Author a full light-mode token set in `app/globals.css` paralleling the current dark set — `--bg`, `--surface`, `--surface-2`, `--text`, `--text-muted`, `--accent-brand`, `--requirement`, `--guidance`, `--success`, `--warning`, `--danger`. WCAG AA contrast verified per token pair.
+- [ ] Build shadcn `ThemeToggle` (sun/moon icon, tri-state: Light / Dark / System). Mount top-right in both the marketing nav and the app shell header.
+- [ ] Light-mode variants of the four-state catalog (loading skeleton, empty, error, partial) for KH + Generator — per the "ships alongside dark" decision, every state Appendix G catalogued now has a light counterpart.
+
+**6C · Generator UX (latency fix + report persistence + operator-grade styling)**
+- [ ] Replace the native `<select>` elements in `components/generator/GeneratorForm.tsx:208-219` with shadcn `Select` for Station / Unit / Shift. Keep the same submit path — only the control is swapped.
+- [ ] Fix the Generator latency: `app/api/generator/turnover/route.ts:68` currently calls OpenAI with `stream: false` and `max_tokens = 1500`, so the entire report generates before any bytes reach the browser. Switch to `stream: true` and pipe through `createUIMessageStream` (mirror the Knowledge Hub pattern) so tokens render progressively. `scanOutput` moves to a post-stream finalize step.
+- [ ] Surface the pipeline as three user-visible phases: "Pulling plant snapshot" (RPC in-flight) → "Drafting turnover" (first tokens arriving) → "Finalizing" (output guard pass). Skeleton shimmer per phase; `aria-live="polite"` on the phase label.
+- [ ] Report layout — operator-grade, not TOC-heavy:
+  - [ ] Left-rail quick-jump with the 6 section labels (Plant Status / Safety Systems / Work & Clearances / Key Events / Watch Items / Recommended Actions). Active-section highlight on scroll. Lighter than a full sticky TOC.
+  - [ ] Anchor IDs on every heading + smooth-scroll links from the rail.
+  - [ ] Severity callouts: `[CRITICAL]` → red-outlined block with alert icon, `[ATTENTION]` → amber, `[ROUTINE]` → muted. Replace the current inline badges.
+  - [ ] Collapsible section cards so operators can fold routine noise away.
+  - [ ] Thin 1px borders + deep saturated surface per the Vercel-dashboard reference class. Zero decorative gradients in the app shell.
+- [ ] Add a print stylesheet + "Save as PDF" button (browser print route) so operators can hand off the report.
+- [ ] **Generated-report persistence** (hybrid per the 2026-04-17 decision):
+  - [ ] Supabase migration: `generated_reports(id uuid pk, owner_id uuid references auth.users, station text, unit int, shift text, report_markdown text, snapshot_hash text, generated_at timestamptz default now())`. RLS: owner-only read/write. Compound index on `(owner_id, station, unit, shift, generated_at desc)`.
+  - [ ] RPCs (`SECURITY DEFINER`): `list_reports()`, `get_report(p_id uuid)`, `save_report(p_station text, p_unit int, p_shift text, p_markdown text, p_snapshot_hash text)`, `delete_report(p_id uuid)`. Grant EXECUTE to `authenticated` only.
+  - [ ] Update `get_turnover_snapshot` (or add a sibling `get_snapshot_hash`) to return a hash over `(plant_status.updated_at ∪ work_orders.updated_at ∪ shift_log.updated_at)` for the requested unit — this is the dedupe key.
+  - [ ] Route logic: before calling OpenAI, hash the snapshot. If a signed-in user has an existing report with the same `snapshot_hash`, return it with "Last generated {x} ago, nothing has changed" + an explicit **Regenerate** button. Otherwise generate + `save_report` after streaming completes.
+  - [ ] Anon path: store the last 5 reports in localStorage keyed by `{station,unit,shift,snapshot_hash}` with the same dedupe behavior. Ring-buffer eviction beyond 5.
+  - [ ] UI: "Recent reports" rail in the Generator shell (signed-in: server; anon: localStorage). Each row → station/unit/shift badge + relative time + trash icon. Click to load instantly from cache.
+
+**6B · Knowledge Hub chat UX**
+- [ ] Streaming-state indicator: while assistant is responding, show an "Answering…" row with animated typing dots inside the thread (distinct from the existing abort button); read assistant-ui's streaming state so it disappears as soon as tokens start arriving.
+- [ ] Make inline citation chips in `components/assistant-ui/markdown-text.tsx` clickable — resolve each `[REGDOC-X.X.X §Y.Z]` to the matching chunk URL from the `data-sources` UIMessage part and render as an `<a target="_blank">` with the existing chip styling. Keep the Sources panel as the secondary detail view.
+- [ ] Kill thread auto-naming. Threads start and stay at "New thread" unless the user renames. (Confirm `lib/thread-store.ts:49` default + any upstream assistant-ui auto-title are both neutralized.)
+- [ ] Add rename + delete UX to every thread row (kebab → Rename / Delete) for anon and signed-in. Inline input on Rename, Enter/Esc handling, focus trap.
+- [ ] **Hybrid thread persistence** (landed late per the ordering decision — biggest RLS surface, ships after the rest of Phase 6 is green):
+  - [ ] Write `supabase/migrations/…_chat_threads.sql` — `chat_threads(id uuid pk, owner_id uuid references auth.users, title text, created_at, updated_at)` and `chat_messages(id uuid pk, thread_id uuid, role text, content jsonb, created_at)`. RLS: owner-only select/insert/update/delete on both tables. No direct table grants.
+  - [ ] RPCs (`SECURITY DEFINER`): `list_threads()`, `get_thread(p_id uuid)`, `save_message(p_thread uuid, p_role text, p_content jsonb)`, `rename_thread(p_id uuid, p_title text)`, `delete_thread(p_id uuid)`. Grant EXECUTE to `authenticated` only.
+  - [ ] Route handlers `app/api/threads/*` wrapping the RPCs (anon key + cookies via `@supabase/ssr`). Withguard them with signed-in-only rate limits.
+  - [ ] Update `lib/thread-store.ts` to branch on `session`: localStorage for anon, `fetch('/api/threads/...')` for signed-in. Optimistic writes + background sync.
+  - [ ] One-shot migration path: on first sign-in detect any localStorage threads and POST them to a new `migrate_local_threads` RPC, then clear localStorage so the server becomes source of truth.
+- [ ] Write one integration test that proves signed-in threads survive a sign-out → sign-in round-trip (anon tier not impacted).
+
+**6D · Brand palette swap (operator-grade, not marketing-grade)**
+- [ ] Extract a dark-navy palette referenced against **Vercel Dashboard / Linear / Palantir Foundry** — instrument-panel calm, thin 1px borders, deep saturated surfaces. Pull one cue from npxai.com (the overall "energy of the deep + aurora") but darken and desaturate so the app reads as an operator tool, not a marketing site. Keep `--requirement` blue + `--guidance` amber — they carry semantic meaning, not decoration.
+- [ ] Drop the new values into `app/globals.css` using the existing Appendix G token names — no component-level edits cascade. Update `--bg`, `--surface`, `--surface-2`, `--border`, `--accent-brand` only.
+- [ ] Verify WCAG AA contrast against both light and dark palettes for text-on-surface, citation chips, severity callouts, and the three Generator severity blocks. Adjust any token that fails.
+- [ ] Sign-in button fix — `components/site/SignInButton.tsx` needs to render as a solid, high-contrast chip on any background (homepage hero included). Add a visible border + solid fill; never transparent over gradients.
+- [ ] Typography pass — Inter for UI; JetBrains Mono used deliberately on timestamps, REGDOC IDs, clearance codes so structured data looks structured.
+
+**6E · Marketing hero (aurora lives here and only here)**
+- [ ] Build an animated northern-lights background in the hero of `app/(marketing)/page.tsx`: layered SVG gradients + CSS `@keyframes` drifting horizontally, GPU-friendly (transforms + opacity only, no large repaints). Colors pulled from our darker palette — not NPXai's marketing teal. Honor `prefers-reduced-motion: reduce` with a static gradient fallback.
+- [ ] Confirm aurora does NOT appear on `/knowledge-hub`, `/generator`, or any app-group route. Motion stays marketing-only per the 2026-04-17 visual-direction decision.
+- [ ] Refresh the "What's in the demo" cards + "Why NPX AI?" pillars to the new brand tokens and typography.
+- [ ] Smoke-test Lighthouse on the homepage — aurora must not drop Performance below 85 on mid-tier mobile.
+
+**6F · Cross-cutting**
+- [ ] Responsive audit of the new app shell: sidebar collapses to a hamburger drawer below `md`; marketing pages stay full-width but stack card grids on mobile.
+- [ ] a11y pass — `role="navigation"` on the app sidebar, keyboard-traversable thread list + recent-reports rail, `aria-live="polite"` on streaming-state indicator and the Generator phase chip, reduced-motion fallback for the aurora, theme toggle reachable via keyboard with a proper `aria-label`.
+- [ ] Browserbase verification (new flows): homepage aurora + CTA click-through, theme toggle light ⇄ dark on every page, KH streaming indicator appears then disappears, citation chip opens the source URL in a new tab, thread rename persists across reload for signed-in users, Generator streams tokens progressively, shadcn Selects open/close correctly, Recent Reports rail loads a cached report without re-hitting OpenAI, snapshot-hash dedupe triggers when nothing has changed.
+- [ ] `bun run preflight` + `bun run build` + `bun run eval:kb` stay green after all 6A–6F changes.
 
 ### Ongoing / cross-phase
 - [ ] Keep `PLAN.md` current phase updated when phase transitions happen

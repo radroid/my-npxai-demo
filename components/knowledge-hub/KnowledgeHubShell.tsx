@@ -6,25 +6,13 @@ import {
 	useChatRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
 import { SourcesDataUI } from "@/components/knowledge-hub/SourcesDataUI";
-import {
-	Sidebar,
-	SidebarContent,
-	SidebarHeader,
-	SidebarInset,
-	SidebarProvider,
-	SidebarRail,
-	SidebarTrigger,
-} from "@/components/ui/sidebar";
 
-// Knowledge Hub client shell. Wires the assistant-ui Thread + ThreadList
-// against our own route handler (`/api/knowledge-hub/query`) instead of the
-// starter template's Assistant Cloud + `/api/chat`. Thread persistence is
-// in-memory for now — Phase 3 swaps in the localStorage zustand store
-// (`lib/thread-store.ts`) per the 2026-04-16 decision to keep threads
-// client-side only.
+const SIDEBAR_STATE_KEY = "npxai-kh-threads-collapsed";
 
 export function KnowledgeHubShell() {
 	const runtime = useChatRuntime({
@@ -33,41 +21,75 @@ export function KnowledgeHubShell() {
 			api: "/api/knowledge-hub/query",
 		}),
 	});
+	const [collapsed, setCollapsed] = useState(false);
+	const [hydrated, setHydrated] = useState(false);
+
+	useEffect(() => {
+		try {
+			const stored = window.localStorage.getItem(SIDEBAR_STATE_KEY);
+			if (stored === "1") setCollapsed(true);
+		} catch {}
+		setHydrated(true);
+	}, []);
+	useEffect(() => {
+		if (!hydrated) return;
+		try {
+			window.localStorage.setItem(SIDEBAR_STATE_KEY, collapsed ? "1" : "0");
+		} catch {}
+	}, [collapsed, hydrated]);
 
 	return (
 		<AssistantRuntimeProvider runtime={runtime}>
 			<SourcesDataUI />
-			<SidebarProvider>
-				<div className="flex h-[calc(100dvh-3.5rem)] w-full">
-					<Sidebar
+			<div className="flex h-full w-full gap-2">
+				{!collapsed ? (
+					<aside
 						role="complementary"
 						aria-label="Thread history"
-						className="!top-14 !h-[calc(100svh-3.5rem)] border-r border-[--border]"
+						className="hidden w-64 shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:flex"
 					>
-						<SidebarHeader className="border-b border-[--border] bg-[--surface] px-3 py-3">
-							<p className="text-sm font-semibold text-[--text]">
-								Knowledge Hub
-							</p>
-							<p className="text-xs text-[--text-muted]">CNSC REGDOC Q&amp;A</p>
-						</SidebarHeader>
-						<SidebarContent className="bg-[--surface] px-2 py-2">
+						<div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-3">
+							<div>
+								<p className="text-sm font-semibold text-[var(--text)]">
+									Knowledge Hub
+								</p>
+								<p className="text-xs text-[var(--text-muted)]">CNSC REGDOC Q&amp;A</p>
+							</div>
+							<button
+								type="button"
+								aria-label="Collapse thread history"
+								onClick={() => setCollapsed(true)}
+								className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+							>
+								<PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+							</button>
+						</div>
+						<div className="flex-1 overflow-y-auto px-2 py-2">
 							<ThreadList />
-						</SidebarContent>
-						<SidebarRail />
-					</Sidebar>
-					<SidebarInset className="bg-[--bg]">
-						<div className="flex h-10 shrink-0 items-center gap-2 border-b border-[--border] px-3">
-							<SidebarTrigger />
-							<span className="text-xs text-[--text-muted]">
-								Ask a regulatory question — answers cite CNSC REGDOCs.
-							</span>
 						</div>
-						<div className="flex-1 overflow-hidden">
-							<Thread />
-						</div>
-					</SidebarInset>
-				</div>
-			</SidebarProvider>
+					</aside>
+				) : null}
+				<section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+					<div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-3">
+						{collapsed ? (
+							<button
+								type="button"
+								aria-label="Expand thread history"
+								onClick={() => setCollapsed(false)}
+								className="hidden h-7 w-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] lg:inline-flex"
+							>
+								<PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+							</button>
+						) : null}
+						<span className="text-xs text-[var(--text-muted)]">
+							Ask a regulatory question — answers cite CNSC REGDOCs.
+						</span>
+					</div>
+					<div className="min-h-0 flex-1 overflow-hidden">
+						<Thread />
+					</div>
+				</section>
+			</div>
 		</AssistantRuntimeProvider>
 	);
 }

@@ -33,7 +33,7 @@ export function SourcesPanel({ data }: SourcesPanelProps) {
 				onClick={() => setOpen((v) => !v)}
 				aria-expanded={open}
 				aria-controls="sources-panel-body"
-				className="flex w-full items-center justify-between rounded-md border border-[--border] bg-[--surface] px-3 py-2 text-left text-xs text-[--text-muted] transition-colors hover:text-[--text] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+				className="flex w-full items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 			>
 				<span className="font-medium">
 					Sources · {chunks.length} snippet{chunks.length === 1 ? "" : "s"}
@@ -47,35 +47,35 @@ export function SourcesPanel({ data }: SourcesPanelProps) {
 			{open && (
 				<ol
 					id="sources-panel-body"
-					className="mt-2 space-y-2 rounded-md border border-[--border] bg-[--surface] p-2"
+					className="mt-2 space-y-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2"
 				>
 					{chunks.map((c, idx) => (
 						<li
 							key={c.id}
-							className="rounded-md border border-[--border]/60 bg-[--bg] p-2 text-xs leading-snug"
+							className="rounded-md border border-[var(--border)]/60 bg-[var(--bg)] p-2 text-xs leading-snug"
 						>
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="font-mono text-[10px] text-[--text-muted]">
+								<span className="font-mono text-[10px] text-[var(--text-muted)]">
 									S{idx + 1}
 								</span>
 								<SourceBadge chunk={c} />
 								{c.section_number ? (
-									<span className="text-[--text-muted]">
+									<span className="text-[var(--text-muted)]">
 										§{c.section_number}
 										{c.section_title ? ` — ${c.section_title}` : ""}
 									</span>
 								) : null}
-								<span className="ml-auto font-mono text-[10px] text-[--text-muted]">
+								<span className="ml-auto font-mono text-[10px] text-[var(--text-muted)]">
 									sim {c.similarity.toFixed(3)}
 								</span>
 							</div>
-							<p className="mt-1 text-[--text-muted]">{c.snippet}…</p>
+							<p className="mt-1 text-[var(--text-muted)]">{c.snippet}…</p>
 							{c.url ? (
 								<a
 									href={c.url}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="mt-1 inline-block text-[--accent] underline underline-offset-2 hover:text-[--text]"
+									className="mt-1 inline-block text-[var(--accent-brand)] underline underline-offset-2 hover:text-[var(--text)]"
 								>
 									View on cnsc-ccsn.gc.ca →
 								</a>
@@ -94,8 +94,8 @@ function SourceBadge({ chunk }: { chunk: SourceChunk }) {
 		<span
 			className={
 				isReq
-					? "rounded-full border border-[--requirement]/40 bg-[--requirement]/10 px-2 py-0.5 font-medium text-[10px] text-[--requirement]"
-					: "rounded-full border border-[--guidance]/40 bg-[--guidance]/10 px-2 py-0.5 font-medium text-[10px] text-[--guidance]"
+					? "rounded-full border border-[var(--requirement)]/40 bg-[var(--requirement)]/10 px-2 py-0.5 font-medium text-[10px] text-[var(--requirement)]"
+					: "rounded-full border border-[var(--guidance)]/40 bg-[var(--guidance)]/10 px-2 py-0.5 font-medium text-[10px] text-[var(--guidance)]"
 			}
 			title={isReq ? "Regulatory requirement" : "Guidance"}
 		>

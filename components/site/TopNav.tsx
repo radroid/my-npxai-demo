@@ -1,13 +1,17 @@
+import { BookOpen, FileText } from "lucide-react";
 import Link from "next/link";
+import { ConceptsMenu } from "@/components/site/ConceptsMenu";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { SignInButton } from "./SignInButton";
 import { UserChip } from "./UserChip";
 
-const NAV_LINKS = [
-	{ href: "/knowledge-hub", label: "Knowledge Hub" },
-	{ href: "/generator", label: "Generator" },
-	{ href: "/insights", label: "Insights" },
-	{ href: "/equivalency", label: "Equivalency" },
+// Working apps (interactive) render as primary pill buttons so the two
+// things evaluators should *try* are unmissable. Concept explainers hide
+// behind the ConceptsMenu dropdown so the row isn't busy.
+const WORKING_APPS = [
+	{ href: "/knowledge-hub", label: "Knowledge Hub", Icon: BookOpen },
+	{ href: "/generator", label: "Generator", Icon: FileText },
 ];
 
 export async function TopNav() {
@@ -17,36 +21,44 @@ export async function TopNav() {
 	} = await supabase.auth.getUser();
 
 	return (
-		<header className="sticky top-0 z-40 w-full border-b border-[--border] bg-[--surface]/90 backdrop-blur supports-[backdrop-filter]:bg-[--surface]/70">
+		<header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur supports-[backdrop-filter]:bg-[var(--surface)]/70">
 			<nav
 				aria-label="Primary"
-				className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 md:px-6"
+				className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:px-6"
 			>
 				<Link
 					href="/"
-					className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[--text] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] rounded-md"
+					className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] rounded-md"
 				>
 					<span
 						aria-hidden="true"
-						className="inline-block h-6 w-6 rounded-md bg-[--accent]"
+						className="inline-block h-6 w-6 rounded-md bg-[var(--accent-brand)]"
 					/>
 					<span>NPXai Demo</span>
 				</Link>
 
-				<ul className="hidden items-center gap-6 md:flex">
-					{NAV_LINKS.map((link) => (
-						<li key={link.href}>
+				<ul className="hidden items-center gap-2 md:flex">
+					{WORKING_APPS.map(({ href, label, Icon }) => (
+						<li key={href}>
 							<Link
-								href={link.href}
-								className="text-sm text-[--text-muted] transition-colors hover:text-[--text] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] rounded-md"
+								href={href}
+								className="group inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:border-[var(--accent-brand)] hover:bg-[var(--accent-brand)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 							>
-								{link.label}
+								<Icon
+									className="h-3.5 w-3.5 text-[var(--text-muted)] transition-colors group-hover:text-white"
+									aria-hidden="true"
+								/>
+								<span>{label}</span>
 							</Link>
 						</li>
 					))}
+					<li>
+						<ConceptsMenu />
+					</li>
 				</ul>
 
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-3">
+					<ThemeToggle />
 					{user ? <UserChip email={user.email ?? ""} /> : <SignInButton />}
 				</div>
 			</nav>

@@ -13,6 +13,10 @@ import { Children, type FC, memo, type ReactNode, useState } from "react";
 import remarkGfm from "remark-gfm";
 
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
+import {
+	findCitationMatch,
+	useCitationSources,
+} from "@/components/knowledge-hub/citation-sources";
 import { cn } from "@/lib/utils";
 
 const MarkdownTextImpl = () => {
@@ -72,13 +76,37 @@ const useCopyToClipboard = ({
 const CITATION_RE = /\[REGDOC-\d+(?:\.\d+){1,3}(?:\s+§[\d.]+)?\]/g;
 
 function CitationChip({ label }: { label: string }) {
+	const sources = useCitationSources();
+	const match = findCitationMatch(sources, label);
+	const inner = label.slice(1, -1);
+	const baseClass =
+		"mx-0.5 inline-flex items-center rounded-full border border-[var(--requirement)]/40 bg-[var(--requirement)]/10 px-1.5 py-0 font-mono text-[0.7em] text-[var(--requirement)] leading-[1.4] align-baseline";
+	const tooltip = match?.section_title
+		? `${inner} — ${match.section_title}`
+		: `CNSC citation: ${inner}`;
+
+	if (match?.url) {
+		return (
+			<a
+				href={match.url}
+				target="_blank"
+				rel="noopener noreferrer"
+				data-citation="true"
+				className={`${baseClass} cursor-pointer no-underline transition-colors hover:bg-[var(--requirement)]/20 hover:text-[var(--requirement)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--requirement)]`}
+				title={tooltip}
+			>
+				{inner}
+			</a>
+		);
+	}
+
 	return (
 		<span
 			data-citation="true"
-			className="mx-0.5 inline-flex items-center rounded-full border border-[--requirement]/40 bg-[--requirement]/10 px-1.5 py-0 font-mono text-[0.7em] text-[--requirement] leading-[1.4] align-baseline"
-			title={`CNSC citation: ${label.slice(1, -1)}`}
+			className={baseClass}
+			title={tooltip}
 		>
-			{label.slice(1, -1)}
+			{inner}
 		</span>
 	);
 }

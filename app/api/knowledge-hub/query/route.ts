@@ -113,14 +113,21 @@ export const POST = withGuard(
 	async ({ req, ctx, supabase }) => {
 		const body = (await req.json().catch(() => null)) as {
 			messages?: UIMessageLike[];
+			trigger?: string;
 		} | null;
 		const messages = body?.messages ?? [];
 		const rawQuery = extractQuery(messages);
 		const query = stripHtmlTags(sanitizeQueryText(rawQuery));
+		// AI SDK tags the request with the user's intent. On "regenerate-
+		// assistant-message" (the Refresh button in the assistant action bar)
+		// we bypass the Redis answer cache AND invalidate any existing entry,
+		// so a user who regenerates gets a genuinely fresh call to OpenAI.
+		const isRegenerate = body?.trigger === "regenerate-assistant-message";
 
 		ctx.logFields.prompt_version = PROMPT_VERSION;
 		ctx.logFields.query_len = query.length;
 		ctx.logFields.model = OPENAI_MODELS.chat;
+		ctx.logFields.trigger = body?.trigger ?? "unknown";
 
 		if (!query) {
 			logGuardEvent({
@@ -167,9 +174,18 @@ export const POST = withGuard(
 		}
 
 		// Cache hit check — skips embed + RPC + LLM for repeat queries.
+		// Regenerate requests bypass the cache AND drop the stored entry, so
+		// the new response overwrites the stale one for future hits.
 		const redis = getRedis();
 		const cKey = await cacheKey(query);
-		const cached = (await redis.get<CachedAnswer>(cKey)) ?? null;
+		if (isRegenerate) {
+			redis.del(cKey).catch((err) =>
+				console.error("kh_cache_invalidate_error", err),
+			);
+		}
+		const cached = isRegenerate
+			? null
+			: ((await redis.get<CachedAnswer>(cKey)) ?? null);
 		if (cached?.text) {
 			ctx.logFields.cache = "hit";
 			ctx.logFields.fallback_taken = false;

@@ -7,6 +7,10 @@ Rules for agents working in this repo. Only essential, repeatedly-relevant rules
 - Use **Bun** as the package manager. Never run `npm`, `yarn`, or `pnpm`. Use `bun install`, `bun add`, `bun dev`, `bunx`.
 - **Assume the dev server is already running.** Do not start, restart, or kill it.
 - **Prefer CLIs over dashboards or ad-hoc drivers for external services.** For databases and deployment platforms (Supabase, Cloudflare, Vercel, etc.), use the official CLI (`supabase`, `wrangler`, `vercel`) for schema changes, migrations, env management, and deploys. Do not propose new npm drivers (`postgres.js`, `pg`) or "paste into the dashboard SQL editor" as the primary path. The CLIs give us versioned, replayable, scriptable operations; dashboard-paste is a last resort when no CLI command exists.
+- **Every frontend change must work in BOTH light and dark themes.** The app ships both modes (`next-themes` + the shadcn `ThemeToggle`). Whenever you touch colors/backgrounds/borders/text:
+  1. Reference semantic tokens from `app/globals.css` — never hardcoded hex values in components. Available tokens: `--bg`, `--surface`, `--surface-2`, `--text`, `--text-muted`, `--accent-brand`, `--accent-brand-hover`, `--requirement`, `--guidance`, `--success`, `--warning`, `--danger`, `--border`, `--border-strong`. Light values are in `:root`, dark values in `.dark`.
+  2. Mentally verify each element in BOTH palettes before shipping. Special danger zone: white/colored text on colored backgrounds — these flip catastrophically if a token doesn't resolve or the contrast doesn't survive the theme swap.
+  3. **Tailwind 4 CSS-variable syntax matters.** Write `bg-[var(--accent-brand)]` (explicit `var()`) or `bg-(--accent-brand)` (Tailwind 4 parentheses shorthand). Do NOT use the bracket-only form `bg-[--accent-brand]` — Tailwind 4 treats that as a literal token and the background silently fails to render, leaving white-on-white text in light mode. Same rule for `text-`, `border-`, `ring-`, `fill-`, `stroke-` arbitrary-value utilities.
 
 ## PLAN.md + TODO.md workflow
 

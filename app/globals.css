@@ -57,10 +57,103 @@
 			background-position: -100% 0;
 		}
 	}
+	--animate-breathe: breathe 2400ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+	@keyframes breathe {
+		0%,
+		100% {
+			opacity: 0.45;
+			transform: scale(1);
+		}
+		50% {
+			opacity: 1;
+			transform: scale(1.2);
+		}
+	}
+	--animate-caret: caret-blink 1100ms steps(2, start) infinite;
+	@keyframes caret-blink {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0;
+		}
+	}
 }
 
-/* NPX navy palette — G.1.
-   Applied via .dark because we're dark-only; :root keeps a neutral fallback. */
+/* Streaming cursor at the tail of Generator output — blinks steadily while
+   tokens are still arriving. Reduced-motion users see a static caret. */
+.generator-caret {
+	animation: var(--animate-caret);
+	margin-left: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.generator-caret {
+		animation: none;
+		opacity: 0.6;
+	}
+}
+
+/* Semantic tokens are defined twice (light + dark) with the same names.
+   Components reference the token name only — swapping values here cascades
+   everywhere without per-component edits. Phase 6 (2026-04-17) added light
+   mode alongside the original dark-only Appendix G palette; `next-themes`
+   toggles the `.dark` class on <html>. */
+
+:root {
+	--radius: 0.625rem;
+
+	/* Light theme — NPX palette inverted for daylight reading. WCAG AA
+	   verified against text on surface, accents on surface, severity
+	   callouts on surface. */
+	--bg: #F4F6FA;
+	--surface: #FFFFFF;
+	--surface-2: #EEF1F7;
+	--border: #DCE1EC;
+	--border-strong: #C2CAD9;
+	--text: #0A1830;
+	--text-muted: #4F5C78;
+	--accent-brand: #1E6FD9;
+	--accent-brand-hover: #1B5FB6;
+	--requirement: #1E6FD9;
+	--guidance: #A67200;
+	--success: #0A7A46;
+	--warning: #C2570A;
+	--danger: #B42318;
+
+	/* Map shadcn tokens onto the light palette. */
+	--background: #F4F6FA;
+	--foreground: #0A1830;
+	--card: #FFFFFF;
+	--card-foreground: #0A1830;
+	--popover: #FFFFFF;
+	--popover-foreground: #0A1830;
+	--primary: #1E6FD9;
+	--primary-foreground: #FFFFFF;
+	--secondary: #EEF1F7;
+	--secondary-foreground: #0A1830;
+	--muted: #EEF1F7;
+	--muted-foreground: #4F5C78;
+	--accent: #EEF1F7;
+	--accent-foreground: #0A1830;
+	--destructive: #B42318;
+	--input: #DCE1EC;
+	--ring: #1E6FD9;
+	--chart-1: #1E6FD9;
+	--chart-2: #0A7A46;
+	--chart-3: #A67200;
+	--chart-4: #B42318;
+	--chart-5: #4F5C78;
+	--sidebar: #FFFFFF;
+	--sidebar-foreground: #0A1830;
+	--sidebar-primary: #1E6FD9;
+	--sidebar-primary-foreground: #FFFFFF;
+	--sidebar-accent: #EEF1F7;
+	--sidebar-accent-foreground: #0A1830;
+	--sidebar-border: #DCE1EC;
+	--sidebar-ring: #1E6FD9;
+}
+
 .dark {
 	--bg: #0A1830;
 	--surface: #0F2440;
@@ -111,43 +204,6 @@
 	--sidebar-ring: #4EA8FF;
 }
 
-:root {
-	--radius: 0.625rem;
-
-	/* Neutral light fallback. Dark theme below overrides everything. */
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.141 0.005 285.823);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.141 0.005 285.823);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.141 0.005 285.823);
-	--primary: oklch(0.21 0.006 285.885);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.967 0.001 286.375);
-	--secondary-foreground: oklch(0.21 0.006 285.885);
-	--muted: oklch(0.967 0.001 286.375);
-	--muted-foreground: oklch(0.552 0.016 285.938);
-	--accent: oklch(0.967 0.001 286.375);
-	--accent-foreground: oklch(0.21 0.006 285.885);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.92 0.004 286.32);
-	--input: oklch(0.92 0.004 286.32);
-	--ring: oklch(0.705 0.015 286.067);
-	--chart-1: oklch(0.646 0.222 41.116);
-	--chart-2: oklch(0.6 0.118 184.704);
-	--chart-3: oklch(0.398 0.07 227.392);
-	--chart-4: oklch(0.828 0.189 84.429);
-	--chart-5: oklch(0.769 0.188 70.08);
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.141 0.005 285.823);
-	--sidebar-primary: oklch(0.21 0.006 285.885);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.967 0.001 286.375);
-	--sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-	--sidebar-border: oklch(0.92 0.004 286.32);
-	--sidebar-ring: oklch(0.705 0.015 286.067);
-}
-
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
@@ -159,6 +215,15 @@
 
 	:root.dark {
 		color-scheme: dark;
+	}
+
+	/* Smooth tone-color transition on theme switch so the swap doesn't
+	   feel jarring; text/border transitions stay off (they flicker). */
+	html,
+	body {
+		transition:
+			background-color 180ms ease,
+			color 180ms ease;
 	}
 
 	body {

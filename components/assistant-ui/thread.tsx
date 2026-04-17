@@ -24,7 +24,7 @@ import {
 	RefreshCwIcon,
 	SquareIcon,
 } from "lucide-react";
-import type { FC } from "react";
+import { type FC, useMemo } from "react";
 import {
 	ComposerAddAttachment,
 	ComposerAttachments,
@@ -34,6 +34,10 @@ import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { Reasoning } from "@/components/assistant-ui/reasoning";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
+import {
+	type CitationSource,
+	CitationSourcesProvider,
+} from "@/components/knowledge-hub/citation-sources";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -166,7 +170,7 @@ const StarterQuestions: FC = () => {
 						composer.setText(s.prompt);
 						composer.send();
 					}}
-					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 				>
 					<span className="block font-medium">{s.title}</span>
 					<span className="mt-0.5 block text-muted-foreground text-xs">
@@ -277,32 +281,58 @@ const MessageError: FC = () => {
 	);
 };
 
-const AssistantMessage: FC = () => {
-	return (
-		<MessagePrimitive.Root
-			className="aui-assistant-message-root fade-in slide-in-from-bottom-1 relative mx-auto w-full max-w-(--thread-max-width) animate-in py-3 duration-150"
-			data-role="assistant"
-		>
-			<div className="aui-assistant-message-content wrap-break-word px-2 text-foreground leading-relaxed">
-				<MessagePrimitive.Parts>
-					{({ part }) => {
-						if (part.type === "text") return <MarkdownText />;
-						if (part.type === "reasoning") return <Reasoning {...part} />;
-						if (part.type === "tool-call")
-							return part.toolUI ?? <ToolFallback {...part} />;
-						// `data` parts (including our data-sources payload) are
-						// handled via makeAssistantDataUI in KnowledgeHubShell.
-						return null;
-					}}
-				</MessagePrimitive.Parts>
-				<MessageError />
-			</div>
+const EMPTY_CITATION_SOURCES: CitationSource[] = [];
 
-			<div className="aui-assistant-message-footer mt-1 ml-2 flex">
-				<BranchPicker />
-				<AssistantActionBar />
-			</div>
-		</MessagePrimitive.Root>
+const AssistantMessage: FC = () => {
+	// Subscribe to the stable `parts` reference only; deriving citationSources
+	// inside a selector closure returns a new [] literal on every call and
+	// throws `getSnapshot should be cached` → maximum update depth exceeded.
+	// Derive in useMemo instead so the memoized array identity is stable.
+	const messageParts = useAuiState((s) => s.message.parts);
+	const citationSources = useMemo<CitationSource[]>(() => {
+		const parts = messageParts as unknown as Array<{
+			type?: string;
+			data?: { chunks?: CitationSource[] };
+		}>;
+		for (const part of parts ?? []) {
+			if (
+				part?.type === "data-sources" &&
+				part.data &&
+				Array.isArray(part.data.chunks)
+			) {
+				return part.data.chunks;
+			}
+		}
+		return EMPTY_CITATION_SOURCES;
+	}, [messageParts]);
+
+	return (
+		<CitationSourcesProvider sources={citationSources}>
+			<MessagePrimitive.Root
+				className="aui-assistant-message-root fade-in slide-in-from-bottom-1 relative mx-auto w-full max-w-(--thread-max-width) animate-in py-3 duration-150"
+				data-role="assistant"
+			>
+				<div className="aui-assistant-message-content wrap-break-word px-2 text-foreground leading-relaxed">
+					<MessagePrimitive.Parts>
+						{({ part }) => {
+							if (part.type === "text") return <MarkdownText />;
+							if (part.type === "reasoning") return <Reasoning {...part} />;
+							if (part.type === "tool-call")
+								return part.toolUI ?? <ToolFallback {...part} />;
+							// `data` parts (including our data-sources payload) are
+							// handled via makeAssistantDataUI in KnowledgeHubShell.
+							return null;
+						}}
+					</MessagePrimitive.Parts>
+					<MessageError />
+				</div>
+
+				<div className="aui-assistant-message-footer mt-1 ml-2 flex">
+					<BranchPicker />
+					<AssistantActionBar />
+				</div>
+			</MessagePrimitive.Root>
+		</CitationSourcesProvider>
 	);
 };
 
