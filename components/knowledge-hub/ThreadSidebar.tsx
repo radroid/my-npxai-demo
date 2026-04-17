@@ -33,7 +33,10 @@ export function ThreadSidebar() {
 				<PlusIcon className="h-4 w-4" aria-hidden="true" />
 				New thread
 			</button>
-			<ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto py-1">
+			<ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-1 py-1">
+				{/* px-1 leaves room for the rename-input's ring-2 which would
+				    otherwise be clipped — overflow-y-auto alone coerces
+				    overflow-x to auto per CSS spec and crops the ring. */}
 				{threads.length === 0 ? (
 					<li className="px-2 py-6 text-center text-xs text-[var(--text-muted)]">
 						Threads you start will show up here.
@@ -105,7 +108,10 @@ function ThreadRow({
 					onFocus={(e) => e.currentTarget.select()}
 					onBlur={() => void commit()}
 					onKeyDown={onKey}
-					className="min-w-0 flex-1 rounded-md border border-[var(--accent-brand)] bg-[var(--bg)] px-2.5 py-1.5 text-sm text-[var(--text)] shadow-sm outline-none ring-2 ring-[var(--accent-brand)]/30 focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					// mx-0.5 leaves breathing room so ring-2 isn't clipped by the
+					// sidebar's scroll container (overflow-y-auto on the ancestor
+					// forces overflow-x: auto per CSS spec).
+					className="mx-0.5 min-w-0 flex-1 rounded-md border border-[var(--accent-brand)] bg-[var(--bg)] px-2.5 py-1.5 text-sm text-[var(--text)] shadow-sm outline-none ring-2 ring-[var(--accent-brand)]/30 focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 					aria-label="Rename thread"
 				/>
 			) : (
