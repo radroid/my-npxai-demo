@@ -14,6 +14,7 @@
 		"preflight": "bun run scripts/preflight.ts",
 		"ingest": "bun run scripts/ingest.ts",
 		"eval:kb": "bun run scripts/eval-kb.ts",
+		"test:tiers": "bun run scripts/tier-tests.ts",
 		"build:cloudflare": "bunx opennextjs-cloudflare build",
 		"preview:cloudflare": "bunx opennextjs-cloudflare preview",
 		"deploy:cloudflare": "bunx opennextjs-cloudflare deploy"
