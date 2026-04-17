@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -11,51 +11,48 @@ import remarkGfm from "remark-gfm";
 const PRIORITY_RE = /\[(CRITICAL|ATTENTION|ROUTINE)\]/g;
 const LEADING_PRIORITY_RE = /^\s*\[(CRITICAL|ATTENTION|ROUTINE)\]\s*/;
 
-type SeverityTone = {
-	container: string;
-	icon: ReactNode;
-	label: string;
-	labelClass: string;
-};
+type SeverityLevel = "CRITICAL" | "ATTENTION" | "ROUTINE";
+type SeverityTone = { container: string; icon: ReactNode; accent: string };
 
-const SEVERITY_TONES: Record<string, SeverityTone> = {
+const CALLOUT_BASE = "border-l-4 px-3 py-2 rounded-r-md";
+const PRIORITY_CHIP_BASE =
+	"mx-0.5 inline-flex items-center rounded-full border px-1.5 py-0 font-mono text-[0.72em] leading-[1.4] align-baseline";
+
+const SEVERITY_TONES: Record<SeverityLevel, SeverityTone> = {
 	CRITICAL: {
-		container:
-			"border-l-4 border-[var(--danger)] bg-[var(--danger)]/10 pl-3 pr-3 py-2 rounded-r-md",
+		container: `${CALLOUT_BASE} border-[var(--danger)] bg-[var(--danger)]/10`,
 		icon: <AlertTriangle className="size-4 text-[var(--danger)]" aria-hidden />,
-		label: "CRITICAL",
-		labelClass: "text-[var(--danger)]",
+		accent: "text-[var(--danger)]",
 	},
 	ATTENTION: {
-		container:
-			"border-l-4 border-[var(--guidance)] bg-[var(--guidance)]/10 pl-3 pr-3 py-2 rounded-r-md",
+		container: `${CALLOUT_BASE} border-[var(--guidance)] bg-[var(--guidance)]/10`,
 		icon: (
 			<AlertTriangle className="size-4 text-[var(--guidance)]" aria-hidden />
 		),
-		label: "ATTENTION",
-		labelClass: "text-[var(--guidance)]",
+		accent: "text-[var(--guidance)]",
 	},
 	ROUTINE: {
-		container:
-			"border-l-4 border-[var(--border-strong)] bg-[var(--surface-2)] pl-3 pr-3 py-2 rounded-r-md",
+		container: `${CALLOUT_BASE} border-[var(--border-strong)] bg-[var(--surface-2)]`,
 		icon: (
 			<CheckCircle2 className="size-4 text-[var(--text-muted)]" aria-hidden />
 		),
-		label: "ROUTINE",
-		labelClass: "text-[var(--text-muted)]",
+		accent: "text-[var(--text-muted)]",
 	},
 };
 
+const PRIORITY_CHIP_CLS: Record<string, string> = {
+	CRITICAL:
+		"border-[var(--danger)]/40 bg-[var(--danger)]/10 text-[var(--danger)]",
+	ATTENTION:
+		"border-[var(--guidance)]/40 bg-[var(--guidance)]/10 text-[var(--guidance)]",
+};
+const PRIORITY_CHIP_DEFAULT =
+	"border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]";
+
 function PriorityBadge({ level }: { level: string }) {
-	const cls =
-		level === "CRITICAL"
-			? "border-[var(--danger)]/40 bg-[var(--danger)]/10 text-[var(--danger)]"
-			: level === "ATTENTION"
-				? "border-[var(--guidance)]/40 bg-[var(--guidance)]/10 text-[var(--guidance)]"
-				: "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]";
 	return (
 		<span
-			className={`mx-0.5 inline-flex items-center rounded-full border px-1.5 py-0 font-mono text-[0.72em] leading-[1.4] align-baseline ${cls}`}
+			className={`${PRIORITY_CHIP_BASE} ${PRIORITY_CHIP_CLS[level] ?? PRIORITY_CHIP_DEFAULT}`}
 		>
 			{level}
 		</span>
@@ -78,32 +75,59 @@ function renderWithPriorities(children: ReactNode): ReactNode {
 }
 
 function processChildren(children: ReactNode): ReactNode {
-	if (Array.isArray(children)) {
-		return children.map((c, i) =>
-			typeof c === "string" ? (
-				// biome-ignore lint/suspicious/noArrayIndexKey: children order is stable within a markdown node
-				<span key={`seg-${i}-${c.length}`}>{renderWithPriorities(c)}</span>
-			) : (
-				c
-			),
-		);
-	}
-	return renderWithPriorities(children);
+	if (!Array.isArray(children)) return renderWithPriorities(children);
+	return children.map((c, i) =>
+		typeof c === "string" ? (
+			// biome-ignore lint/suspicious/noArrayIndexKey: children order is stable within a markdown node
+			<span key={`seg-${i}-${c.length}`}>{renderWithPriorities(c)}</span>
+		) : (
+			c
+		),
+	);
+}
+
+function childrenToText(children: ReactNode): string {
+	if (Array.isArray(children))
+		return children.map((c) => (typeof c === "string" ? c : "")).join("");
+	return typeof children === "string" ? children : "";
 }
 
 function extractLeadingSeverity(
 	children: ReactNode,
-): { level: keyof typeof SEVERITY_TONES; rest: ReactNode } | null {
+): { level: SeverityLevel; rest: ReactNode } | null {
 	const first = Array.isArray(children) ? children[0] : children;
 	if (typeof first !== "string") return null;
 	const match = first.match(LEADING_PRIORITY_RE);
 	if (!match) return null;
-	const level = match[1] as keyof typeof SEVERITY_TONES;
+	const level = match[1] as SeverityLevel;
 	const trimmed = first.slice(match[0].length);
 	const rest = Array.isArray(children)
 		? [trimmed, ...children.slice(1)]
 		: trimmed;
 	return { level, rest };
+}
+
+function SeverityInner({
+	level,
+	rest,
+}: {
+	level: SeverityLevel;
+	rest: ReactNode;
+}) {
+	const tone = SEVERITY_TONES[level];
+	return (
+		<div className="flex items-start gap-2">
+			<span className="mt-[3px] shrink-0">{tone.icon}</span>
+			<div className="min-w-0">
+				<span
+					className={`mr-2 font-mono text-[0.72em] tracking-wide ${tone.accent}`}
+				>
+					[{level}]
+				</span>
+				{processChildren(rest)}
+			</div>
+		</div>
+	);
 }
 
 export function slugify(s: string): string {
@@ -113,124 +137,79 @@ export function slugify(s: string): string {
 		.replace(/(^-|-$)/g, "");
 }
 
+const TEXT_BODY = "text-sm leading-relaxed text-[var(--text)]";
+
+const styled =
+	(tag: string, className: string) =>
+	// biome-ignore lint/suspicious/noExplicitAny: generic factory over react-markdown's per-tag prop types
+	({ node, ...props }: any) =>
+		createElement(tag, { ...props, className });
+
 export function ReportBody({ report }: { report: string }) {
 	return (
 		<ReactMarkdown
 			remarkPlugins={[remarkGfm]}
 			components={{
-				h1: ({ node, ...props }) => (
-					<h1
+				h1: styled("h1", "mt-0 mb-2 font-semibold text-[var(--text)] text-lg"),
+				h2: ({ node, children, ...props }) => (
+					<h2
 						{...props}
-						className="mt-0 mb-2 font-semibold text-[var(--text)] text-lg"
-					/>
+						id={slugify(
+							childrenToText(children)
+								.replace(/^\d+\.\s+/, "")
+								.trim(),
+						)}
+						className="mt-5 mb-2 font-semibold text-[var(--text)] text-base scroll-mt-4"
+					>
+						{children}
+					</h2>
 				),
-				h2: ({ node, children, ...props }) => {
-					const text = String(
-						Array.isArray(children)
-							? children.map((c) => (typeof c === "string" ? c : "")).join("")
-							: (children ?? ""),
-					)
-						.replace(/^\d+\.\s+/, "")
-						.trim();
-					const id = slugify(text);
-					return (
-						<h2
-							{...props}
-							id={id}
-							className="mt-5 mb-2 font-semibold text-[var(--text)] text-base scroll-mt-4"
-						>
-							{children}
-						</h2>
-					);
-				},
-				h3: ({ node, ...props }) => (
-					<h3
-						{...props}
-						className="mt-3 mb-1 font-medium text-[var(--text)] text-sm"
-					/>
-				),
+				h3: styled("h3", "mt-3 mb-1 font-medium text-[var(--text)] text-sm"),
 				p: ({ node, children, ...props }) => {
-					const severity = extractLeadingSeverity(children);
-					if (severity) {
-						const tone = SEVERITY_TONES[severity.level];
+					const sev = extractLeadingSeverity(children);
+					if (sev) {
 						return (
-							<div className={`my-2 ${tone.container}`} role="note">
-								<div className="flex items-start gap-2">
-									<span className="mt-[3px] shrink-0">{tone.icon}</span>
-									<div className="min-w-0 text-sm leading-relaxed text-[var(--text)]">
-										<span
-											className={`mr-2 font-mono text-[0.72em] tracking-wide ${tone.labelClass}`}
-										>
-											[{tone.label}]
-										</span>
-										{processChildren(severity.rest)}
-									</div>
-								</div>
+							<div
+								className={`my-2 ${TEXT_BODY} ${SEVERITY_TONES[sev.level].container}`}
+								role="note"
+							>
+								<SeverityInner level={sev.level} rest={sev.rest} />
 							</div>
 						);
 					}
 					return (
-						<p
-							{...props}
-							className="my-2 text-sm leading-relaxed text-[var(--text)]"
-						>
+						<p {...props} className={`my-2 ${TEXT_BODY}`}>
 							{processChildren(children)}
 						</p>
 					);
 				},
 				li: ({ node, children, ...props }) => {
-					const severity = extractLeadingSeverity(children);
-					if (severity) {
-						const tone = SEVERITY_TONES[severity.level];
+					const sev = extractLeadingSeverity(children);
+					if (sev) {
 						return (
 							<li
 								{...props}
-								className={`my-2 list-none text-sm leading-relaxed text-[var(--text)] ${tone.container}`}
+								className={`my-2 list-none ${TEXT_BODY} ${SEVERITY_TONES[sev.level].container}`}
 							>
-								<div className="flex items-start gap-2">
-									<span className="mt-[3px] shrink-0">{tone.icon}</span>
-									<div className="min-w-0">
-										<span
-											className={`mr-2 font-mono text-[0.72em] tracking-wide ${tone.labelClass}`}
-										>
-											[{tone.label}]
-										</span>
-										{processChildren(severity.rest)}
-									</div>
-								</div>
+								<SeverityInner level={sev.level} rest={sev.rest} />
 							</li>
 						);
 					}
 					return (
-						<li
-							{...props}
-							className="my-1 text-sm leading-relaxed text-[var(--text)]"
-						>
+						<li {...props} className={`my-1 ${TEXT_BODY}`}>
 							{processChildren(children)}
 						</li>
 					);
 				},
-				ul: ({ node, ...props }) => (
-					<ul {...props} className="my-2 ml-5 list-disc space-y-1" />
+				ul: styled("ul", "my-2 ml-5 list-disc space-y-1"),
+				ol: styled("ol", "my-2 ml-5 list-decimal space-y-1"),
+				strong: styled("strong", "font-semibold text-[var(--text)]"),
+				table: styled("table", "my-3 w-full border-collapse text-xs"),
+				th: styled(
+					"th",
+					"border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-left font-medium",
 				),
-				ol: ({ node, ...props }) => (
-					<ol {...props} className="my-2 ml-5 list-decimal space-y-1" />
-				),
-				strong: ({ node, ...props }) => (
-					<strong {...props} className="font-semibold text-[var(--text)]" />
-				),
-				table: ({ node, ...props }) => (
-					<table {...props} className="my-3 w-full border-collapse text-xs" />
-				),
-				th: ({ node, ...props }) => (
-					<th
-						{...props}
-						className="border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-left font-medium"
-					/>
-				),
-				td: ({ node, ...props }) => (
-					<td {...props} className="border border-[var(--border)] px-2 py-1" />
-				),
+				td: styled("td", "border border-[var(--border)] px-2 py-1"),
 			}}
 		>
 			{report}
