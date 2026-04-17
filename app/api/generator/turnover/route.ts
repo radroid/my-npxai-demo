@@ -205,7 +205,14 @@ ${JSON.stringify(snapshot, null, 2)}
 							},
 						);
 						if (saveErr) {
-							console.warn("save_report_warn", saveErr.message);
+							console.warn(
+								`save_report failed: ${JSON.stringify({
+									message: saveErr.message,
+									code: saveErr.code,
+									details: saveErr.details,
+									hint: saveErr.hint,
+								})}`,
+							);
 						} else if (Array.isArray(saved) && saved.length > 0) {
 							savedId = (saved[0] as { id: string }).id;
 						}

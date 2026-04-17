@@ -46,7 +46,18 @@ export async function POST(
 		p_content: body.content,
 	});
 	if (error) {
-		console.error("save_message failed", error);
+		// PostgrestError serializes to `{}` via console's default inspector
+		// because its fields aren't own-enumerable in the way Node expects.
+		// Hand-serialize so the real message/code lands in the log.
+		console.error(
+			`save_message failed: ${JSON.stringify({
+				message: error.message,
+				code: error.code,
+				details: error.details,
+				hint: error.hint,
+				thread_id: id,
+			})}`,
+		);
 		return NextResponse.json({ error: "rpc_failed" }, { status: 500 });
 	}
 	const row = Array.isArray(data) ? data[0] : data;

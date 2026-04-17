@@ -47,9 +47,25 @@ export async function POST(req: Request) {
 		p_title: title,
 	});
 	if (error) {
-		console.error("create_thread failed", error);
+		// PostgrestError's fields aren't own-enumerable, so the default
+		// console inspector prints `{}`. Hand-serialize the useful bits.
+		console.error(
+			`create_thread failed: ${JSON.stringify({
+				message: error.message,
+				code: error.code,
+				details: error.details,
+				hint: error.hint,
+			})}`,
+		);
 		return NextResponse.json({ error: "rpc_failed" }, { status: 500 });
 	}
 	const row = Array.isArray(data) ? data[0] : data;
-	return NextResponse.json({ id: row?.id, created_at: row?.created_at, title });
+	if (!row?.id) {
+		// Guards against the RPC returning `[{id:null,...}]` on a silent
+		// partial failure — the client would otherwise POST messages to
+		// /api/threads/null/messages and silently lose the turn.
+		console.error("create_thread returned empty row", { data });
+		return NextResponse.json({ error: "empty_row" }, { status: 500 });
+	}
+	return NextResponse.json({ id: row.id, created_at: row.created_at, title });
 }

@@ -98,7 +98,26 @@ export const useThreadStore = create<ThreadStoreState>()(
 			loaded: false,
 
 			setMode: async (mode) => {
-				set({ mode, loaded: false });
+				const prevMode = get().mode;
+				// Mode transition: nuke in-memory + persisted state that belonged to
+				// the other tier. Anon state is a local UUID space; signed-in state
+				// is a Supabase UUID space. Crossing over without clearing leaks an
+				// anon activeThreadId into the signed-in path, which then routes
+				// syncMessages → save_message RPC → "thread not found" (the 2026-04-
+				// 17 bug where chat_threads stayed empty despite onFinish firing).
+				const crossingTiers = prevMode !== "unknown" && prevMode !== mode;
+				if (crossingTiers) {
+					set({
+						mode,
+						loaded: false,
+						threads: [],
+						messagesByThread: {},
+						activeThreadId: null,
+						runtimeKey: newId(),
+					});
+				} else {
+					set({ mode, loaded: false });
+				}
 				if (mode === "anon") {
 					// Rehydrate from localStorage — the persist middleware handles
 					// `threads` + `messagesByThread` automatically. Mark as loaded.
@@ -117,13 +136,30 @@ export const useThreadStore = create<ThreadStoreState>()(
 				// and clear any stale anon state. Messages load lazily per-thread.
 				const res = await api<{ threads: ServerThread[] }>("/api/threads");
 				if ("error" in res) {
-					set({ threads: [], messagesByThread: {}, loaded: true });
+					set({
+						threads: [],
+						messagesByThread: {},
+						activeThreadId: null,
+						loaded: true,
+					});
 					return;
 				}
-				set({
-					threads: res.threads.map(toSummary),
-					messagesByThread: {},
-					loaded: true,
+				const serverThreads = res.threads.map(toSummary);
+				const serverIds = new Set(serverThreads.map((t) => t.id));
+				set((s) => {
+					// If the rehydrated activeThreadId doesn't exist on the server
+					// (common when it was minted in anon mode and persisted across
+					// sign-in), drop it. Otherwise syncMessages will POST to
+					// /api/threads/:stale-id/messages and every save fails.
+					const staleActive =
+						s.activeThreadId && !serverIds.has(s.activeThreadId);
+					return {
+						threads: serverThreads,
+						messagesByThread: {},
+						activeThreadId: staleActive ? null : s.activeThreadId,
+						loaded: true,
+						...(staleActive ? { runtimeKey: newId() } : {}),
+					};
 				});
 			},
 
