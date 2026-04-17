@@ -40,15 +40,13 @@ export function KnowledgeHubShell() {
 					<Sidebar
 						role="complementary"
 						aria-label="Thread history"
-						className="border-r border-[--border]"
+						className="!top-14 !h-[calc(100svh-3.5rem)] border-r border-[--border]"
 					>
 						<SidebarHeader className="border-b border-[--border] bg-[--surface] px-3 py-3">
 							<p className="text-sm font-semibold text-[--text]">
 								Knowledge Hub
 							</p>
-							<p className="text-xs text-[--text-muted]">
-								CNSC REGDOC Q&amp;A
-							</p>
+							<p className="text-xs text-[--text-muted]">CNSC REGDOC Q&amp;A</p>
 						</SidebarHeader>
 						<SidebarContent className="bg-[--surface] px-2 py-2">
 							<ThreadList />
