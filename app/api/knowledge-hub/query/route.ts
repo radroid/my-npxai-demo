@@ -23,7 +23,11 @@ import {
 	KNOWLEDGE_HUB_SYSTEM,
 	PROMPT_VERSION,
 } from "@/lib/prompts";
-import { detectJailbreakMarkers, sanitizeQueryText } from "@/lib/validators";
+import {
+	detectJailbreakMarkers,
+	sanitizeQueryText,
+	stripHtmlTags,
+} from "@/lib/validators";
 
 // D.3 fallback thresholds. Calibrated 2026-04-17 against scripts/probe-sims.ts:
 // well-formed questions score 0.6–0.75; "manager"/"melting point" OOS/OOC score
@@ -74,7 +78,7 @@ export const POST = withGuard(
 		} | null;
 		const messages = body?.messages ?? [];
 		const rawQuery = extractQuery(messages);
-		const query = sanitizeQueryText(rawQuery);
+		const query = stripHtmlTags(sanitizeQueryText(rawQuery));
 
 		ctx.logFields.prompt_version = PROMPT_VERSION;
 		ctx.logFields.query_len = query.length;

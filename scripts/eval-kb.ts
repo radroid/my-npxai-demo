@@ -7,9 +7,10 @@
 // Phase-3 ship bar miss (≥17/20 AND all 3 adversarial pass).
 //
 // Usage:
-//   bun run eval:kb                    # localhost:3000 (or $EVAL_BASE_URL)
+//   bun run eval:kb                    # localhost:3001 (or $EVAL_BASE_URL)
 //   EVAL_BASE_URL=https://npx.curlycloud.dev bun run eval:kb
 //   bun run eval:kb --only 17,18,19    # run a subset
+//   bun run eval:kb --debug            # print raw response text on failures
 
 import fs from "node:fs";
 import path from "node:path";
@@ -45,7 +46,10 @@ interface EvalResult {
 	outputLen: number;
 }
 
-const BASE_URL = process.env.EVAL_BASE_URL ?? "http://localhost:3000";
+// Default to 3001 — this repo's `next dev` binds there because another
+// local project holds 3000. Override with EVAL_BASE_URL when needed
+// (e.g. `EVAL_BASE_URL=https://npx.curlycloud.dev bun run eval:kb`).
+const BASE_URL = process.env.EVAL_BASE_URL ?? "http://localhost:3001";
 const ENDPOINT = `${BASE_URL}/api/knowledge-hub/query`;
 const LATENCY_SOFT_CAP_MS = 10_000;
 
