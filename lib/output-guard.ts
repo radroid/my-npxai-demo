@@ -20,14 +20,12 @@ export interface GuardResult {
 export function scanOutput(output: string): GuardResult {
 	for (const pattern of DENY_PATTERNS) {
 		const match = pattern.exec(output);
-		if (match) {
-			const cutoff = match.index;
-			return {
-				safe: false,
-				output: `${output.slice(0, cutoff)}\n\n[response truncated — unsafe content]`,
-				reason: `output_deny_${pattern.source.replace(/[^a-z]/gi, "")}`,
-			};
-		}
+		if (!match) continue;
+		return {
+			safe: false,
+			output: `${output.slice(0, match.index)}\n\n[response truncated — unsafe content]`,
+			reason: `output_deny_${pattern.source.replace(/[^a-z]/gi, "")}`,
+		};
 	}
 	return { safe: true, output };
 }
@@ -51,12 +49,7 @@ export class StreamingGuard {
 		}
 		this.tripped = true;
 		// Emit only the portion of the final safe output the caller hasn't seen yet.
-		const alreadyEmittedLen = this.buffer.length - token.length;
-		const trailingSafe = result.output.slice(alreadyEmittedLen);
-		return {
-			safeTokens: trailingSafe,
-			terminate: true,
-			reason: result.reason,
-		};
+		const safeTokens = result.output.slice(this.buffer.length - token.length);
+		return { safeTokens, terminate: true, reason: result.reason };
 	}
 }

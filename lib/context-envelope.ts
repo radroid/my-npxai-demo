@@ -27,15 +27,13 @@ function attr(key: string, value: string | null | undefined): string {
 }
 
 export function wrapChunk(chunk: RetrievedChunk, index: number): string {
-	const id = `S${index + 1}`;
-	const attrs = [
-		` id="${id}"`,
-		attr("regdoc", chunk.regdoc_id),
-		attr("section", chunk.section_number),
-		attr("section_title", chunk.section_title),
-		attr("requirement_type", chunk.requirement_type ?? "guidance"),
-		attr("url", chunk.url),
-	].join("");
+	const attrs =
+		` id="S${index + 1}"` +
+		attr("regdoc", chunk.regdoc_id) +
+		attr("section", chunk.section_number) +
+		attr("section_title", chunk.section_title) +
+		attr("requirement_type", chunk.requirement_type ?? "guidance") +
+		attr("url", chunk.url);
 	return `<context_snippet${attrs}>\n${htmlEscape(chunk.chunk_text)}\n</context_snippet>`;
 }
 
@@ -43,6 +41,5 @@ export function buildContextEnvelope(
 	chunks: RetrievedChunk[],
 	userQuery: string,
 ): string {
-	const wrapped = chunks.map((c, i) => wrapChunk(c, i)).join("\n");
-	return `${wrapped}\n\nUSER QUESTION:\n${userQuery}`;
+	return `${chunks.map(wrapChunk).join("\n")}\n\nUSER QUESTION:\n${userQuery}`;
 }
