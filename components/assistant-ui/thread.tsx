@@ -8,6 +8,7 @@ import {
 	MessagePrimitive,
 	SuggestionPrimitive,
 	ThreadPrimitive,
+	useAssistantApi,
 	useAuiState,
 } from "@assistant-ui/react";
 import {
@@ -52,6 +53,9 @@ export const Thread: FC = () => {
 		>
 			<ThreadPrimitive.Viewport
 				turnAnchor="top"
+				role="log"
+				aria-live="polite"
+				aria-label="Conversation transcript"
 				className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4"
 			>
 				<AuiIf condition={(s) => s.thread.isEmpty}>
@@ -93,35 +97,108 @@ const ThreadScrollToBottom: FC = () => {
 	);
 };
 
+// Appendix E Q1–5 — canonical starter questions (see PLAN.md Appendix E.1).
+// Surfaced on the empty state so first-time visitors (including the NPX
+// evaluators) have a clear demonstration of the Knowledge Hub's capability
+// without thinking of a regulatory question on the spot.
+const STARTER_QUESTIONS: Array<{ title: string; prompt: string }> = [
+	{
+		title: "Shift turnover requirements",
+		prompt:
+			"What are the CNSC requirements for shift turnover at a reactor facility?",
+	},
+	{
+		title: "Minimum staff complement",
+		prompt: "What is the minimum staff complement for a nuclear power plant?",
+	},
+	{
+		title: "Personnel training (REGDOC-2.2.2)",
+		prompt: "What does REGDOC-2.2.2 say about personnel training programs?",
+	},
+	{
+		title: "Aging management (REGDOC-2.6.3)",
+		prompt:
+			"What does REGDOC-2.6.3 require for aging management of structures, systems and components?",
+	},
+	{
+		title: "Accident management",
+		prompt:
+			"How should an accident management program be structured at a nuclear facility?",
+	},
+];
+
 const ThreadWelcome: FC = () => {
 	return (
 		<div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
 			<div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
 				<div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
 					<h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-2xl duration-200">
-						Hello there!
+						CNSC Knowledge Hub
 					</h1>
 					<p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-muted-foreground text-xl delay-75 duration-200">
-						How can I help you today?
+						Ask a regulatory question — answers cite REGDOC + section.
+					</p>
+					<p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 mt-3 animate-in fill-mode-both text-muted-foreground text-sm delay-100 duration-200">
+						Or start with one of these:
 					</p>
 				</div>
 			</div>
-			<ThreadSuggestions />
+			<StarterQuestions />
 		</div>
 	);
 };
 
-const ThreadSuggestions: FC = () => {
+const StarterQuestions: FC = () => {
+	const api = useAssistantApi();
+	return (
+		<div className="aui-thread-welcome-suggestions grid w-full @md:grid-cols-2 gap-2 pb-4">
+			{STARTER_QUESTIONS.map((s) => (
+				<button
+					key={s.prompt}
+					type="button"
+					onClick={() => {
+						const apiAny = api as unknown as {
+							composer?: { setText?: (t: string) => void; send?: () => void };
+							thread?: {
+								composer?: { setText?: (t: string) => void; send?: () => void };
+								append?: (msg: { role: "user"; content: string }) => void;
+							};
+						};
+						const composer = apiAny.thread?.composer ?? apiAny.composer ?? null;
+						if (composer?.setText && composer.send) {
+							composer.setText(s.prompt);
+							composer.send();
+						} else if (apiAny.thread?.append) {
+							apiAny.thread.append({ role: "user", content: s.prompt });
+						}
+					}}
+					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+				>
+					<span className="block font-medium">{s.title}</span>
+					<span className="mt-0.5 block text-muted-foreground text-xs">
+						{s.prompt}
+					</span>
+				</button>
+			))}
+		</div>
+	);
+};
+
+// Legacy generic suggestions (runtime-driven). Unused by Knowledge Hub but
+// preserved so other surfaces using <Thread /> can still opt in.
+// biome-ignore lint/correctness/noUnusedVariables: shared primitive, kept for future surfaces
+const _ThreadSuggestions: FC = () => {
 	return (
 		<div className="aui-thread-welcome-suggestions grid w-full @md:grid-cols-2 gap-2 pb-4">
 			<ThreadPrimitive.Suggestions>
-				{() => <ThreadSuggestionItem />}
+				{() => <_ThreadSuggestionItem />}
 			</ThreadPrimitive.Suggestions>
 		</div>
 	);
 };
 
-const ThreadSuggestionItem: FC = () => {
+// biome-ignore lint/correctness/noUnusedVariables: shared primitive, kept for future surfaces
+const _ThreadSuggestionItem: FC = () => {
 	return (
 		<div className="aui-thread-welcome-suggestion-display fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both duration-200">
 			<SuggestionPrimitive.Trigger send asChild>
