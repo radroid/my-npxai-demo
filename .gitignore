@@ -49,3 +49,6 @@ scraped_regdocs/
 
 # local agent state
 .claude/
+
+# ui-test scratch (screenshots, reports)
+.context/
