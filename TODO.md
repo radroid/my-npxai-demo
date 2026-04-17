@@ -112,9 +112,9 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Load Inter + JetBrains Mono via `next/font` (self-hosted, no runtime CDN)
 
 ### Phase 2 — Scaffolding (Fri Apr 17)
-- [ ] Wire assistant-ui (`ThreadListSidebar` + `Thread`) into `app/knowledge-hub/page.tsx`
-- [ ] Build custom runtime adapter pointing to `/api/knowledge-hub/query`
-- [ ] Test send/receive round-trip with a mock response
+- [x] Wire assistant-ui (`Thread` + `ThreadList` in a navy-themed sidebar) into `app/knowledge-hub/page.tsx` via `components/knowledge-hub/KnowledgeHubShell.tsx` (client component, `useChatRuntime` w/ no Assistant Cloud → Phase 3 will swap in localStorage persistence per 2026-04-16 decision).
+- [x] Custom runtime adapter pointing to `/api/knowledge-hub/query` — `AssistantChatTransport({ api: "/api/knowledge-hub/query" })`.
+- [x] Test send/receive round-trip with a mock response — `/api/knowledge-hub/query` now streams a deterministic UIMessage via `createUIMessageStream`/`createUIMessageStreamResponse` (no OpenAI call). Phase 3 replaces the handler with the real RAG pipeline.
 - [x] Build top nav component — `components/site/TopNav.tsx` (server, reads `auth.getUser()` and swaps between `SignInButton` + `UserChip`), `components/site/SignInButton.tsx` (client stub for iter 3), `components/site/UserChip.tsx` (client, initials + email + sign-out dropdown). Sticky header with backdrop-blur, navy tokens only, `focus-visible` rings.
 - [x] Build sign-in modal per Appendix J.6 — implemented in `components/site/SignInButton.tsx` as a Radix Dialog with 4 states (idle / loading / success / error), email input with `autocomplete="email"`, `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } })`. Radix handles role="dialog", focus trap, Esc dismiss, and focus return. Status area uses `aria-live="polite"`; error banner uses `role="alert"`. Below `sm`, modal goes full-screen via `max-sm:h-full max-sm:max-w-full max-sm:rounded-none`. Errors never surface raw Supabase strings — just "Something went wrong. Try again." + retry. **Human test blocker:** Supabase Auth → Providers → Email must be enabled before the magic-link actually sends.
 - [x] Build footer component — `components/site/Footer.tsx`, "Built by Raj Dholakia as a demonstration for NPX Innovation" with LinkedIn + npxai.com links, simulated-data disclaimer, wired into `app/layout.tsx` below `<main>`.
