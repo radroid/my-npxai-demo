@@ -14,13 +14,14 @@ import { useThreadStore } from "@/lib/thread-store";
 export function ThreadSidebar() {
 	const threads = useThreadStore((s) => s.threads);
 	const activeId = useThreadStore((s) => s.activeThreadId);
-	const createThread = useThreadStore((s) => s.createThread);
 	const setActiveThread = useThreadStore((s) => s.setActiveThread);
 
-	const onNew = async () => {
-		const id = await createThread();
-		setActiveThread(id);
-	};
+	// "+ New thread" just clears activeId and bumps runtimeKey (setActiveThread
+	// handles the bump). The thread itself isn't written until the first send's
+	// onFinish calls createThread(initialMessages) — avoids empty "New thread"
+	// rows piling up in the sidebar and, more importantly, avoids a remount
+	// while the user is mid-interaction.
+	const onNew = () => setActiveThread(null);
 
 	return (
 		<div className="flex h-full flex-col gap-1">

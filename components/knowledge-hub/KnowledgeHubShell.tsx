@@ -19,6 +19,7 @@ const SIDEBAR_STATE_KEY = "npxai-kh-threads-collapsed";
 
 export function KnowledgeHubShell() {
 	const activeId = useThreadStore((s) => s.activeThreadId);
+	const runtimeKey = useThreadStore((s) => s.runtimeKey);
 	const messagesByThread = useThreadStore((s) => s.messagesByThread);
 	const syncMessages = useThreadStore((s) => s.syncMessages);
 	const createThread = useThreadStore((s) => s.createThread);
@@ -55,18 +56,15 @@ export function KnowledgeHubShell() {
 		if (activeId) void loadMessages(activeId);
 	}, [activeId, loadMessages]);
 
-	// Unique runtime id per thread. When it changes, `useChatRuntime` remounts
-	// and seeds from the new `messages` array. "__new__" is the placeholder for
-	// a fresh composer with no thread yet.
-	const runtimeId = activeId ?? "__new__";
+	// The runtime's message tree is seeded from the store on mount. `runtimeKey`
+	// (not `activeId`) drives remount so the onFinish null→tid transition keeps
+	// the live runtime intact — see the rationale on `runtimeKey` in the store.
 	const seededMessages = activeId ? (messagesByThread[activeId] ?? []) : [];
 
 	return (
 		<AssistantRuntimeProvider
-			// `key` forces a full React remount so useChatRuntime re-reads the
-			// new `messages` prop cleanly on thread switch.
-			key={runtimeId}
-			runtime={useThreadRuntime(runtimeId, seededMessages, async (messages) => {
+			key={runtimeKey}
+			runtime={useThreadRuntime(runtimeKey, seededMessages, async (messages) => {
 				// AI SDK's onFinish fires with the full authoritative `messages`
 				// list (user turns included). If this is the first turn on a fresh
 				// composer, create the thread *with* the messages so the single

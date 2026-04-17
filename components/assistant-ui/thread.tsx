@@ -23,7 +23,7 @@ import {
 	RefreshCwIcon,
 	SquareIcon,
 } from "lucide-react";
-import { type FC, useEffect, useMemo, useState } from "react";
+import { type FC, useEffect, useMemo, useRef, useState } from "react";
 import {
 	ComposerAddAttachment,
 	ComposerAttachments,
@@ -147,18 +147,30 @@ const StarterQuestions: FC = () => {
 	const api = useAssistantApi() as unknown as {
 		composer: () => { setText: (t: string) => void; send: () => void };
 	};
+	// Single-shot guard: once ANY starter fires a send, lock all of them until
+	// this welcome unmounts (it will, the moment thread.isEmpty flips false).
+	// A fast double-click was landing the same composer draft on the tree
+	// twice, tripping MessageRepository's duplicate-id check.
+	const launchedRef = useRef(false);
+	const threadRunning = useAuiState((s) => s.thread.isRunning);
+	const [launched, setLaunched] = useState(false);
+	const disabled = launched || threadRunning;
 	return (
 		<div className="aui-thread-welcome-suggestions grid w-full @md:grid-cols-2 gap-2 pb-4">
 			{STARTER_QUESTIONS.map((s) => (
 				<button
 					key={s.prompt}
 					type="button"
+					disabled={disabled}
 					onClick={() => {
+						if (launchedRef.current || threadRunning) return;
+						launchedRef.current = true;
+						setLaunched(true);
 						const composer = api.composer();
 						composer.setText(s.prompt);
 						composer.send();
 					}}
-					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					<span className="block font-medium">{s.title}</span>
 					<span className="mt-0.5 block text-muted-foreground text-xs">
