@@ -22,11 +22,6 @@
 	--color-sidebar-primary: var(--sidebar-primary);
 	--color-sidebar-foreground: var(--sidebar-foreground);
 	--color-sidebar: var(--sidebar);
-	--color-chart-5: var(--chart-5);
-	--color-chart-4: var(--chart-4);
-	--color-chart-3: var(--chart-3);
-	--color-chart-2: var(--chart-2);
-	--color-chart-1: var(--chart-1);
 	--color-ring: var(--ring);
 	--color-input: var(--input);
 	--color-border: var(--border);
@@ -41,8 +36,6 @@
 	--color-primary: var(--primary);
 	--color-popover-foreground: var(--popover-foreground);
 	--color-popover: var(--popover);
-	--color-card-foreground: var(--card-foreground);
-	--color-card: var(--card);
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
@@ -124,8 +117,6 @@
 	/* Map shadcn tokens onto the light palette. */
 	--background: #f4f6fa;
 	--foreground: #0a1830;
-	--card: #ffffff;
-	--card-foreground: #0a1830;
 	--popover: #ffffff;
 	--popover-foreground: #0a1830;
 	--primary: #1e6fd9;
@@ -139,11 +130,6 @@
 	--destructive: #b42318;
 	--input: #dce1ec;
 	--ring: #1e6fd9;
-	--chart-1: #1e6fd9;
-	--chart-2: #0a7a46;
-	--chart-3: #a67200;
-	--chart-4: #b42318;
-	--chart-5: #4f5c78;
 	--sidebar: #ffffff;
 	--sidebar-foreground: #0a1830;
 	--sidebar-primary: #1e6fd9;
@@ -173,8 +159,6 @@
 	   (sidebar, tooltip, card) inherit the brand look without rewrites. */
 	--background: #0a1830;
 	--foreground: #e6ecf5;
-	--card: #0f2440;
-	--card-foreground: #e6ecf5;
 	--popover: #0f2440;
 	--popover-foreground: #e6ecf5;
 	--primary: #4ea8ff;
@@ -189,11 +173,6 @@
 	--border: #24385c;
 	--input: #24385c;
 	--ring: #4ea8ff;
-	--chart-1: #4ea8ff;
-	--chart-2: #4ade80;
-	--chart-3: #f5b94e;
-	--chart-4: #ef4444;
-	--chart-5: #94a3c3;
 	--sidebar: #0f2440;
 	--sidebar-foreground: #e6ecf5;
 	--sidebar-primary: #4ea8ff;
