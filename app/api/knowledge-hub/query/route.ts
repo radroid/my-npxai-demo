@@ -30,17 +30,12 @@ import {
 } from "@/lib/validators";
 
 // D.3 fallback thresholds. Calibrated 2026-04-17 against scripts/probe-sims.ts:
-// well-formed questions score 0.6–0.75; "manager"/"melting point" OOS/OOC score
-// 0.31–0.33; the edge case "turnover" (Q20) scores 0.426. Setting LOW_SIM_OOS
-// to 0.40 lets single-word corpus-relevant queries through while still catching
-// genuine out-of-corpus + adversarial prompts (all <0.33 on current corpus).
+// LOW_SIM_OOS=0.40 lets single-word corpus-relevant queries (Q20 "turnover" at
+// 0.426) through while still catching OOS/adversarial (<0.33 on current corpus).
+// MIN_CHUNK_SIM=0.35 drops low-relevance glossary chunks (Q19 regression: a
+// REGDOC-3.6 chunk at 0.32 was being cited instead of the on-topic top-1).
 const LOW_SIM_OOS = 0.4;
 const LOW_SIM_DISCLAIMER = 0.35;
-// Request 8 at the RPC but filter to sim >= 0.35 before building the envelope.
-// Rationale (Q19 regression 2026-04-17): for borderline queries a low-relevance
-// glossary chunk (REGDOC-3.6, sim 0.32) was being cited instead of the top-1
-// operational REGDOC (2.3.4, sim 0.50). Dropping anything below 0.35 forces the
-// LLM to cite from chunks that are actually on-topic.
 const MATCH_COUNT = 8;
 const MIN_CHUNK_SIM = 0.35;
 // Successful LLM answers cache by query hash for 30 minutes. Saves OpenAI
@@ -62,33 +57,22 @@ interface CachedAnswer {
 		requirement_type: "requirement" | "guidance" | null;
 		snippet: string;
 	}>;
-	prompt_version: string;
-	cached_at: string;
 }
 
-async function sha256Hex(input: string): Promise<string> {
+async function cacheKey(query: string): Promise<string> {
 	const buf = await crypto.subtle.digest(
 		"SHA-256",
-		new TextEncoder().encode(input),
+		new TextEncoder().encode(`kh:${PROMPT_VERSION}:${query.toLowerCase()}`),
 	);
-	return Array.from(new Uint8Array(buf))
+	const hex = Array.from(new Uint8Array(buf))
 		.map((b) => b.toString(16).padStart(2, "0"))
 		.join("");
+	return `kh:cache:${hex.slice(0, 24)}`;
 }
 
-function cacheKey(query: string): Promise<string> {
-	return sha256Hex(`kh:${PROMPT_VERSION}:${query.toLowerCase()}`).then(
-		(h) => `kh:cache:${h.slice(0, 24)}`,
-	);
-}
-
-interface UIMessagePart {
-	type: string;
-	text?: string;
-}
 interface UIMessageLike {
 	role: string;
-	parts?: UIMessagePart[];
+	parts?: Array<{ type: string; text?: string }>;
 	content?: string;
 }
 
@@ -129,49 +113,33 @@ export const POST = withGuard(
 		ctx.logFields.model = OPENAI_MODELS.chat;
 		ctx.logFields.trigger = body?.trigger ?? "unknown";
 
-		if (!query) {
+		const logValidation = (detail: string) =>
 			logGuardEvent({
 				route: "knowledge-hub/query",
 				reason: "validation",
 				ip_hash: ctx.ipHash,
 				tier: ctx.tier,
 				user_hash: ctx.userHash,
-				detail: "empty_query",
+				detail,
 			});
+		const validationError = (detail: string, message: string) => {
+			logValidation(detail);
 			return NextResponse.json(
-				{ error: "validation", message: "Query is required." },
+				{ error: "validation", message },
 				{ status: 400 },
 			);
-		}
-		if (query.length > ctx.inputCharCap) {
-			logGuardEvent({
-				route: "knowledge-hub/query",
-				reason: "validation",
-				ip_hash: ctx.ipHash,
-				tier: ctx.tier,
-				user_hash: ctx.userHash,
-				detail: `char_cap_${ctx.inputCharCap}`,
-			});
-			return NextResponse.json(
-				{
-					error: "validation",
-					message: `Query exceeds ${ctx.inputCharCap} character limit for your tier.`,
-				},
-				{ status: 400 },
+		};
+
+		if (!query) return validationError("empty_query", "Query is required.");
+		if (query.length > ctx.inputCharCap)
+			return validationError(
+				`char_cap_${ctx.inputCharCap}`,
+				`Query exceeds ${ctx.inputCharCap} character limit for your tier.`,
 			);
-		}
 
 		const markers = detectJailbreakMarkers(query);
-		if (markers.length > 0) {
-			logGuardEvent({
-				route: "knowledge-hub/query",
-				reason: "validation",
-				ip_hash: ctx.ipHash,
-				tier: ctx.tier,
-				user_hash: ctx.userHash,
-				detail: `jailbreak_markers:${markers.length}`,
-			});
-		}
+		if (markers.length > 0)
+			logValidation(`jailbreak_markers:${markers.length}`);
 
 		// Cache hit check — skips embed + RPC + LLM for repeat queries.
 		// Regenerate requests bypass the cache AND drop the stored entry, so
@@ -194,11 +162,7 @@ export const POST = withGuard(
 				execute: async ({ writer }) => {
 					const msgId = crypto.randomUUID();
 					writer.write({ type: "text-start", id: msgId });
-					writer.write({
-						type: "text-delta",
-						id: msgId,
-						delta: cached.text,
-					});
+					writer.write({ type: "text-delta", id: msgId, delta: cached.text });
 					writer.write({
 						type: "data-sources",
 						data: { chunks: cached.chunks },
@@ -252,14 +216,13 @@ export const POST = withGuard(
 		);
 		// Use top-1 from the raw retrieval for the D.3 gate, but drop
 		// low-relevance chunks before envelope-building so the LLM cites from
-		// on-topic context only.
+		// on-topic context only. Average is over the kept chunks to match what
+		// the LLM actually sees.
 		const topSim = allChunks[0]?.similarity ?? 0;
 		const chunks =
 			topSim < LOW_SIM_OOS
 				? allChunks
 				: allChunks.filter((c) => c.similarity >= MIN_CHUNK_SIM);
-		// Average over the kept (≥ MIN_CHUNK_SIM) chunks when the gate is
-		// passed — matches the chunks actually shown to the LLM.
 		const avgSim =
 			chunks.length > 0
 				? chunks.reduce((acc, c) => acc + c.similarity, 0) / chunks.length
@@ -336,8 +299,7 @@ export const POST = withGuard(
 						const delta = part.choices[0]?.delta?.content ?? "";
 						if (!delta) continue;
 						outputTokens += 1;
-						const r = emit(delta);
-						if (r.terminate) break;
+						if (emit(delta).terminate) break;
 					}
 					await recordOpenAICall(0);
 				} catch (err) {
@@ -370,14 +332,14 @@ export const POST = withGuard(
 
 				// Cache only clean, successful answers (not output-guard truncations).
 				if (!outputGuardTripped && accumulated.trim().length > 60) {
-					const payload: CachedAnswer = {
-						text: accumulated,
-						chunks: sourceChunks,
-						prompt_version: PROMPT_VERSION,
-						cached_at: new Date().toISOString(),
-					};
 					redis
-						.set(cKey, payload, { ex: CACHE_TTL_SECONDS })
+						.set(
+							cKey,
+							{ text: accumulated, chunks: sourceChunks },
+							{
+								ex: CACHE_TTL_SECONDS,
+							},
+						)
 						.catch((err) => console.error("kh_cache_write_error", err));
 				}
 			},
