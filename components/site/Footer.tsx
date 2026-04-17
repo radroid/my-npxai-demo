@@ -26,9 +26,16 @@ export function Footer() {
 					</Link>
 					.
 				</p>
-				<p className="text-[--text-muted]">
-					© {year} · Simulated data, not for operational use.
-				</p>
+				<div className="flex items-center gap-3 text-[--text-muted]">
+					<Link
+						href="/faq"
+						className="hover:text-[--text] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] rounded-sm"
+					>
+						FAQ
+					</Link>
+					<span aria-hidden="true">·</span>
+					<span>© {year} · Simulated data, not for operational use.</span>
+				</div>
 			</div>
 		</footer>
 	);
