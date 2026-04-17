@@ -17,13 +17,9 @@ export function KnowledgeHubShell() {
 	const activeId = useThreadStore((s) => s.activeThreadId);
 	const runtimeKey = useThreadStore((s) => s.runtimeKey);
 	const messagesByThread = useThreadStore((s) => s.messagesByThread);
-	const threads = useThreadStore((s) => s.threads);
-	const mode = useThreadStore((s) => s.mode);
-	const loaded = useThreadStore((s) => s.loaded);
 	const syncMessages = useThreadStore((s) => s.syncMessages);
 	const createThread = useThreadStore((s) => s.createThread);
 	const setMode = useThreadStore((s) => s.setMode);
-	const setActiveThread = useThreadStore((s) => s.setActiveThread);
 	const loadMessages = useThreadStore((s) => s.loadMessages);
 	const autoTitle = useThreadStore((s) => s.autoTitle);
 
@@ -49,21 +45,13 @@ export function KnowledgeHubShell() {
 	}, [setMode]);
 
 	// Lazy-load messages for the active thread (signed-in only — anon already
-	// has them in-memory via persist middleware).
+	// has them in-memory via persist middleware). loadMessages itself bumps
+	// runtimeKey on success when the loaded thread is still active, so the
+	// provider remounts with populated seededMessages instead of the empty
+	// tree it started with when the user first clicked the thread.
 	useEffect(() => {
 		if (activeId) void loadMessages(activeId);
 	}, [activeId, loadMessages]);
-
-	// Returning signed-in users land on their most recent thread instead of a
-	// blank welcome screen. Fresh users (zero threads) see the welcome — the
-	// thread mints lazily on first send via the onFinish path below. No eager
-	// server-row creation here, so no zombie rows if the user navigates away.
-	useEffect(() => {
-		if (!loaded) return;
-		if (mode !== "signed_in") return;
-		if (activeId) return;
-		if (threads.length > 0) setActiveThread(threads[0].id);
-	}, [loaded, mode, activeId, threads, setActiveThread]);
 
 	// The runtime's message tree is seeded from the store on mount. `runtimeKey`
 	// (not `activeId`) drives remount so the onFinish null→tid transition keeps

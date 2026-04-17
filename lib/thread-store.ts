@@ -290,10 +290,23 @@ export const useThreadStore = create<ThreadStoreState>()(
 				// populated messagesByThread[id] while this fetch was in flight.
 				// Clobbering it with the server's (still-empty) list would lose the
 				// user's in-progress turn.
+				//
+				// If the fetched thread is STILL the active one when the fetch
+				// resolves, bump runtimeKey. Without this, seededMessages (derived
+				// from messagesByThread[activeId]) updates but the runtime — keyed
+				// on runtimeKey, which only bumped on the initial click — doesn't
+				// remount and keeps its empty tree. Symptom: clicked thread shows
+				// empty until the user flips to another and back. See
+				// CHAT-IMPROVEMENTS.md — the whole remount dance goes away with
+				// the P1 adapter refactor, this is the tactical fix until then.
 				set((s) => {
 					const current = s.messagesByThread[id];
 					if (current && current.length >= msgs.length) return s;
-					return { messagesByThread: { ...s.messagesByThread, [id]: msgs } };
+					const update: Partial<ThreadStoreState> = {
+						messagesByThread: { ...s.messagesByThread, [id]: msgs },
+					};
+					if (s.activeThreadId === id) update.runtimeKey = newId();
+					return update;
 				});
 			},
 
