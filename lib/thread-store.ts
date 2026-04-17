@@ -161,14 +161,43 @@ export const useThreadStore = create<ThreadStoreState>()(
 						...(staleActive ? { runtimeKey: newId() } : {}),
 					};
 				});
+				// Refresh-with-persisted-active path: activeThreadId survived from
+				// persist, but mode just transitioned unknown→signed_in so no prior
+				// loadMessages call had a chance to run (it would have short-circuited
+				// on mode !== "signed_in"). Fetch the active thread's messages now.
+				// loadMessages itself bumps runtimeKey on arrival, so the provider
+				// remounts exactly once with populated seededMessages.
+				const activeId = get().activeThreadId;
+				if (activeId) void get().loadMessages(activeId);
 			},
 
-			setActiveThread: (id) =>
-				set((s) =>
-					s.activeThreadId === id
-						? { activeThreadId: id }
-						: { activeThreadId: id, runtimeKey: newId() },
-				),
+			setActiveThread: (id) => {
+				const state = get();
+				// Clicking the already-active thread: no id change. Still kick off
+				// loadMessages in case a prior fetch failed and the user is retrying.
+				// loadMessages is cache-gated, so this is a no-op on the happy path.
+				if (state.activeThreadId === id) {
+					if (id && state.mode === "signed_in") void get().loadMessages(id);
+					return;
+				}
+				// If we need to fetch (signed-in, no cached messages), defer the
+				// runtimeKey bump until loadMessages arrives — it bumps itself when
+				// the fetched thread is still active. The provider keeps the previous
+				// thread's content visible during the fetch instead of flashing an
+				// empty welcome screen for ~500ms and then repopulating.
+				const needsFetch =
+					id !== null &&
+					state.mode === "signed_in" &&
+					(state.messagesByThread[id]?.length ?? 0) === 0;
+				if (needsFetch) {
+					set({ activeThreadId: id });
+					void get().loadMessages(id);
+					return;
+				}
+				// Null (new thread), anon, or cache hit — bump runtimeKey now so the
+				// provider remounts immediately with whatever seed is available.
+				set({ activeThreadId: id, runtimeKey: newId() });
+			},
 
 			createThread: async (title = "New thread", initialMessages = []) => {
 				const state = get();

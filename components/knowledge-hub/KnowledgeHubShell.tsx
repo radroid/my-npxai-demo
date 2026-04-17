@@ -20,11 +20,12 @@ export function KnowledgeHubShell() {
 	const syncMessages = useThreadStore((s) => s.syncMessages);
 	const createThread = useThreadStore((s) => s.createThread);
 	const setMode = useThreadStore((s) => s.setMode);
-	const loadMessages = useThreadStore((s) => s.loadMessages);
 	const autoTitle = useThreadStore((s) => s.autoTitle);
 
 	// Detect session → tell the store which mode to run in. This triggers the
-	// one-shot thread-list fetch for signed-in users.
+	// one-shot thread-list fetch for signed-in users, and (if a persisted
+	// activeThreadId survived the mode transition) the initial loadMessages
+	// for that thread. setActiveThread drives all subsequent message loads.
 	useEffect(() => {
 		let cancelled = false;
 		(async () => {
@@ -43,15 +44,6 @@ export function KnowledgeHubShell() {
 			cancelled = true;
 		};
 	}, [setMode]);
-
-	// Lazy-load messages for the active thread (signed-in only — anon already
-	// has them in-memory via persist middleware). loadMessages itself bumps
-	// runtimeKey on success when the loaded thread is still active, so the
-	// provider remounts with populated seededMessages instead of the empty
-	// tree it started with when the user first clicked the thread.
-	useEffect(() => {
-		if (activeId) void loadMessages(activeId);
-	}, [activeId, loadMessages]);
 
 	// The runtime's message tree is seeded from the store on mount. `runtimeKey`
 	// (not `activeId`) drives remount so the onFinish null→tid transition keeps
