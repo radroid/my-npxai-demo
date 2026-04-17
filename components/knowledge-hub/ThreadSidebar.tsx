@@ -31,7 +31,7 @@ export function ThreadSidebar({ onNavigate }: { onNavigate?: () => void }) {
 			<button
 				type="button"
 				onClick={onNew}
-				className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-[var(--surface)] px-2.5 text-xs text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+				className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-xs text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 			>
 				<PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />
 				New thread
@@ -41,7 +41,7 @@ export function ThreadSidebar({ onNavigate }: { onNavigate?: () => void }) {
 				    otherwise be clipped — the ancestor's overflow-y-auto coerces
 				    overflow-x to auto per CSS spec and crops the ring. */}
 				{threads.length === 0 ? (
-					<li className="px-2 py-2 text-xs text-[var(--text-muted)]">
+					<li className="px-2 py-2 text-xs text-fg-muted">
 						Threads you start will show up here.
 					</li>
 				) : (
@@ -101,8 +101,8 @@ function ThreadRow({
 		<li
 			className={`group relative flex items-center gap-1 rounded-md ${
 				active
-					? "bg-[var(--surface-2)]"
-					: "hover:bg-[var(--surface-2)]/50 focus-within:bg-[var(--surface-2)]/50"
+					? "bg-surface-2"
+					: "hover:bg-surface-2/50 focus-within:bg-surface-2/50"
 			}`}
 		>
 			{editing ? (
@@ -117,7 +117,7 @@ function ThreadRow({
 					// mx-0.5 leaves breathing room so ring-2 isn't clipped by the
 					// sidebar's scroll container (overflow-y-auto on the ancestor
 					// forces overflow-x: auto per CSS spec).
-					className="mx-0.5 min-w-0 flex-1 rounded-md border border-[var(--accent-brand)] bg-[var(--bg)] px-2.5 py-1.5 text-sm text-[var(--text)] shadow-sm outline-none ring-2 ring-[var(--accent-brand)]/30 focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					className="mx-0.5 min-w-0 flex-1 rounded-md border border-brand bg-bg px-2.5 py-1.5 text-sm text-fg shadow-sm outline-none ring-2 ring-brand/30 focus-visible:ring-2 focus-visible:ring-brand"
 					aria-label="Rename thread"
 				/>
 			) : (
@@ -127,10 +127,8 @@ function ThreadRow({
 						setActiveThread(id);
 						onNavigate?.();
 					}}
-					className={`min-w-0 flex-1 cursor-pointer truncate px-2.5 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] ${
-						active
-							? "font-medium text-[var(--text)]"
-							: "text-[var(--text-muted)] hover:text-[var(--text)]"
+					className={`min-w-0 flex-1 cursor-pointer truncate px-2.5 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+						active ? "font-medium text-fg" : "text-fg-muted hover:text-fg"
 					}`}
 					title={title}
 				>
@@ -153,7 +151,7 @@ function ThreadRow({
 							setDraft(title);
 							setEditing(true);
 						}}
-						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface hover:text-fg focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 					>
 						<PencilIcon className="h-3.5 w-3.5" aria-hidden="true" />
 					</button>
@@ -161,7 +159,7 @@ function ThreadRow({
 						type="button"
 						aria-label="Delete thread"
 						onClick={() => void onDelete()}
-						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--danger)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+						className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface hover:text-danger focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 					>
 						<Trash2Icon className="h-3.5 w-3.5" aria-hidden="true" />
 					</button>

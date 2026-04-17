@@ -170,7 +170,7 @@ const StarterQuestions: FC = () => {
 						composer.setText(s.prompt);
 						composer.send();
 					}}
-					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:cursor-not-allowed disabled:opacity-60"
+					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					<span className="block font-medium">{s.title}</span>
 					<span className="mt-0.5 block text-muted-foreground text-xs">
@@ -287,11 +287,11 @@ const ThinkingPill: FC = () => {
 		<div
 			role="status"
 			aria-live="polite"
-			className="inline-flex items-center gap-2 rounded-full border border-border bg-[var(--surface-2)] px-3 py-1.5 text-xs text-[var(--text-muted)]"
+			className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs text-fg-muted"
 		>
 			<span
 				aria-hidden="true"
-				className="h-1.5 w-1.5 animate-breathe rounded-full bg-[var(--accent-brand)]"
+				className="h-1.5 w-1.5 animate-breathe rounded-full bg-brand"
 			/>
 			<span>{THINKING_VERBS[idx]}…</span>
 		</div>
@@ -316,7 +316,7 @@ const StreamingCaret: FC = () => {
 	return (
 		<span
 			aria-hidden="true"
-			className="generator-caret inline-block h-[1em] w-[2px] translate-y-[2px] bg-[var(--accent-brand)] align-baseline"
+			className="generator-caret inline-block h-[1em] w-[2px] translate-y-[2px] bg-brand align-baseline"
 		/>
 	);
 };

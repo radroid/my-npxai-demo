@@ -34,13 +34,13 @@ export default function InsightsPage() {
 	return (
 		<div className="mx-auto flex max-w-4xl flex-col gap-12 px-4 py-16 md:px-6">
 			<header className="flex flex-col gap-4">
-				<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+				<p className="text-xs uppercase tracking-[0.18em] text-fg-muted">
 					Concept · not a working feature this sprint
 				</p>
-				<h1 className="font-semibold text-3xl text-[var(--text)] md:text-4xl">
+				<h1 className="font-semibold text-3xl text-fg md:text-4xl">
 					Insights — narrative layer over plant + regulatory signal
 				</h1>
-				<p className="max-w-3xl text-[var(--text-muted)] md:text-lg">
+				<p className="max-w-3xl text-fg-muted md:text-lg">
 					The Insights surface would sit downstream of the Knowledge Hub and
 					Generator: both of those tools pull structured data on demand, while
 					Insights continuously scans the same data + CNSC signal for
@@ -54,25 +54,20 @@ export default function InsightsPage() {
 				{SIGNALS.map((s) => (
 					<article
 						key={s.title}
-						className="flex flex-col gap-2 rounded-lg border border-border bg-[var(--surface)] p-5"
+						className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-5"
 					>
-						<s.icon
-							className="size-5 text-[var(--accent-brand)]"
-							aria-hidden="true"
-						/>
-						<h2 className="font-semibold text-[var(--text)]">{s.title}</h2>
-						<p className="text-sm text-[var(--text-muted)] leading-relaxed">
-							{s.body}
-						</p>
+						<s.icon className="size-5 text-brand" aria-hidden="true" />
+						<h2 className="font-semibold text-fg">{s.title}</h2>
+						<p className="text-sm text-fg-muted leading-relaxed">{s.body}</p>
 					</article>
 				))}
 			</section>
 
-			<section className="rounded-lg border border-border bg-[var(--surface)] p-6">
-				<h2 className="font-semibold text-[var(--text)] text-xl">
+			<section className="rounded-lg border border-border bg-surface p-6">
+				<h2 className="font-semibold text-fg text-xl">
 					What would it take to build this for real?
 				</h2>
-				<ul className="mt-3 space-y-2 text-sm text-[var(--text-muted)] leading-relaxed">
+				<ul className="mt-3 space-y-2 text-sm text-fg-muted leading-relaxed">
 					<li>
 						· Continuous ingestion of the same simulated (or real) plant data
 						already seeded for the Generator.
@@ -97,14 +92,14 @@ export default function InsightsPage() {
 			<div className="flex items-center gap-3 text-sm">
 				<Link
 					href="/knowledge-hub"
-					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+					className="inline-flex items-center gap-1 text-brand hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					See the Knowledge Hub <ArrowRightIcon className="size-4" />
 				</Link>
-				<span className="text-[var(--text-muted)]">·</span>
+				<span className="text-fg-muted">·</span>
 				<Link
 					href="/generator"
-					className="inline-flex items-center gap-1 text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+					className="inline-flex items-center gap-1 text-brand hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					See the Generator <ArrowRightIcon className="size-4" />
 				</Link>

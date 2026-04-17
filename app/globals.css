@@ -28,6 +28,23 @@
 	--color-destructive: var(--destructive);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-accent: var(--accent);
+	/* NPX semantic tokens — canonical utilities so components can write
+	   `bg-surface` / `text-fg` / `bg-brand` instead of `bg-[var(--surface)]`
+	   arbitrary values. Underlying CSS custom properties in :root and .dark
+	   stay unchanged; these are additive aliases. */
+	--color-bg: var(--bg);
+	--color-surface: var(--surface);
+	--color-surface-2: var(--surface-2);
+	--color-fg: var(--text);
+	--color-fg-muted: var(--text-muted);
+	--color-brand: var(--accent-brand);
+	--color-brand-hover: var(--accent-brand-hover);
+	--color-requirement: var(--requirement);
+	--color-guidance: var(--guidance);
+	--color-success: var(--success);
+	--color-warning: var(--warning);
+	--color-danger: var(--danger);
+	--color-border-strong: var(--border-strong);
 	--color-muted-foreground: var(--muted-foreground);
 	--color-muted: var(--muted);
 	--color-secondary-foreground: var(--secondary-foreground);

@@ -10,7 +10,7 @@ export function AuroraHero({ children }: { children: ReactNode }) {
 				<div className="aurora-band aurora-band-a" />
 				<div className="aurora-band aurora-band-b" />
 				<div className="aurora-band aurora-band-c" />
-				<div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--bg)]" />
+				<div className="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-bg" />
 			</div>
 			{children}
 		</div>

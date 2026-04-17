@@ -79,9 +79,9 @@ export function KnowledgeHubShell() {
 			)}
 		>
 			<SourcesDataUI />
-			<section className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-[var(--bg)]">
-				<div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-[var(--surface)] px-3">
-					<span className="text-xs text-[var(--text-muted)]">
+			<section className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-bg">
+				<div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
+					<span className="text-xs text-fg-muted">
 						Ask a regulatory question — answers cite CNSC REGDOCs.
 					</span>
 				</div>

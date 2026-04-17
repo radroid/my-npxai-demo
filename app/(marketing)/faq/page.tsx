@@ -53,10 +53,8 @@ export default function FAQPage() {
 	return (
 		<div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-16 md:px-6">
 			<header className="flex flex-col gap-3">
-				<p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-					FAQ
-				</p>
-				<h1 className="font-semibold text-3xl text-[var(--text)] md:text-4xl">
+				<p className="text-xs uppercase tracking-[0.18em] text-fg-muted">FAQ</p>
+				<h1 className="font-semibold text-3xl text-fg md:text-4xl">
 					Frequently asked questions
 				</h1>
 			</header>
@@ -64,20 +62,20 @@ export default function FAQPage() {
 				{FAQS.map((f) => (
 					<div
 						key={f.q}
-						className="rounded-lg border border-border bg-[var(--surface)] p-5"
+						className="rounded-lg border border-border bg-surface p-5"
 					>
-						<dt className="font-semibold text-[var(--text)]">{f.q}</dt>
-						<dd className="mt-2 text-sm text-[var(--text-muted)] leading-relaxed">
+						<dt className="font-semibold text-fg">{f.q}</dt>
+						<dd className="mt-2 text-sm text-fg-muted leading-relaxed">
 							{f.a}
 						</dd>
 					</div>
 				))}
 			</dl>
-			<footer className="text-sm text-[var(--text-muted)]">
+			<footer className="text-sm text-fg-muted">
 				Something missing? The{" "}
 				<Link
 					href="/"
-					className="text-[var(--accent-brand)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+					className="text-brand hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
 				>
 					homepage contact section
 				</Link>{" "}

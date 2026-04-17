@@ -27,7 +27,7 @@ export function ThemeToggle({ size = "md" }: { size?: ToggleSize }) {
 	return (
 		<fieldset
 			aria-label="Color theme"
-			className="inline-flex items-center gap-0.5 rounded-full border border-border bg-[var(--surface-2)] p-0.5"
+			className="inline-flex items-center gap-0.5 rounded-full border border-border bg-surface-2 p-0.5"
 		>
 			{OPTIONS.map(({ value, label, Icon }) => {
 				const isActive = active === value;
@@ -38,10 +38,10 @@ export function ThemeToggle({ size = "md" }: { size?: ToggleSize }) {
 						aria-pressed={isActive}
 						aria-label={`${label} theme`}
 						onClick={() => setTheme(value)}
-						className={`inline-flex ${btnSize} items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] ${
+						className={`inline-flex ${btnSize} items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
 							isActive
-								? "bg-[var(--surface)] text-[var(--text)] shadow-sm"
-								: "text-[var(--text-muted)] hover:text-[var(--text)]"
+								? "bg-surface text-fg shadow-sm"
+								: "text-fg-muted hover:text-fg"
 						}`}
 					>
 						<Icon className={iconSize} aria-hidden="true" />

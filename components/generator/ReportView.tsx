@@ -51,9 +51,9 @@ export function ReportView({
 
 	return (
 		<div className="grid gap-6 lg:grid-cols-[1fr_180px]">
-			<article className="print-area prose-report min-w-0 text-[var(--text)]">
+			<article className="print-area prose-report min-w-0 text-fg">
 				<header className="mb-4 flex flex-col gap-2 border-b border-border pb-3">
-					<div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)] font-mono">
+					<div className="flex flex-wrap items-center gap-2 text-xs text-fg-muted font-mono">
 						<span>
 							{meta.station} · {meta.unit}
 						</span>
@@ -63,7 +63,7 @@ export function ReportView({
 						<span>{generated.toLocaleString()}</span>
 					</div>
 					{showCachedBanner ? (
-						<div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-[var(--surface-2)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] print:hidden">
+						<div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-fg-muted print:hidden">
 							<span>
 								{source === "cached"
 									? "Cached — plant snapshot hasn't changed since last generation."
@@ -72,7 +72,7 @@ export function ReportView({
 							<button
 								type="button"
 								onClick={onRegenerate}
-								className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border bg-[var(--surface)] px-2 py-1 text-[var(--text)] transition-colors hover:bg-[var(--accent-brand)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+								className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-fg transition-colors hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 							>
 								<RefreshCw className="size-3" aria-hidden />
 								Regenerate
@@ -85,15 +85,15 @@ export function ReportView({
 			{presentSections.length > 0 ? (
 				<aside
 					aria-label="Section quick jump"
-					className="order-first hidden self-start rounded-md border border-border bg-[var(--surface-2)] p-3 text-xs lg:sticky lg:top-4 lg:order-last lg:block print:hidden"
+					className="order-first hidden self-start rounded-md border border-border bg-surface-2 p-3 text-xs lg:sticky lg:top-4 lg:order-last lg:block print:hidden"
 				>
-					<p className="mb-2 font-medium text-[var(--text)]">Jump to</p>
+					<p className="mb-2 font-medium text-fg">Jump to</p>
 					<ul className="flex flex-col gap-1">
 						{presentSections.map((label) => (
 							<li key={label}>
 								<a
 									href={`#${slugify(label)}`}
-									className="block rounded px-2 py-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+									className="block rounded px-2 py-1 text-fg-muted transition-colors hover:bg-surface hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 								>
 									{label}
 								</a>

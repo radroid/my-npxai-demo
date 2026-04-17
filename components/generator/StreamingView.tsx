@@ -88,33 +88,29 @@ export function StreamingView({
 	return (
 		<div className="flex flex-col gap-4">
 			<div
-				className="flex items-center gap-2 text-xs text-[var(--text-muted)]"
+				className="flex items-center gap-2 text-xs text-fg-muted"
 				aria-live="polite"
 			>
 				<span
 					aria-hidden="true"
-					className="size-2 animate-breathe rounded-full bg-[var(--accent-brand)]"
+					className="size-2 animate-breathe rounded-full bg-brand"
 				/>
 				{PHASE_LABELS[phase]}…
 			</div>
-			<ol className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+			<ol className="flex items-center gap-1.5 text-[11px] text-fg-muted">
 				{PHASES.map((p, i) => (
 					<li key={p} className="flex items-center gap-1.5">
 						<span
 							className={`inline-block size-1.5 rounded-full ${
-								i <= activeIdx
-									? "bg-[var(--accent-brand)]"
-									: "bg-[var(--border)]"
+								i <= activeIdx ? "bg-brand" : "bg-border"
 							}`}
 							aria-hidden="true"
 						/>
-						<span
-							className={i === activeIdx ? "text-[var(--text)]" : undefined}
-						>
+						<span className={i === activeIdx ? "text-fg" : undefined}>
 							{PHASE_LABELS[p]}
 						</span>
 						{i < PHASES.length - 1 ? (
-							<span aria-hidden="true" className="mx-1 text-[var(--border)]">
+							<span aria-hidden="true" className="mx-1 text-border">
 								›
 							</span>
 						) : null}
@@ -126,7 +122,7 @@ export function StreamingView({
 					<ReportBody report={drained} />
 					<span
 						aria-hidden="true"
-						className="generator-caret inline-block h-3 w-[2px] translate-y-0.5 bg-[var(--accent-brand)]"
+						className="generator-caret inline-block h-3 w-[2px] translate-y-0.5 bg-brand"
 					/>
 				</div>
 			) : (
@@ -134,14 +130,14 @@ export function StreamingView({
 					{SKELETON_WIDTHS.map((w) => (
 						<div
 							key={`sk-w${w}`}
-							className="h-3 w-full animate-breathe rounded bg-[var(--border)]/60"
+							className="h-3 w-full animate-breathe rounded bg-border/60"
 							style={{ width: `${w}%` }}
 						/>
 					))}
 				</div>
 			)}
 			{meta ? (
-				<div className="mt-2 text-[11px] text-[var(--text-muted)]">
+				<div className="mt-2 text-[11px] text-fg-muted">
 					{meta.station} · {meta.unit} · {meta.shift} shift
 				</div>
 			) : null}

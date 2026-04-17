@@ -71,16 +71,16 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 				{trigger ?? (
 					<button
 						type="button"
-						className="inline-flex h-8 cursor-pointer items-center rounded-md bg-[var(--accent-brand)] px-3 text-xs font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
+						className="inline-flex h-8 cursor-pointer items-center rounded-md bg-brand px-3 text-xs font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
 					>
 						Sign in
 					</button>
 				)}
 			</DialogTrigger>
-			<DialogContent className="border-border bg-[var(--surface)] text-[var(--text)] sm:max-w-md max-sm:h-full max-sm:max-w-full max-sm:rounded-none">
+			<DialogContent className="border-border bg-surface text-fg sm:max-w-md max-sm:h-full max-sm:max-w-full max-sm:rounded-none">
 				<DialogHeader>
-					<DialogTitle className="text-[var(--text)]">{COPY.title}</DialogTitle>
-					<DialogDescription className="text-[var(--text-muted)]">
+					<DialogTitle className="text-fg">{COPY.title}</DialogTitle>
+					<DialogDescription className="text-fg-muted">
 						{COPY.blurb}
 					</DialogDescription>
 				</DialogHeader>
@@ -89,16 +89,13 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 					<div
 						aria-live="polite"
 						id={statusId}
-						className="rounded-md border border-border bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text)]"
+						className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-fg"
 					>
 						{COPY.success}
 					</div>
 				) : (
 					<form onSubmit={onSubmit} className="flex flex-col gap-3">
-						<label
-							htmlFor={emailId}
-							className="text-sm text-[var(--text-muted)]"
-						>
+						<label htmlFor={emailId} className="text-sm text-fg-muted">
 							{COPY.emailLabel}
 						</label>
 						<input
@@ -111,7 +108,7 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 							onChange={(e) => setEmail(e.target.value)}
 							placeholder={COPY.emailPlaceholder}
 							disabled={status === "loading"}
-							className="h-10 rounded-md border border-border bg-[var(--bg)] px-3 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:opacity-60"
+							className="h-10 rounded-md border border-border bg-bg px-3 text-sm text-fg placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
 						/>
 
 						{status === "error" ? (
@@ -119,13 +116,13 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 								role="alert"
 								aria-live="polite"
 								id={statusId}
-								className="rounded-md border border-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]"
+								className="rounded-md border border-danger bg-danger/10 px-3 py-2 text-sm text-danger"
 							>
 								<p>{COPY.error}</p>
 								<button
 									type="button"
 									onClick={reset}
-									className="mt-2 inline-flex cursor-pointer items-center text-xs font-medium text-[var(--text)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] rounded-sm"
+									className="mt-2 inline-flex cursor-pointer items-center text-xs font-medium text-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-sm"
 								>
 									{COPY.retry}
 								</button>
@@ -136,7 +133,7 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 							type="submit"
 							disabled={status === "loading" || !email.trim()}
 							aria-describedby={status === "error" ? statusId : undefined}
-							className="mt-1 inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-4 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-60"
+							className="mt-1 inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{status === "loading" ? (
 								<>

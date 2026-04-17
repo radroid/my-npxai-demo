@@ -8,9 +8,28 @@ Rules for agents working in this repo. Only essential, repeatedly-relevant rules
 - **Assume the dev server is already running.** Do not start, restart, or kill it.
 - **Prefer CLIs over dashboards or ad-hoc drivers for external services.** For databases and deployment platforms (Supabase, Cloudflare, Vercel, etc.), use the official CLI (`supabase`, `wrangler`, `vercel`) for schema changes, migrations, env management, and deploys. Do not propose new npm drivers (`postgres.js`, `pg`) or "paste into the dashboard SQL editor" as the primary path. The CLIs give us versioned, replayable, scriptable operations; dashboard-paste is a last resort when no CLI command exists.
 - **Every frontend change must work in BOTH light and dark themes.** The app ships both modes (`next-themes` + the shadcn `ThemeToggle`). Whenever you touch colors/backgrounds/borders/text:
-  1. Reference semantic tokens from `app/globals.css` — never hardcoded hex values in components. Available tokens: `--bg`, `--surface`, `--surface-2`, `--text`, `--text-muted`, `--accent-brand`, `--accent-brand-hover`, `--requirement`, `--guidance`, `--success`, `--warning`, `--danger`, `--border`, `--border-strong`. Light values are in `:root`, dark values in `.dark`.
+  1. **Prefer canonical Tailwind utilities over arbitrary `var()` values.** All semantic tokens are mapped in `app/globals.css` under `@theme inline`, so use the generated utility instead of the escape hatch:
+     | Token | Canonical utility | Use instead of |
+     |---|---|---|
+     | `--bg` | `bg-bg`, `to-bg`, `from-bg`, `via-bg` | `bg-[var(--bg)]` |
+     | `--surface` | `bg-surface` | `bg-[var(--surface)]` |
+     | `--surface-2` | `bg-surface-2` | `bg-[var(--surface-2)]` |
+     | `--text` | `text-fg` | `text-[var(--text)]` |
+     | `--text-muted` | `text-fg-muted` | `text-[var(--text-muted)]` |
+     | `--accent-brand` | `bg-brand`, `text-brand`, `ring-brand`, `border-brand` (opacity modifiers work: `ring-brand/30`) | `bg-[var(--accent-brand)]` |
+     | `--accent-brand-hover` | `bg-brand-hover` (typically under `hover:`) | `bg-[var(--accent-brand-hover)]` |
+     | `--requirement` | `bg-requirement`, `text-requirement`, `border-requirement` | `text-[var(--requirement)]` |
+     | `--guidance` | `bg-guidance`, `text-guidance`, `border-guidance` | `text-[var(--guidance)]` |
+     | `--success` | `bg-success`, `text-success`, `border-success` | `text-[var(--success)]` |
+     | `--warning` | `bg-warning`, `text-warning`, `border-warning` | `text-[var(--warning)]` |
+     | `--danger` | `bg-danger`, `text-danger`, `border-danger`, `ring-danger` | `text-[var(--danger)]` |
+     | `--border` | `border-border` | `border-[var(--border)]` |
+     | `--border-strong` | `border-border-strong` | `border-[var(--border-strong)]` |
+     | `--accent` | `ring-accent` (shadcn alias; our semantic brand focus ring is `ring-brand`) | `ring-[var(--accent)]` |
+
+     Never hardcoded hex values. Light values live in `:root`, dark values in `.dark` — the canonical utilities resolve through `var(--…)` so dark mode continues to work.
   2. Mentally verify each element in BOTH palettes before shipping. Special danger zone: white/colored text on colored backgrounds — these flip catastrophically if a token doesn't resolve or the contrast doesn't survive the theme swap.
-  3. **Tailwind 4 CSS-variable syntax matters.** Write `bg-[var(--accent-brand)]` (explicit `var()`) or `bg-(--accent-brand)` (Tailwind 4 parentheses shorthand). Do NOT use the bracket-only form `bg-[--accent-brand]` — Tailwind 4 treats that as a literal token and the background silently fails to render, leaving white-on-white text in light mode. Same rule for `text-`, `border-`, `ring-`, `fill-`, `stroke-` arbitrary-value utilities.
+  3. **Tailwind 4 arbitrary-value syntax gotcha (for the rare case you do need an escape hatch).** Write `bg-[var(--foo)]` (explicit `var()`) or `bg-(--foo)` (Tailwind 4 parentheses shorthand). Do NOT use the bracket-only form `bg-[--foo]` — Tailwind 4 treats that as a literal token and the background silently fails to render, leaving white-on-white text in light mode. Same rule for `text-`, `border-`, `ring-`, `fill-`, `stroke-` arbitrary-value utilities.
 
 ## OVERNIGHT.md (sprint state, gitignored)
 

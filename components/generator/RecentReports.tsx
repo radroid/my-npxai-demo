@@ -100,28 +100,28 @@ export function RecentReports({ onNavigate }: { onNavigate?: () => void }) {
 
 	return (
 		<div className="flex h-full flex-col gap-2 px-3 py-3">
-			<div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+			<div className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
 				<Clock3 className="size-3.5" aria-hidden />
 				Recent reports
 			</div>
 			{reports.length === 0 ? (
-				<p className="px-1 py-2 text-xs text-[var(--text-muted)]">
+				<p className="px-1 py-2 text-xs text-fg-muted">
 					{loading ? "Loading…" : "Reports you generate will show up here."}
 				</p>
 			) : (
 				<ul className="flex flex-col gap-0.5">
 					{reports.map((r) => (
 						<li key={r.id}>
-							<div className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-[var(--surface-2)]">
+							<div className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-surface-2">
 								<button
 									type="button"
 									onClick={() => handleSelect(r)}
-									className="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+									className="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 								>
-									<span className="truncate font-mono text-[var(--text)]">
+									<span className="truncate font-mono text-fg">
 										{r.station} · {r.unit} · {r.shift}
 									</span>
-									<span className="text-[var(--text-muted)]">
+									<span className="text-fg-muted">
 										{relativeTime(r.generated_at)}
 									</span>
 								</button>
@@ -129,7 +129,7 @@ export function RecentReports({ onNavigate }: { onNavigate?: () => void }) {
 									type="button"
 									aria-label={`Delete report for ${r.station} ${r.unit} ${r.shift}`}
 									onClick={(e) => handleDelete(r.id, e)}
-									className="shrink-0 cursor-pointer rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity hover:bg-[var(--surface)] hover:text-[var(--danger)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)] group-hover:opacity-100"
+									className="shrink-0 cursor-pointer rounded p-1 text-fg-muted opacity-0 transition-opacity hover:bg-surface hover:text-danger focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger group-hover:opacity-100"
 								>
 									<Trash2 className="size-3" aria-hidden />
 								</button>

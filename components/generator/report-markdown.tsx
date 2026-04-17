@@ -20,34 +20,27 @@ const PRIORITY_CHIP_BASE =
 
 const SEVERITY_TONES: Record<SeverityLevel, SeverityTone> = {
 	CRITICAL: {
-		container: `${CALLOUT_BASE} border-[var(--danger)] bg-[var(--danger)]/10`,
-		icon: <AlertTriangle className="size-4 text-[var(--danger)]" aria-hidden />,
-		accent: "text-[var(--danger)]",
+		container: `${CALLOUT_BASE} border-danger bg-danger/10`,
+		icon: <AlertTriangle className="size-4 text-danger" aria-hidden />,
+		accent: "text-danger",
 	},
 	ATTENTION: {
-		container: `${CALLOUT_BASE} border-[var(--guidance)] bg-[var(--guidance)]/10`,
-		icon: (
-			<AlertTriangle className="size-4 text-[var(--guidance)]" aria-hidden />
-		),
-		accent: "text-[var(--guidance)]",
+		container: `${CALLOUT_BASE} border-guidance bg-guidance/10`,
+		icon: <AlertTriangle className="size-4 text-guidance" aria-hidden />,
+		accent: "text-guidance",
 	},
 	ROUTINE: {
-		container: `${CALLOUT_BASE} border-[var(--border-strong)] bg-[var(--surface-2)]`,
-		icon: (
-			<CheckCircle2 className="size-4 text-[var(--text-muted)]" aria-hidden />
-		),
-		accent: "text-[var(--text-muted)]",
+		container: `${CALLOUT_BASE} border-border-strong bg-surface-2`,
+		icon: <CheckCircle2 className="size-4 text-fg-muted" aria-hidden />,
+		accent: "text-fg-muted",
 	},
 };
 
 const PRIORITY_CHIP_CLS: Record<string, string> = {
-	CRITICAL:
-		"border-[var(--danger)]/40 bg-[var(--danger)]/10 text-[var(--danger)]",
-	ATTENTION:
-		"border-[var(--guidance)]/40 bg-[var(--guidance)]/10 text-[var(--guidance)]",
+	CRITICAL: "border-danger/40 bg-danger/10 text-danger",
+	ATTENTION: "border-guidance/40 bg-guidance/10 text-guidance",
 };
-const PRIORITY_CHIP_DEFAULT =
-	"border-border bg-[var(--surface)] text-[var(--text-muted)]";
+const PRIORITY_CHIP_DEFAULT = "border-border bg-surface text-fg-muted";
 
 function PriorityBadge({ level }: { level: string }) {
 	return (
@@ -137,7 +130,7 @@ export function slugify(s: string): string {
 		.replace(/(^-|-$)/g, "");
 }
 
-const TEXT_BODY = "text-sm leading-relaxed text-[var(--text)]";
+const TEXT_BODY = "text-sm leading-relaxed text-fg";
 
 const styled =
 	(tag: string, className: string) =>
@@ -150,7 +143,7 @@ export function ReportBody({ report }: { report: string }) {
 		<ReactMarkdown
 			remarkPlugins={[remarkGfm]}
 			components={{
-				h1: styled("h1", "mt-0 mb-2 font-semibold text-[var(--text)] text-lg"),
+				h1: styled("h1", "mt-0 mb-2 font-semibold text-fg text-lg"),
 				h2: ({ node, children, ...props }) => (
 					<h2
 						{...props}
@@ -159,12 +152,12 @@ export function ReportBody({ report }: { report: string }) {
 								.replace(/^\d+\.\s+/, "")
 								.trim(),
 						)}
-						className="mt-5 mb-2 font-semibold text-[var(--text)] text-base scroll-mt-4"
+						className="mt-5 mb-2 font-semibold text-fg text-base scroll-mt-4"
 					>
 						{children}
 					</h2>
 				),
-				h3: styled("h3", "mt-3 mb-1 font-medium text-[var(--text)] text-sm"),
+				h3: styled("h3", "mt-3 mb-1 font-medium text-fg text-sm"),
 				p: ({ node, children, ...props }) => {
 					const sev = extractLeadingSeverity(children);
 					if (sev) {
@@ -203,11 +196,11 @@ export function ReportBody({ report }: { report: string }) {
 				},
 				ul: styled("ul", "my-2 ml-5 list-disc space-y-1"),
 				ol: styled("ol", "my-2 ml-5 list-decimal space-y-1"),
-				strong: styled("strong", "font-semibold text-[var(--text)]"),
+				strong: styled("strong", "font-semibold text-fg"),
 				table: styled("table", "my-3 w-full border-collapse text-xs"),
 				th: styled(
 					"th",
-					"border border-border bg-[var(--surface-2)] px-2 py-1 text-left font-medium",
+					"border border-border bg-surface-2 px-2 py-1 text-left font-medium",
 				),
 				td: styled("td", "border border-border px-2 py-1"),
 			}}

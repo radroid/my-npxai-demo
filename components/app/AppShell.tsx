@@ -41,7 +41,7 @@ const PRIMARY_NAV = [
 const SIDEBAR_STATE_KEY = "npxai-app-sidebar-collapsed";
 
 const ICON_BTN =
-	"inline-flex items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]";
+	"inline-flex items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
 
 export function AppShell({
 	children,
@@ -69,10 +69,10 @@ export function AppShell({
 		});
 
 	return (
-		<div className="flex h-dvh w-full gap-2 overflow-hidden bg-[var(--bg)] p-2 text-[var(--text)]">
+		<div className="flex h-dvh w-full gap-2 overflow-hidden bg-bg p-2 text-fg">
 			<aside
 				aria-label="App sidebar"
-				className={`hidden shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-[var(--surface)] transition-[width] duration-200 md:flex ${
+				className={`hidden shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-surface transition-[width] duration-200 md:flex ${
 					collapsed ? "w-14" : "w-60"
 				}`}
 			>
@@ -86,7 +86,7 @@ export function AppShell({
 			<Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
 				<SheetContent
 					side="left"
-					className="w-72 border-r border-border bg-[var(--surface)] p-0"
+					className="w-72 border-r border-border bg-surface p-0"
 				>
 					<SheetTitle className="sr-only">Navigation</SheetTitle>
 					<AppSidebarContent
@@ -98,7 +98,7 @@ export function AppShell({
 			</Sheet>
 
 			<main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-				<header className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border bg-[var(--surface)] px-3 mb-3 md:hidden">
+				<header className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border bg-surface px-3 mb-3 md:hidden">
 					<button
 						type="button"
 						aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -109,11 +109,11 @@ export function AppShell({
 					</button>
 					<Link
 						href="/"
-						className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--text)]"
+						className="flex items-center gap-2 text-sm font-semibold tracking-tight text-fg"
 					>
 						<span
 							aria-hidden="true"
-							className="inline-block h-5 w-5 rounded-md bg-[var(--accent-brand)]"
+							className="inline-block h-5 w-5 rounded-md bg-brand"
 						/>
 						<span>NPXai Demo</span>
 					</Link>
@@ -170,7 +170,7 @@ function AppSidebarContent({
 						href="/"
 						aria-label="NPXai Demo — home"
 						title="NPXai Demo"
-						className="flex size-7 items-center justify-center rounded-md bg-[var(--accent-brand)] font-semibold text-[12px] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+						className="flex size-7 items-center justify-center rounded-md bg-brand font-semibold text-[12px] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 					>
 						N
 					</Link>
@@ -178,11 +178,11 @@ function AppSidebarContent({
 					<Link
 						href="/"
 						onClick={onNavigate}
-						className="flex items-center gap-2 rounded-md text-sm font-semibold tracking-tight text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+						className="flex items-center gap-2 rounded-md text-sm font-semibold tracking-tight text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 					>
 						<span
 							aria-hidden="true"
-							className="inline-block h-6 w-6 rounded-md bg-[var(--accent-brand)]"
+							className="inline-block h-6 w-6 rounded-md bg-brand"
 						/>
 						<span>NPXai Demo</span>
 					</Link>
@@ -212,12 +212,12 @@ function AppSidebarContent({
 							onClick={onNavigate}
 							aria-current={active ? "page" : undefined}
 							title={collapsed ? label : undefined}
-							className={`flex items-center gap-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] ${
+							className={`flex items-center gap-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
 								collapsed ? "justify-center p-2" : "px-2.5 py-2"
 							} ${
 								active
-									? "bg-[var(--accent-brand)] font-medium text-white shadow-sm hover:bg-[var(--accent-brand-hover)]"
-									: "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+									? "bg-brand font-medium text-white shadow-sm hover:bg-brand-hover"
+									: "text-fg-muted hover:bg-surface-2 hover:text-fg"
 							}`}
 						>
 							<Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -244,7 +244,7 @@ function AppSidebarContent({
 				</div>
 			) : (
 				<div className="border-t border-border p-3">
-					<p className="mb-3 text-[11px] leading-snug text-[var(--text-muted)]">
+					<p className="mb-3 text-[11px] leading-snug text-fg-muted">
 						Simulated data. Not for operational use.
 					</p>
 					<div className="flex flex-col items-start gap-2">
@@ -277,9 +277,7 @@ function ContextualRail({
 		body = threadsLoaded ? (
 			<ThreadSidebar onNavigate={onNavigate} />
 		) : (
-			<p className="px-5 py-3 text-xs text-[var(--text-muted)]">
-				Loading threads…
-			</p>
+			<p className="px-5 py-3 text-xs text-fg-muted">Loading threads…</p>
 		);
 	} else if (pathname.startsWith("/generator")) {
 		body = <RecentReports onNavigate={onNavigate} />;
@@ -290,7 +288,7 @@ function ContextualRail({
 	return (
 		<div className="flex min-h-0 flex-1 flex-col border-t border-border">
 			{label ? (
-				<div className="px-5 pt-3 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+				<div className="px-5 pt-3 text-[11px] font-medium uppercase tracking-wide text-fg-muted">
 					{label}
 				</div>
 			) : null}
@@ -318,7 +316,7 @@ function CollapsedThemeCycle() {
 			aria-label={`Switch to ${label} theme`}
 			title={`Theme: ${active} → ${label}`}
 			onClick={() => setTheme(next)}
-			className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-[var(--surface-2)] text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+			className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-2 text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 		>
 			<Icon className="h-3.5 w-3.5" aria-hidden="true" />
 		</button>
@@ -333,7 +331,7 @@ function CollapsedSignIn() {
 					type="button"
 					aria-label="Sign in"
 					title="Sign in"
-					className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-[var(--accent-brand)] text-white shadow-sm transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-brand text-white shadow-sm transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 				>
 					<LogIn className="h-4 w-4" aria-hidden="true" />
 				</button>
@@ -350,13 +348,13 @@ function CollapsedUserAvatar({ email }: { email: string }) {
 					type="button"
 					aria-label={`Account menu for ${email}`}
 					title={email}
-					className="flex size-8 items-center justify-center rounded-full bg-[var(--accent-brand)] font-semibold text-[11px] text-white shadow-sm ring-1 ring-[var(--border)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					className="flex size-8 items-center justify-center rounded-full bg-brand font-semibold text-[11px] text-white shadow-sm ring-1 ring-border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 				>
 					{initialsFromEmail(email)}
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent side="right" align="end" className="min-w-48">
-				<DropdownMenuLabel className="truncate text-xs font-normal text-[var(--text-muted)]">
+				<DropdownMenuLabel className="truncate text-xs font-normal text-fg-muted">
 					{email}
 				</DropdownMenuLabel>
 				<DropdownMenuSeparator />

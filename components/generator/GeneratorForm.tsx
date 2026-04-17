@@ -23,7 +23,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { SHIFTS, STATIONS, UNITS } from "@/lib/validators";
 
 const OUTLINE_BUTTON =
-	"inline-flex items-center justify-center gap-2 rounded-md border border-border bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]";
+	"inline-flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
 
 export const GeneratorForm: FC = () => {
 	const [station, setStation] = useState<string>(STATIONS[0]);
@@ -91,21 +91,21 @@ export const GeneratorForm: FC = () => {
 		status === "pulling" || status === "drafting" || status === "finalizing";
 
 	return (
-		<div className="h-full overflow-auto rounded-xl border border-border bg-[var(--surface)]">
+		<div className="h-full overflow-auto rounded-xl border border-border bg-surface">
 			<div className="mx-auto grid w-full max-w-[1600px] gap-6 p-4 md:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
 				<aside className="flex flex-col gap-4">
 					<header>
-						<h1 className="text-xl font-semibold text-[var(--text)]">
+						<h1 className="text-xl font-semibold text-fg">
 							Shift Turnover Generator
 						</h1>
-						<p className="mt-1 text-xs text-[var(--text-muted)]">
+						<p className="mt-1 text-xs text-fg-muted">
 							CANDU shift turnover reports per CNSC REGDOC-2.3.4, generated from
 							simulated Bruce Power plant data.
 						</p>
 					</header>
 					<form
 						onSubmit={handleSubmit}
-						className="flex flex-col gap-3 rounded-md border border-border bg-[var(--surface)] p-4"
+						className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4"
 					>
 						<LabeledSelect
 							label="Station"
@@ -128,7 +128,7 @@ export const GeneratorForm: FC = () => {
 						<button
 							type="submit"
 							disabled={isLoading}
-							className="mt-1 inline-flex items-center justify-center gap-2 rounded-md bg-[var(--accent-brand)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] disabled:cursor-not-allowed disabled:opacity-60"
+							className="mt-1 inline-flex items-center justify-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{isLoading ? (
 								<>
@@ -170,7 +170,7 @@ export const GeneratorForm: FC = () => {
 
 				<section
 					aria-live="polite"
-					className="min-h-[360px] rounded-md border border-border bg-[var(--surface)] p-4 md:p-6 print:border-0 print:p-0"
+					className="min-h-[360px] rounded-md border border-border bg-surface p-4 md:p-6 print:border-0 print:p-0"
 				>
 					{status === "idle" && <EmptyState />}
 					{isLoading && (
@@ -183,7 +183,7 @@ export const GeneratorForm: FC = () => {
 					{status === "error" && (
 						<div
 							role="alert"
-							className="rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
+							className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
 						>
 							{error}
 						</div>
@@ -216,16 +216,13 @@ function LabeledSelect({
 	const id = `gen-${label.replace(/\s+/g, "-").toLowerCase()}`;
 	return (
 		<div className="flex flex-col gap-1">
-			<label
-				htmlFor={id}
-				className="text-xs font-medium text-[var(--text-muted)]"
-			>
+			<label htmlFor={id} className="text-xs font-medium text-fg-muted">
 				{label}
 			</label>
 			<Select value={value} onValueChange={onChange}>
 				<SelectTrigger
 					id={id}
-					className="w-full border-border bg-[var(--bg)] text-sm text-[var(--text)]"
+					className="w-full border-border bg-bg text-sm text-fg"
 				>
 					<SelectValue />
 				</SelectTrigger>
@@ -244,12 +241,12 @@ function LabeledSelect({
 function EmptyState() {
 	return (
 		<div className="flex h-full min-h-[320px] flex-col items-center justify-center text-center">
-			<p className="font-medium text-[var(--text)]">No report yet</p>
-			<p className="mt-1 max-w-md text-xs text-[var(--text-muted)]">
+			<p className="font-medium text-fg">No report yet</p>
+			<p className="mt-1 max-w-md text-xs text-fg-muted">
 				Pick a unit + shift and click{" "}
-				<span className="font-medium text-[var(--text)]">Generate report</span>.
-				Unit 3 Evening is the demo's richest dataset — outage in progress, 3
-				active clearances, multiple work orders.
+				<span className="font-medium text-fg">Generate report</span>. Unit 3
+				Evening is the demo's richest dataset — outage in progress, 3 active
+				clearances, multiple work orders.
 			</p>
 		</div>
 	);

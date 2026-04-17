@@ -99,7 +99,7 @@ const ThreadListItemMore: FC = () => {
 					</ThreadListItemMorePrimitive.Item>
 				</ThreadListItemPrimitive.Archive>
 				<ThreadListItemPrimitive.Delete asChild>
-					<ThreadListItemMorePrimitive.Item className="aui-thread-list-item-more-item flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-[var(--danger)] outline-none hover:bg-accent focus:bg-accent">
+					<ThreadListItemMorePrimitive.Item className="aui-thread-list-item-more-item flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-danger outline-none hover:bg-accent focus:bg-accent">
 						<Trash2Icon className="size-4" />
 						Delete
 					</ThreadListItemMorePrimitive.Item>
