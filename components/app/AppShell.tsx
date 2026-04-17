@@ -30,47 +30,40 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { initialsFromEmail } from "@/lib/initials";
 
-type PrimaryNavItem = {
-	href: string;
-	label: string;
-	Icon: typeof BookOpen;
-};
-
-const PRIMARY_NAV: PrimaryNavItem[] = [
+const PRIMARY_NAV = [
 	{ href: "/knowledge-hub", label: "Knowledge Hub", Icon: BookOpen },
 	{ href: "/generator", label: "Generator", Icon: FileText },
-];
+] as const;
 
 const SIDEBAR_STATE_KEY = "npxai-app-sidebar-collapsed";
 
-type AppShellProps = {
+const ICON_BTN =
+	"inline-flex items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]";
+
+export function AppShell({
+	children,
+	userEmail,
+}: {
 	children: ReactNode;
 	userEmail: string | null;
-};
-
-export function AppShell({ children, userEmail }: AppShellProps) {
+}) {
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [collapsed, setCollapsed] = useState(false);
-	const [hydrated, setHydrated] = useState(false);
 
 	useEffect(() => {
 		try {
-			const stored = window.localStorage.getItem(SIDEBAR_STATE_KEY);
-			if (stored === "1") setCollapsed(true);
-		} catch {
-			// localStorage unavailable — keep defaults.
-		}
-		setHydrated(true);
+			setCollapsed(window.localStorage.getItem(SIDEBAR_STATE_KEY) === "1");
+		} catch {}
 	}, []);
 
-	useEffect(() => {
-		if (!hydrated) return;
-		try {
-			window.localStorage.setItem(SIDEBAR_STATE_KEY, collapsed ? "1" : "0");
-		} catch {
-			// Ignore quota / privacy errors.
-		}
-	}, [collapsed, hydrated]);
+	const toggleCollapsed = () =>
+		setCollapsed((v) => {
+			const n = !v;
+			try {
+				window.localStorage.setItem(SIDEBAR_STATE_KEY, n ? "1" : "0");
+			} catch {}
+			return n;
+		});
 
 	return (
 		<div className="flex h-dvh w-full gap-2 overflow-hidden bg-[var(--bg)] p-2 text-[var(--text)]">
@@ -83,7 +76,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
 				<AppSidebarContent
 					userEmail={userEmail}
 					collapsed={collapsed}
-					onToggleCollapse={() => setCollapsed((v) => !v)}
+					onToggleCollapse={toggleCollapsed}
 				/>
 			</aside>
 
@@ -106,7 +99,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
 						type="button"
 						aria-label={mobileOpen ? "Close menu" : "Open menu"}
 						onClick={() => setMobileOpen(true)}
-						className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+						className={`${ICON_BTN} h-9 w-9`}
 					>
 						<Menu className="h-4 w-4" aria-hidden="true" />
 					</button>
@@ -140,11 +133,27 @@ function AppSidebarContent({
 }) {
 	const pathname = usePathname();
 
+	// One header action button: Expand (collapsed), Close (mobile), or Collapse (desktop expanded).
+	const action = collapsed
+		? onToggleCollapse && {
+				on: onToggleCollapse,
+				aria: "Expand sidebar",
+				Icon: PanelLeftOpen,
+				size: "h-8 w-8",
+			}
+		: onNavigate
+			? { on: onNavigate, aria: "Close menu", Icon: X, size: "h-8 w-8" }
+			: onToggleCollapse
+				? {
+						on: onToggleCollapse,
+						aria: "Collapse sidebar",
+						Icon: PanelLeftClose,
+						size: "h-7 w-7",
+					}
+				: null;
+
 	return (
 		<div className="flex h-full flex-col">
-			{/* Header — logo + collapse toggle. Toggle always lives at the top
-			    of the sidebar in both states so the control doesn't jump
-			    between top and bottom when the user flips the panel. */}
 			<div
 				className={`flex shrink-0 border-b border-[var(--border)] ${
 					collapsed
@@ -153,60 +162,37 @@ function AppSidebarContent({
 				}`}
 			>
 				{collapsed ? (
-					<>
-						<Link
-							href="/"
-							aria-label="NPXai Demo — home"
-							title="NPXai Demo"
-							className="flex size-7 items-center justify-center rounded-md bg-[var(--accent-brand)] font-semibold text-[12px] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
-						>
-							N
-						</Link>
-						{onToggleCollapse ? (
-							<button
-								type="button"
-								aria-label="Expand sidebar"
-								onClick={onToggleCollapse}
-								className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
-							>
-								<PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-							</button>
-						) : null}
-					</>
+					<Link
+						href="/"
+						aria-label="NPXai Demo — home"
+						title="NPXai Demo"
+						className="flex size-7 items-center justify-center rounded-md bg-[var(--accent-brand)] font-semibold text-[12px] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					>
+						N
+					</Link>
 				) : (
-					<>
-						<Link
-							href="/"
-							onClick={onNavigate}
-							className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)] rounded-md"
-						>
-							<span
-								aria-hidden="true"
-								className="inline-block h-6 w-6 rounded-md bg-[var(--accent-brand)]"
-							/>
-							<span>NPXai Demo</span>
-						</Link>
-						{onNavigate ? (
-							<button
-								type="button"
-								aria-label="Close menu"
-								onClick={onNavigate}
-								className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
-							>
-								<X className="h-4 w-4" aria-hidden="true" />
-							</button>
-						) : onToggleCollapse ? (
-							<button
-								type="button"
-								aria-label="Collapse sidebar"
-								onClick={onToggleCollapse}
-								className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
-							>
-								<PanelLeftClose className="h-4 w-4" aria-hidden="true" />
-							</button>
-						) : null}
-					</>
+					<Link
+						href="/"
+						onClick={onNavigate}
+						className="flex items-center gap-2 rounded-md text-sm font-semibold tracking-tight text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
+					>
+						<span
+							aria-hidden="true"
+							className="inline-block h-6 w-6 rounded-md bg-[var(--accent-brand)]"
+						/>
+						<span>NPXai Demo</span>
+					</Link>
 				)}
+				{action ? (
+					<button
+						type="button"
+						aria-label={action.aria}
+						onClick={action.on}
+						className={`${ICON_BTN} ${action.size}`}
+					>
+						<action.Icon className="h-4 w-4" aria-hidden="true" />
+					</button>
+				) : null}
 			</div>
 
 			<nav
@@ -231,11 +217,7 @@ function AppSidebarContent({
 							}`}
 						>
 							<Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-							{collapsed ? (
-								<span className="sr-only">{label}</span>
-							) : (
-								<span>{label}</span>
-							)}
+							<span className={collapsed ? "sr-only" : undefined}>{label}</span>
 						</Link>
 					);
 				})}
@@ -267,24 +249,24 @@ function AppSidebarContent({
 	);
 }
 
-// Compact theme control for the collapsed sidebar — cycles through
-// Light → Dark → System on each click, showing the icon of the active
-// mode. Keeps all three choices reachable in 32px of width.
+const THEME_CYCLE = {
+	light: { next: "dark", Icon: Sun, label: "Dark" },
+	dark: { next: "system", Icon: Moon, label: "System" },
+	system: { next: "light", Icon: Monitor, label: "Light" },
+} as const;
+
 function CollapsedThemeCycle() {
 	const { theme, setTheme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);
 	const active = (mounted ? theme : "system") ?? "system";
-	const next =
-		active === "light" ? "dark" : active === "dark" ? "system" : "light";
-	const Icon = active === "light" ? Sun : active === "dark" ? Moon : Monitor;
-	const nextLabel =
-		next === "light" ? "Light" : next === "dark" ? "Dark" : "System";
+	const { next, Icon, label } =
+		THEME_CYCLE[active as keyof typeof THEME_CYCLE] ?? THEME_CYCLE.system;
 	return (
 		<button
 			type="button"
-			aria-label={`Switch to ${nextLabel} theme`}
-			title={`Theme: ${active} → ${nextLabel}`}
+			aria-label={`Switch to ${label} theme`}
+			title={`Theme: ${active} → ${label}`}
 			onClick={() => setTheme(next)}
 			className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 		>
@@ -311,7 +293,6 @@ function CollapsedSignIn() {
 }
 
 function CollapsedUserAvatar({ email }: { email: string }) {
-	const initials = initialsFromEmail(email);
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
@@ -321,7 +302,7 @@ function CollapsedUserAvatar({ email }: { email: string }) {
 					title={email}
 					className="flex size-8 items-center justify-center rounded-full bg-[var(--accent-brand)] font-semibold text-[11px] text-white shadow-sm ring-1 ring-[var(--border)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-brand)]"
 				>
-					{initials}
+					{initialsFromEmail(email)}
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent side="right" align="end" className="min-w-48">
