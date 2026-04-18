@@ -57,8 +57,14 @@ const ENDPOINT = `${BASE_URL}/api/knowledge-hub/query`;
 const LATENCY_SOFT_CAP_MS = 10_000;
 const SHIP_PASS_THRESHOLD = 17;
 
-const CITATION_RE = /\[(?:REGDOC-\d+(?:\.\d+){1,3}|NSCA)(?:\s+§[\d.]+)?\]/g;
-const SECTION_RE = /§([\d.]+)/;
+// Section labels in the CNSC corpus are not always numeric — appendix /
+// glossary sections use letters (REGDOC-3.6 §A, REGDOC-2.4.1 §Appendix C,
+// §B.2) and statutory sections use parenthetical sub-letters (NSCA §26(a),
+// §48(1)(b)). The § glyph is occasionally dropped by the model. Allow all
+// of these so extracted citations reflect what the LLM actually wrote.
+const CITATION_RE =
+	/\[(?:REGDOC-\d+(?:\.\d+){1,3}|NSCA)(?:\s+§?[A-Za-z0-9.()]+(?:\s[A-Za-z0-9.()]+)?)?\]/g;
+const SECTION_RE = /§([A-Za-z0-9.()]+(?:\s[A-Za-z0-9.()]+)?)/;
 
 function parseOnly(argv: string[]): Set<number> | null {
 	const idx = argv.indexOf("--only");
@@ -175,7 +181,9 @@ function extractCitations(
 
 function sectionMatchesPrefix(cited: string, prefix: string): boolean {
 	if (cited === prefix) return true;
-	return cited.startsWith(`${prefix}.`);
+	// Accept numeric sub-sections ("3.2" ⊃ "3.2.1") and parenthetical
+	// sub-clauses used in statutory citations ("26" ⊃ "26(a)", "48(1)(b)").
+	return cited.startsWith(`${prefix}.`) || cited.startsWith(`${prefix}(`);
 }
 
 function checkBehavior(
@@ -257,10 +265,25 @@ function checkCiteSections(
 	return { pass: false, reason: `no_cite_section_match:${prefixes.join("|")}` };
 }
 
+// Strip markdown formatting that the LLM adds for presentation (bold,
+// italics, inline code) but which splits content phrases mid-word — e.g.
+// `**Possess, transfer...** a nuclear substance` hides the substring
+// `transfer... a nuclear substance` from a naive grader. Also collapses
+// non-breaking spaces + curly apostrophes to ASCII equivalents.
+function normalizeForMatching(raw: string): string {
+	return raw
+		.replace(/\*\*|__|`/g, "") // bold / underline bold / inline code markers
+		.replace(/(?<=\w)\*(?=\w)/g, "") // leftover single-asterisk italics inside words
+		.replace(/[\u00A0\u2007\u202F]/g, " ") // non-breaking whitespace variants
+		.replace(/[\u2018\u2019]/g, "'") // curly single quotes
+		.replace(/[\u201C\u201D]/g, '"') // curly double quotes
+		.toLowerCase();
+}
+
 function checkContainAny(phrases: string[], text: string): CheckResult {
 	if (phrases.length === 0) return { pass: true };
-	const lower = text.toLowerCase();
-	const hit = phrases.some((p) => lower.includes(p.toLowerCase()));
+	const norm = normalizeForMatching(text);
+	const hit = phrases.some((p) => norm.includes(p.toLowerCase()));
 	if (!hit) return { pass: false, reason: `missing_any:${phrases.join("|")}` };
 	return { pass: true };
 }
@@ -271,11 +294,11 @@ function checkGroupHits(
 	text: string,
 ): CheckResult {
 	if (groups.length === 0) return { pass: true };
-	const lower = text.toLowerCase();
+	const norm = normalizeForMatching(text);
 	for (let i = 0; i < groups.length; i++) {
 		const group = groups[i];
 		const threshold = thresholds[i] ?? 1;
-		const hits = group.filter((g) => lower.includes(g.toLowerCase())).length;
+		const hits = group.filter((g) => norm.includes(g.toLowerCase())).length;
 		if (hits < threshold) {
 			return {
 				pass: false,
@@ -288,9 +311,9 @@ function checkGroupHits(
 
 function checkDeny(phrases: string[], text: string): CheckResult {
 	if (phrases.length === 0) return { pass: true };
-	const lower = text.toLowerCase();
+	const norm = normalizeForMatching(text);
 	for (const banned of phrases) {
-		if (lower.includes(banned.toLowerCase())) {
+		if (norm.includes(banned.toLowerCase())) {
 			return { pass: false, reason: `forbidden:${banned}` };
 		}
 	}

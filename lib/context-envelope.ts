@@ -40,6 +40,17 @@ export function wrapChunk(chunk: RetrievedChunk, index: number): string {
 export function buildContextEnvelope(
 	chunks: RetrievedChunk[],
 	userQuery: string,
+	requiredCites: readonly string[] = [],
 ): string {
-	return `${chunks.map(wrapChunk).join("\n")}\n\nUSER QUESTION:\n${userQuery}`;
+	// Pre-envelope cue: when the route identifies two or more docs as
+	// in-scope for this question (explicit REGDOC/NSCA mentions or concept
+	// hints), list them so the model treats multi-doc citation as a hard
+	// instruction rather than a soft prompt rule. Empirically, GPT-4o-mini
+	// is inconsistent about citing both definitional and domain-specific
+	// docs without this nudge (see #28 in evals/knowledge-hub.jsonl).
+	const multiDocCue =
+		requiredCites.length >= 2
+			? `\n\nMULTI-DOC SCOPE: The user's question spans ${requiredCites.join(", ")}. Your response MUST cite at least one snippet from EACH of these documents.`
+			: "";
+	return `${chunks.map(wrapChunk).join("\n")}${multiDocCue}\n\nUSER QUESTION:\n${userQuery}`;
 }
