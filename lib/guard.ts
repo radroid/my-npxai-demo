@@ -9,7 +9,7 @@ import { hashIp, hashUser, logGuardEvent, logRequest } from "./logger";
 import { createSupabaseServerClient } from "./supabase";
 import { OUTPUT_MAX_TOKENS, QUERY_CHAR_CAP, type Tier } from "./validators";
 
-const GLOBAL_DAILY_CAP = 500;
+const GLOBAL_DAILY_CAP = 2000;
 
 type Window = "1 m" | "1 h" | "24 h";
 const WINDOWS = [
@@ -25,7 +25,7 @@ const LIMITS: Record<
 	"knowledge-hub/query": {
 		anon: { minute: 3, hour: 10, day: 5 },
 		signed_in: { minute: 10, hour: 40, day: 50 },
-		npx_circle: { minute: 15, hour: 80, day: 100 },
+		npx_circle: { minute: 15, hour: 80, day: 200 },
 	},
 	"generator/turnover": {
 		anon: { minute: 1, hour: 3, day: 2 },
