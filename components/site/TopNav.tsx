@@ -2,6 +2,7 @@ import { BookOpen, FileText, Home } from "lucide-react";
 import Link from "next/link";
 import { BrandThemeToggle } from "@/components/site/BrandThemeToggle";
 import { ConceptsMenu } from "@/components/site/ConceptsMenu";
+import { MobileNav } from "@/components/site/MobileNav";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { SignInButton } from "./SignInButton";
@@ -30,16 +31,21 @@ export async function TopNav() {
 	} = await supabase.auth.getUser();
 
 	return (
-		<header className="sticky top-0 z-40 w-full border-b border-border bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/70">
+		<header className="sticky top-0 z-40 w-full overflow-x-clip border-b border-border bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/70">
 			<nav
 				aria-label="Primary"
-				className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:px-6"
+				className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-4 md:px-6"
 			>
-				<div className="flex items-center gap-2">
+				<div className="flex min-w-0 items-center gap-1 sm:gap-2">
+					<MobileNav />
 					<BrandThemeToggle />
-					<Link href="/" aria-label="Home" className={PILL_CLASSES}>
+					<Link
+						href="/"
+						aria-label="Home"
+						className={`${PILL_CLASSES} hidden md:inline-flex`}
+					>
 						<Home className={PILL_ICON_CLASSES} aria-hidden="true" />
-						<span className="hidden sm:inline">Home</span>
+						<span>Home</span>
 					</Link>
 				</div>
 
@@ -57,8 +63,10 @@ export async function TopNav() {
 					</li>
 				</ul>
 
-				<div className="flex items-center gap-3">
-					<ThemeToggle />
+				<div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
+					<div className="hidden sm:flex">
+						<ThemeToggle />
+					</div>
 					{user ? <UserChip email={user.email ?? ""} /> : <SignInButton />}
 				</div>
 			</nav>

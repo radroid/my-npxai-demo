@@ -33,10 +33,10 @@ export function BrandThemeToggle() {
 			aria-pressed={isNpx}
 			aria-label={pressedLabel}
 			title={pressedLabel}
-			className="flex items-center gap-2 rounded-md text-sm font-semibold tracking-tight text-fg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+			className="inline-flex min-w-0 items-center gap-2 rounded-md text-sm font-semibold tracking-tight text-fg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 		>
-			<BrandMark className="h-6 w-6" />
-			<span>NPXai Demo</span>
+			<BrandMark className="h-6 w-6 shrink-0" />
+			<span className="hidden truncate sm:inline">NPXai Demo</span>
 		</button>
 	);
 }
