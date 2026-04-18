@@ -2,7 +2,6 @@ import {
 	ActionBarMorePrimitive,
 	ActionBarPrimitive,
 	AuiIf,
-	BranchPickerPrimitive,
 	ComposerPrimitive,
 	ErrorPrimitive,
 	MessagePrimitive,
@@ -13,13 +12,10 @@ import {
 	ArrowDownIcon,
 	ArrowUpIcon,
 	CheckIcon,
-	ChevronLeftIcon,
-	ChevronRightIcon,
 	CopyIcon,
 	DownloadIcon,
 	MoreHorizontalIcon,
 	PencilIcon,
-	RefreshCwIcon,
 	SquareIcon,
 } from "lucide-react";
 import { type FC, useEffect, useMemo, useState } from "react";
@@ -37,7 +33,6 @@ import {
 	CitationSourcesProvider,
 } from "@/components/knowledge-hub/citation-sources";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export const Thread: FC = () => (
 	<ThreadPrimitive.Root
@@ -151,7 +146,7 @@ const StarterQuestions: FC = () => (
 			<ThreadPrimitive.Suggestion key={s.prompt} prompt={s.prompt} send asChild>
 				<button
 					type="button"
-					className="fade-in slide-in-from-bottom-2 @md:nth-[n+3]:block nth-[n+3]:hidden animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60"
+					className="fade-in slide-in-from-bottom-2 animate-in fill-mode-both h-auto w-full rounded-xl border bg-background px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					<span className="block font-medium">{s.title}</span>
 					<span className="mt-0.5 block text-muted-foreground text-xs">
@@ -343,7 +338,6 @@ const AssistantMessage: FC = () => {
 				</div>
 
 				<div className="aui-assistant-message-footer mt-1 ml-2 flex">
-					<BranchPicker />
 					<AssistantActionBar />
 				</div>
 			</MessagePrimitive.Root>
@@ -368,11 +362,6 @@ const AssistantActionBar: FC = () => (
 				</AuiIf>
 			</TooltipIconButton>
 		</ActionBarPrimitive.Copy>
-		<ActionBarPrimitive.Reload asChild>
-			<TooltipIconButton tooltip="Refresh">
-				<RefreshCwIcon />
-			</TooltipIconButton>
-		</ActionBarPrimitive.Reload>
 		<ActionBarMorePrimitive.Root>
 			<ActionBarMorePrimitive.Trigger asChild>
 				<TooltipIconButton
@@ -413,8 +402,6 @@ const UserMessage: FC = () => (
 				<UserActionBar />
 			</div>
 		</div>
-
-		<BranchPicker className="aui-user-branch-picker col-span-full col-start-1 row-start-3 -mr-1 justify-end" />
 	</MessagePrimitive.Root>
 );
 
@@ -453,30 +440,3 @@ const EditComposer: FC = () => (
 	</MessagePrimitive.Root>
 );
 
-const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
-	className,
-	...rest
-}) => (
-	<BranchPickerPrimitive.Root
-		hideWhenSingleBranch
-		className={cn(
-			"aui-branch-picker-root mr-2 -ml-2 inline-flex items-center text-muted-foreground text-xs",
-			className,
-		)}
-		{...rest}
-	>
-		<BranchPickerPrimitive.Previous asChild>
-			<TooltipIconButton tooltip="Previous">
-				<ChevronLeftIcon />
-			</TooltipIconButton>
-		</BranchPickerPrimitive.Previous>
-		<span className="aui-branch-picker-state font-medium">
-			<BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count />
-		</span>
-		<BranchPickerPrimitive.Next asChild>
-			<TooltipIconButton tooltip="Next">
-				<ChevronRightIcon />
-			</TooltipIconButton>
-		</BranchPickerPrimitive.Next>
-	</BranchPickerPrimitive.Root>
-);
