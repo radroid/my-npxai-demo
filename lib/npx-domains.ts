@@ -1,4 +1,4 @@
-const NPX_EMAIL_DOMAINS = new Set(["npxinnovation.ca"]);
+const NPX_EMAIL_DOMAINS = new Set(["npxinnovation.ca", "npxai.com"]);
 
 export function isNpxEmail(email: string | null | undefined): boolean {
 	if (!email) return false;

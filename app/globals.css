@@ -292,52 +292,32 @@
 		@apply bg-background text-foreground;
 	}
 
-	/* NPX brand easter-egg — plain starry-sky photo behind the page; the
-	   animated aurora curtains are drawn on top by <NpxAuroraSky /> (see
-	   components/site/NpxAuroraSky.tsx). JPEG for Safari-old, @supports
-	   upgrades modern browsers to AVIF.
-
-	   `background-attachment: fixed` is intentionally NOT set — iOS Safari
-	   clamps fixed backgrounds to the device viewport and crops the photo
-	   aggressively in portrait. Letting the image scroll with the page
-	   looks identical on desktop (the photo is larger than the first
-	   viewport anyway) and keeps the full composition visible on mobile. */
+	/* NPX brand easter-egg — paint the NPXai aurora photo fixed behind
+	   the page so it stays in frame while content scrolls (the parallax
+	   feel on npxai.com). Direct body background — no pseudo-element or
+	   z-index trickery — so surfaced children (bg-surface, bg-bg,
+	   bg-surface-2) automatically cover it and content-heavy panels
+	   stay legible. Plain url() gives JPEG-only browsers *an* image;
+	   @supports upgrades modern browsers to AVIF (11 KB vs 250 KB). */
 	.npx body {
 		background-color: var(--bg);
-		background-image: url("/npx-sky.jpg");
+		background-image: url("/npx-background.jpg");
 		background-size: cover;
 		background-position: center center;
 		background-repeat: no-repeat;
+		background-attachment: fixed;
 	}
 	@supports (
-			background-image: image-set(url("/npx-sky.avif") type("image/avif"))
+			background-image: image-set(
+				url("/npx-background.avif") type("image/avif")
+			)
 		) {
 		.npx body {
 			background-image: image-set(
-				url("/npx-sky.avif") type("image/avif"),
-				url("/npx-sky.jpg") type("image/jpeg")
+				url("/npx-background.avif") type("image/avif"),
+				url("/npx-background.jpg") type("image/jpeg")
 			);
 		}
-	}
-	/* Below md the photo is letterboxed with `contain` + center-top so the
-	   full aurora is visible in portrait instead of center-cropping; the
-	   surrounding fill uses --bg (deep NPX indigo) so the letterbox reads
-	   as intentional. Above md we return to `cover` for full-bleed. */
-	@media (max-width: 767px) {
-		.npx body {
-			background-size: contain;
-			background-position: center top;
-		}
-	}
-
-	/* Animated aurora curtains — only visible under the NPX brand theme.
-	   We intentionally do NOT set z-index here: adding z-index would
-	   isolate the ribbons in their own stacking context and break
-	   `mix-blend-mode: screen` against the body background photo. Instead
-	   page content is wrapped in `<div class="relative z-10">` (see
-	   app/layout.tsx) so content always stacks above the aurora. */
-	html:not(.npx) .npx-aurora-root {
-		display: none;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -422,38 +402,64 @@
 @layer utilities {
 	.aurora-band {
 		position: absolute;
-		inset: -25% -10% auto -10%;
-		height: 140%;
-		filter: blur(72px);
-		opacity: 0.55;
+		inset: -42% -16% auto -16%;
+		height: 172%;
+		filter: blur(88px);
+		opacity: 0.5;
 		will-change: transform, opacity;
 		mix-blend-mode: screen;
 	}
 
 	.aurora-band-a {
 		background: radial-gradient(
-			60% 55% at 30% 40%,
-			color-mix(in oklab, var(--accent-brand) 70%, transparent) 0%,
-			transparent 70%
+				34% 78% at 66% 7%,
+				color-mix(in oklab, var(--accent-brand) 72%, transparent) 0%,
+				transparent 68%
+			),
+			radial-gradient(
+				27% 64% at 59% 24%,
+				color-mix(in oklab, var(--success) 58%, transparent) 0%,
+				transparent 72%
+			),
+			radial-gradient(
+				24% 52% at 72% 18%,
+				color-mix(in oklab, var(--requirement) 38%, transparent) 0%,
+				transparent 76%
 		);
+		opacity: 0.6;
 	}
 
 	.aurora-band-b {
 		background: radial-gradient(
-			55% 50% at 70% 35%,
-			color-mix(in oklab, #6366f1 60%, transparent) 0%,
-			transparent 65%
+				52% 82% at 24% 6%,
+				color-mix(in oklab, var(--requirement) 66%, transparent) 0%,
+				transparent 70%
+			),
+			radial-gradient(
+				36% 62% at 36% 26%,
+				color-mix(in oklab, var(--requirement) 44%, transparent) 0%,
+				transparent 74%
+			),
+			radial-gradient(
+				44% 64% at 17% 18%,
+				color-mix(in oklab, var(--accent-brand) 24%, transparent) 0%,
+				transparent 78%
 		);
-		opacity: 0.42;
+		opacity: 0.46;
 	}
 
 	.aurora-band-c {
 		background: radial-gradient(
-			45% 40% at 50% 20%,
-			color-mix(in oklab, #2dd4bf 45%, transparent) 0%,
-			transparent 70%
+				64% 95% at 50% -4%,
+				color-mix(in oklab, var(--success) 48%, transparent) 0%,
+				transparent 74%
+			),
+			radial-gradient(
+				38% 58% at 48% 22%,
+				color-mix(in oklab, var(--requirement) 36%, transparent) 0%,
+				transparent 76%
 		);
-		opacity: 0.28;
+		opacity: 0.3;
 	}
 
 	/* Light-mode aurora — same hues as dark (blue / indigo / teal) but
@@ -466,27 +472,92 @@
 	}
 	:root:not(.dark):not(.npx) .aurora-band-a {
 		background: radial-gradient(
-			60% 55% at 30% 40%,
-			color-mix(in oklab, #4338ca 85%, transparent) 0%,
-			transparent 70%
+				36% 74% at 63% 8%,
+				color-mix(in oklab, var(--requirement) 95%, transparent) 0%,
+				transparent 72%
+			),
+			radial-gradient(
+				30% 56% at 56% 24%,
+				color-mix(in oklab, var(--success) 75%, transparent) 0%,
+				transparent 78%
 		);
-		opacity: 0.52;
+		opacity: 0.7;
 	}
 	:root:not(.dark):not(.npx) .aurora-band-b {
 		background: radial-gradient(
-			55% 50% at 70% 35%,
-			color-mix(in oklab, #8b5cf6 80%, transparent) 0%,
-			transparent 65%
+				52% 80% at 28% 8%,
+				color-mix(in oklab, var(--requirement) 88%, transparent) 0%,
+				transparent 74%
+			),
+			radial-gradient(
+				35% 58% at 38% 28%,
+				color-mix(in oklab, var(--guidance) 45%, transparent) 0%,
+				transparent 78%
 		);
-		opacity: 0.46;
+		opacity: 0.58;
 	}
 	:root:not(.dark):not(.npx) .aurora-band-c {
 		background: radial-gradient(
-			45% 40% at 50% 20%,
-			color-mix(in oklab, #6495ed 95%, transparent) 0%,
-			transparent 70%
+				62% 92% at 50% -3%,
+				color-mix(in oklab, var(--success) 65%, transparent) 0%,
+				transparent 78%
+			),
+			radial-gradient(
+				36% 56% at 52% 22%,
+				color-mix(in oklab, var(--requirement) 55%, transparent) 0%,
+				transparent 80%
 		);
-		opacity: 0.6;
+		opacity: 0.48;
+	}
+
+	/* Pale green shimmer streaks — layered on top of the hero on dark +
+	   NPX themes to echo the soft pale-green glow seen on the left of the
+	   NPXai reference photo. Each streak is a large, heavily-blurred blob
+	   of mint green (#a8e6cf). <AuroraHero> drifts them horizontally via
+	   motion/react so they read as ambient shimmer. Opacity is tuned high
+	   enough to read against both the dark palette canvas and the NPX
+	   aurora-photo body background (screen-blend clamps bright areas). */
+	.aurora-green-streak {
+		position: absolute;
+		filter: blur(90px);
+		opacity: 0.7;
+		will-change: transform, opacity;
+		pointer-events: none;
+	}
+	.aurora-green-streak-a {
+		top: 10%;
+		left: 5%;
+		width: 42%;
+		height: 70%;
+		background: radial-gradient(
+			55% 60% at 50% 40%,
+			#a8e6cf 0%,
+			transparent 72%
+		);
+	}
+	.aurora-green-streak-b {
+		top: 0%;
+		left: 60%;
+		width: 40%;
+		height: 80%;
+		background: radial-gradient(
+			50% 55% at 50% 35%,
+			#b8ecd4 0%,
+			transparent 74%
+		);
+		opacity: 0.55;
+	}
+	.aurora-green-streak-c {
+		top: 25%;
+		left: 30%;
+		width: 45%;
+		height: 60%;
+		background: radial-gradient(
+			50% 50% at 50% 50%,
+			#a8e6cf 0%,
+			transparent 76%
+		);
+		opacity: 0.5;
 	}
 
 	/* Safe-area utilities — consume iOS notch + home-indicator insets.

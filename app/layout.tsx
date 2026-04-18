@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { NpxAuroraSky } from "@/components/site/NpxAuroraSky";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { defaultThemeForEmail } from "@/lib/npx-domains";
@@ -98,10 +97,7 @@ export default async function RootLayout({
 					themes={["light", "dark", "npx"]}
 					disableTransitionOnChange
 				>
-					<NpxAuroraSky />
-					<div className="relative z-10">
-						<TooltipProvider>{children}</TooltipProvider>
-					</div>
+					<TooltipProvider>{children}</TooltipProvider>
 				</ThemeProvider>
 			</body>
 		</html>
