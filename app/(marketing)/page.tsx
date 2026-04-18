@@ -49,14 +49,14 @@ export default async function HomePage() {
 	const isSignedIn = Boolean(user);
 
 	return (
-		<div className="flex flex-col gap-24 pb-24">
+		<div className="flex flex-col gap-14 pb-14 sm:gap-24 sm:pb-24">
 			{/* Hero — aurora is scoped to this section only. */}
 			<AuroraHero>
-				<section className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-20 text-center md:px-6 md:py-28">
-					<p className="text-xs uppercase tracking-[0.18em] text-fg-muted">
+				<section className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 py-12 text-center sm:gap-6 md:px-6 md:py-28">
+					<p className="text-[11px] uppercase tracking-[0.18em] text-fg-muted sm:text-xs">
 						NPXai demo · built by Raj Dholakia
 					</p>
-					<h1 className="max-w-3xl text-balance font-semibold text-4xl leading-tight tracking-tight text-fg md:text-5xl lg:text-6xl">
+					<h1 className="max-w-3xl text-balance font-semibold text-[2rem] leading-[1.1] tracking-tight text-fg sm:text-4xl md:text-5xl lg:text-6xl">
 						A CNSC Knowledge Hub and a CANDU shift generator — live, cited, and
 						on the edge.
 					</h1>
@@ -72,7 +72,7 @@ export default async function HomePage() {
 						</a>
 						.
 					</p>
-					<div className="mt-2 flex flex-col gap-3 sm:flex-row">
+					<div className="mt-2 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
 						<Link
 							href="/knowledge-hub"
 							className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-brand px-6 text-sm font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -122,7 +122,7 @@ export default async function HomePage() {
 			{/* Contact / sign-up */}
 			<section
 				id="contact"
-				className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 rounded-xl border border-border bg-surface p-8 text-center md:p-12"
+				className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 rounded-xl border border-border bg-surface p-6 text-center sm:p-8 md:p-12"
 			>
 				<p className="text-xs uppercase tracking-[0.18em] text-fg-muted">
 					{isSignedIn ? "You're in" : "Sign up"}
