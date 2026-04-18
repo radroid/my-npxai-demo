@@ -74,7 +74,7 @@ export function AppShell({
 		});
 
 	return (
-		<div className="flex h-dvh w-full gap-2 overflow-hidden bg-bg p-2 text-fg">
+		<div className="flex h-dvh w-full gap-2 overflow-hidden bg-bg p-2 text-fg npx:bg-transparent">
 			<aside
 				aria-label="App sidebar"
 				className={`hidden shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-surface transition-[width] duration-200 md:flex ${
