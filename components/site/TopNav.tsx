@@ -1,6 +1,6 @@
-import { BookOpen, FileText } from "lucide-react";
+import { BookOpen, FileText, Home } from "lucide-react";
 import Link from "next/link";
-import { BrandMark } from "@/components/site/BrandMark";
+import { BrandThemeToggle } from "@/components/site/BrandThemeToggle";
 import { ConceptsMenu } from "@/components/site/ConceptsMenu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { createSupabaseServerClient } from "@/lib/supabase";
@@ -9,11 +9,19 @@ import { UserChip } from "./UserChip";
 
 // Working apps (interactive) render as primary pill buttons so the two
 // things evaluators should *try* are unmissable. Concept explainers hide
-// behind the ConceptsMenu dropdown so the row isn't busy.
+// behind the ConceptsMenu dropdown so the row isn't busy. Home lives
+// outside this list (always visible, even on mobile) because the brand
+// lockup is no longer a home-link — clicking it toggles the NPX brand
+// theme easter-egg instead.
 const WORKING_APPS = [
 	{ href: "/knowledge-hub", label: "Knowledge Hub", Icon: BookOpen },
 	{ href: "/generator", label: "Generator", Icon: FileText },
 ];
+
+const PILL_CLASSES =
+	"group inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+const PILL_ICON_CLASSES =
+	"h-3.5 w-3.5 text-fg-muted transition-colors group-hover:text-white";
 
 export async function TopNav() {
 	const supabase = await createSupabaseServerClient();
@@ -27,25 +35,19 @@ export async function TopNav() {
 				aria-label="Primary"
 				className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:px-6"
 			>
-				<Link
-					href="/"
-					className="flex items-center gap-2 text-sm font-semibold tracking-tight text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-md"
-				>
-					<BrandMark className="h-6 w-6" />
-					<span>NPXai Demo</span>
-				</Link>
+				<div className="flex items-center gap-2">
+					<BrandThemeToggle />
+					<Link href="/" aria-label="Home" className={PILL_CLASSES}>
+						<Home className={PILL_ICON_CLASSES} aria-hidden="true" />
+						<span className="hidden sm:inline">Home</span>
+					</Link>
+				</div>
 
 				<ul className="hidden items-center gap-2 md:flex">
 					{WORKING_APPS.map(({ href, label, Icon }) => (
 						<li key={href}>
-							<Link
-								href={href}
-								className="group inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-							>
-								<Icon
-									className="h-3.5 w-3.5 text-fg-muted transition-colors group-hover:text-white"
-									aria-hidden="true"
-								/>
+							<Link href={href} className={PILL_CLASSES}>
+								<Icon className={PILL_ICON_CLASSES} aria-hidden="true" />
 								<span>{label}</span>
 							</Link>
 						</li>

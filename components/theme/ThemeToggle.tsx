@@ -1,26 +1,35 @@
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { NpxLogoMark } from "@/components/icons/NpxLogoMark";
 
 const OPTIONS = [
 	{ value: "light", label: "Light", Icon: Sun },
 	{ value: "dark", label: "Dark", Icon: Moon },
-	{ value: "system", label: "System", Icon: Monitor },
+	{ value: "npx", label: "NPX brand", Icon: NpxLogoMark },
 ] as const;
 
 type ToggleSize = "sm" | "md";
 
 export function ThemeToggle({ size = "md" }: { size?: ToggleSize }) {
-	const { theme, setTheme } = useTheme();
+	const { theme, resolvedTheme, setTheme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
 		setMounted(true);
 	}, []);
 
-	const active = (mounted ? theme : "system") ?? "system";
+	// Before mount we don't know the actual theme; render without an active
+	// pill to avoid a hydration flash. After mount, if the user hasn't picked
+	// explicitly, `theme === "system"` — fall back to the OS-resolved value so
+	// the matching pill (Light or Dark) lights up.
+	const active = mounted
+		? theme === "system"
+			? resolvedTheme
+			: theme
+		: undefined;
 	const btnSize = size === "sm" ? "h-6 w-6" : "h-7 w-7";
 	const iconSize = size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5";
 
