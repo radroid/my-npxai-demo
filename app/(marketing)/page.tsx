@@ -4,72 +4,50 @@ import {
 	FileTextIcon,
 	LayersIcon,
 	LineChartIcon,
-	ShieldCheckIcon,
-	SparklesIcon,
-	ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { AuroraHero } from "@/components/site/AuroraHero";
 import { NewsletterCapture } from "@/components/site/NewsletterCapture";
+import { createSupabaseServerClient } from "@/lib/supabase";
 
 const FEATURES = [
 	{
 		href: "/knowledge-hub",
-		label: "Working feature",
 		icon: BookOpenIcon,
 		title: "Knowledge Hub",
-		blurb:
-			"Retrieval-augmented Q&A over 19 CNSC REGDOCs. Every answer cites the REGDOC and section it came from.",
+		blurb: "Cited Q&A over 19 CNSC REGDOCs.",
 		cta: "Try it",
 	},
 	{
 		href: "/generator",
-		label: "Working feature",
 		icon: FileTextIcon,
 		title: "Shift Turnover Generator",
-		blurb:
-			"Generates a CANDU shift turnover report per REGDOC-2.3.4 from simulated Bruce Power plant data.",
-		cta: "Generate a report",
+		blurb: "REGDOC-2.3.4 turnovers from simulated Bruce Power data.",
+		cta: "Generate one",
 	},
 	{
 		href: "/insights",
-		label: "Explainer",
 		icon: LineChartIcon,
 		title: "Insights",
-		blurb:
-			"Rolling narrative layer over plant trends + regulatory signal. Concept explainer for this sprint.",
-		cta: "Read more",
+		blurb: "Narrative layer over plant + regulatory signal.",
+		cta: "Concept",
 	},
 	{
 		href: "/equivalency",
-		label: "Explainer",
 		icon: LayersIcon,
-		title: "Equivalency Evaluator",
-		blurb:
-			"Maps vendor claims against CNSC expectations to produce a defensible equivalency case. Concept explainer.",
-		cta: "Read more",
+		title: "Equivalency",
+		blurb: "Map vendor claims to CNSC expectations.",
+		cta: "Concept",
 	},
 ] as const;
 
-const WHY = [
-	{
-		icon: ShieldCheckIcon,
-		title: "Security-first RAG",
-		body: "Anon + tier-aware rate limits, HTML-escaped context envelopes, input + output deny lists, and a daily OpenAI circuit breaker. Threads stay client-side, so there's no server-side prompt log to leak.",
-	},
-	{
-		icon: SparklesIcon,
-		title: "Grounded answers only",
-		body: "Every claim is cited back to the specific REGDOC section it came from, with a visible Sources panel under each answer. If the corpus doesn't cover the question, the assistant says so instead of guessing.",
-	},
-	{
-		icon: ZapIcon,
-		title: "Cloudflare-edge deploy",
-		body: "Built on Next.js 16 + @opennextjs/cloudflare, Supabase pgvector (HNSW), and Upstash Redis. Portable to Azure OpenAI + Cosmos DB vector if the deployment posture calls for it.",
-	},
-];
+export default async function HomePage() {
+	const supabase = await createSupabaseServerClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	const isSignedIn = Boolean(user);
 
-export default function HomePage() {
 	return (
 		<div className="flex flex-col gap-24 pb-24">
 			{/* Hero — aurora is scoped to this section only. */}
@@ -83,8 +61,7 @@ export default function HomePage() {
 						on the edge.
 					</h1>
 					<p className="max-w-2xl text-balance text-base text-fg-muted md:text-lg">
-						A working application for the Senior Full-Stack and Intermediate AI
-						Developer roles at{" "}
+						A hiring demo for{" "}
 						<a
 							href="https://npxai.com"
 							className="text-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
@@ -93,8 +70,7 @@ export default function HomePage() {
 						>
 							NPX Innovation
 						</a>
-						. Retrieval-augmented Q&amp;A over 19 REGDOCs, plus a shift-turnover
-						generator that reads from simulated Bruce Power plant data.
+						.
 					</p>
 					<div className="mt-2 flex flex-col gap-3 sm:flex-row">
 						<Link
@@ -119,14 +95,6 @@ export default function HomePage() {
 				id="showcase"
 				className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6"
 			>
-				<header className="flex flex-col gap-2">
-					<p className="text-xs uppercase tracking-[0.18em] text-fg-muted">
-						What's in the demo
-					</p>
-					<h2 className="font-semibold text-2xl text-fg md:text-3xl">
-						Four surfaces — two you can poke, two you can read about.
-					</h2>
-				</header>
 				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					{FEATURES.map((f) => (
 						<Link
@@ -135,10 +103,7 @@ export default function HomePage() {
 							className="group flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 transition-colors hover:border-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
 						>
 							<div className="flex items-center justify-between">
-								<span className="inline-flex items-center gap-2 text-xs text-fg-muted">
-									<f.icon className="size-4" aria-hidden="true" />
-									{f.label}
-								</span>
+								<f.icon className="size-4 text-fg-muted" aria-hidden="true" />
 								<ArrowRightIcon
 									className="size-4 text-fg-muted transition-transform group-hover:translate-x-0.5"
 									aria-hidden="true"
@@ -154,55 +119,25 @@ export default function HomePage() {
 				</div>
 			</section>
 
-			{/* Why */}
-			<section
-				id="why"
-				className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-6"
-			>
-				<header className="flex flex-col gap-2">
-					<p className="text-xs uppercase tracking-[0.18em] text-fg-muted">
-						Why NPX AI?
-					</p>
-					<h2 className="font-semibold text-2xl text-fg md:text-3xl">
-						Built with the posture a regulatory demo actually needs.
-					</h2>
-					<p className="max-w-3xl text-sm text-fg-muted md:text-base">
-						This isn't "throw ChatGPT at a PDF" — the corpus is parsed, chunked,
-						embedded, and audited against a 20-question eval battery before it's
-						wired into the UI. The ship bar is 17/20 with all three adversarial
-						questions passing; the current build hits 20/20.
-					</p>
-				</header>
-				<div className="grid gap-4 md:grid-cols-3">
-					{WHY.map((w) => (
-						<div
-							key={w.title}
-							className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-5"
-						>
-							<w.icon className="size-5 text-brand" aria-hidden="true" />
-							<h3 className="font-semibold text-fg">{w.title}</h3>
-							<p className="text-sm text-fg-muted leading-relaxed">{w.body}</p>
-						</div>
-					))}
-				</div>
-			</section>
-
-			{/* Contact / newsletter */}
+			{/* Contact / sign-up */}
 			<section
 				id="contact"
 				className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 rounded-xl border border-border bg-surface p-8 text-center md:p-12"
 			>
 				<p className="text-xs uppercase tracking-[0.18em] text-fg-muted">
-					Stay in touch
+					{isSignedIn ? "You're in" : "Sign up"}
 				</p>
 				<h2 className="max-w-2xl text-balance font-semibold text-2xl text-fg md:text-3xl">
-					Following the demo? Drop your email and I'll send updates as this
-					grows past the hiring sprint.
+					{isSignedIn
+						? "Thanks for trying the demo."
+						: "Drop your email — I'll send a sign-in link that logs you in directly."}
 				</h2>
-				<NewsletterCapture />
-				<p className="text-[10px] text-fg-muted">
-					UI-only for this demo. Your email isn't stored anywhere.
-				</p>
+				<NewsletterCapture isSignedIn={isSignedIn} />
+				{isSignedIn ? null : (
+					<p className="text-[11px] text-fg-muted">
+						Magic link via Supabase Auth. No password, no marketing list.
+					</p>
+				)}
 			</section>
 		</div>
 	);

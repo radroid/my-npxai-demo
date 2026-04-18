@@ -15,18 +15,18 @@ export const metadata = {
 const SIGNALS = [
 	{
 		icon: TrendingUpIcon,
-		title: "Trend-aware summarisation",
-		body: "Roll up parameter drift (temperature, pressure, oxygen) into plain-language narratives that a control-room supervisor can skim in 30 seconds — rather than hunt through 40 trend screens.",
+		title: "Trend summaries",
+		body: "Parameter drift rolled into a 30-second narrative.",
 	},
 	{
 		icon: AlertTriangleIcon,
 		title: "Regulatory signal",
-		body: "Cross-reference operating anomalies against active CNSC REGDOC sections and recent Commission letters. Flag the clauses a station needs to address before the next compliance inspection, not after.",
+		body: "Operating anomalies cross-referenced against active CNSC clauses.",
 	},
 	{
 		icon: LineChartIcon,
 		title: "Shift-over-shift deltas",
-		body: "Compare the current shift's operating envelope + event log against the same shift last week / last cycle. Narratives highlight what's actually new — not the noise.",
+		body: "What's actually new this shift vs last week — not the noise.",
 	},
 ];
 
@@ -41,12 +41,8 @@ export default function InsightsPage() {
 					Insights — narrative layer over plant + regulatory signal
 				</h1>
 				<p className="max-w-3xl text-fg-muted md:text-lg">
-					The Insights surface would sit downstream of the Knowledge Hub and
-					Generator: both of those tools pull structured data on demand, while
-					Insights continuously scans the same data + CNSC signal for
-					operator-relevant narratives. This page is a scope-cut explainer for
-					the hiring demo — see the two working surfaces for the actual
-					capability proof.
+					Continuous scan of plant data + CNSC signal for operator-relevant
+					narratives.
 				</p>
 			</header>
 
@@ -61,32 +57,6 @@ export default function InsightsPage() {
 						<p className="text-sm text-fg-muted leading-relaxed">{s.body}</p>
 					</article>
 				))}
-			</section>
-
-			<section className="rounded-lg border border-border bg-surface p-6">
-				<h2 className="font-semibold text-fg text-xl">
-					What would it take to build this for real?
-				</h2>
-				<ul className="mt-3 space-y-2 text-sm text-fg-muted leading-relaxed">
-					<li>
-						· Continuous ingestion of the same simulated (or real) plant data
-						already seeded for the Generator.
-					</li>
-					<li>
-						· An additional corpus: CNSC Commission meeting letters + Event
-						Initial Report (EIR) summaries, parsed and embedded alongside the
-						existing REGDOC chunks.
-					</li>
-					<li>
-						· A scheduled worker (Cloudflare cron) that pulls the latest window,
-						applies the same RAG + citation contract, and writes a rolling
-						narrative to an append-only log.
-					</li>
-					<li>
-						· A "what changed since last shift" surface in the UI, with the same
-						Sources-panel contract as the Knowledge Hub.
-					</li>
-				</ul>
 			</section>
 
 			<div className="flex items-center gap-3 text-sm">

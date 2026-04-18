@@ -16,17 +16,17 @@ const PILLARS = [
 	{
 		icon: GitCompareIcon,
 		title: "Claim ↔ clause matching",
-		body: "Vendor submissions rarely line up 1:1 with the CNSC clause they're meant to satisfy. Equivalency maps each claim to the exact section it's addressing and flags gaps where a claim doesn't cover the clause's intent.",
+		body: "Each vendor claim mapped to the REGDOC section it addresses.",
 	},
 	{
 		icon: LayersIcon,
-		title: "Defensible equivalency case",
-		body: "Build the write-up your licensing team would actually hand to a regulator: what the clause requires, what the vendor approach does, why the two are equivalent or different, and the residual risk if any.",
+		title: "Defensible case",
+		body: "The write-up a licensing team would hand to a regulator.",
 	},
 	{
 		icon: CheckCircle2Icon,
 		title: "Traceable evidence",
-		body: "Every paragraph of the equivalency case links back to the source it's quoting — REGDOC section, CSA standard clause, or vendor submission page — with the same Sources-panel contract the Knowledge Hub uses.",
+		body: "Every paragraph links back to its source clause or submission.",
 	},
 ];
 
@@ -38,16 +38,11 @@ export default function EquivalencyPage() {
 					Concept · not a working feature this sprint
 				</p>
 				<h1 className="font-semibold text-3xl text-fg md:text-4xl">
-					Equivalency Evaluator — structured case-building against CNSC
-					expectations
+					Equivalency — structured case-building against CNSC expectations
 				</h1>
 				<p className="max-w-3xl text-fg-muted md:text-lg">
-					When a vendor proposes an alternative approach — a different cooling
-					topology, a non-standard fuel handling sequence, a new digital I&amp;C
-					architecture — the licensee has to make an equivalency case against
-					CNSC expectations. Equivalency would take the vendor's submission, map
-					it to the REGDOC framework, and produce a defensible write-up. This
-					page is a scope-cut explainer for the hiring demo.
+					Map a vendor submission to the REGDOC framework and produce a
+					defensible equivalency write-up.
 				</p>
 			</header>
 
@@ -62,21 +57,6 @@ export default function EquivalencyPage() {
 						<p className="text-sm text-fg-muted leading-relaxed">{p.body}</p>
 					</article>
 				))}
-			</section>
-
-			<section className="rounded-lg border border-border bg-surface p-6">
-				<h2 className="font-semibold text-fg text-xl">
-					Why this pairs with the Knowledge Hub
-				</h2>
-				<p className="mt-3 text-sm text-fg-muted leading-relaxed">
-					The Knowledge Hub proves the retrieval + citation posture works on the
-					regulatory side. Equivalency applies that same posture to the
-					submission side: a vendor PDF becomes a set of claim-clause pairs,
-					each pair is retrieved against the REGDOC corpus that already sits in
-					the Knowledge Hub, and the comparison is rendered with the same
-					requirement/guidance colour contract. Same engine, different entry
-					point.
-				</p>
 			</section>
 
 			<div className="flex items-center gap-3 text-sm">

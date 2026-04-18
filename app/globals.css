@@ -114,48 +114,54 @@
 :root {
 	--radius: 0.625rem;
 
-	/* Light theme — NPX palette inverted for daylight reading. WCAG AA
-	   verified against text on surface, accents on surface, severity
-	   callouts on surface. */
-	--bg: #f4f6fa;
+	/* Light theme — Tweakcn Vercel preset ported 2026-04-17. Neutral
+	   greyscale surface stack + pure black primary for CTAs. Domain tokens
+	   (--requirement / --guidance / --success / --warning / --danger)
+	   intentionally stay colored — they carry regulatory meaning, not
+	   shadcn branding, and removing them would flatten citation chips
+	   and severity callouts to grey. WCAG AA verified against the
+	   surface stack. */
+	--bg: #ffffff;
 	--surface: #ffffff;
-	--surface-2: #eef1f7;
-	--border: #dce1ec;
-	--border-strong: #c2cad9;
-	--text: #0a1830;
-	--text-muted: #4f5c78;
-	--accent-brand: #1e6fd9;
-	--accent-brand-hover: #1b5fb6;
+	--surface-2: #f5f5f5;
+	--border: #e5e5e5;
+	--border-strong: #d4d4d4;
+	--text: #0a0a0a;
+	--text-muted: #737373;
+	--accent-brand: #0a0a0a;
+	--accent-brand-hover: #262626;
 	--requirement: #1e6fd9;
 	--guidance: #a67200;
 	--success: #0a7a46;
 	--warning: #c2570a;
 	--danger: #b42318;
 
-	/* Map shadcn tokens onto the light palette. */
-	--background: #f4f6fa;
-	--foreground: #0a1830;
+	/* Map shadcn tokens onto the Vercel light palette. */
+	--background: #ffffff;
+	--foreground: #0a0a0a;
+	--card: #ffffff;
+	--card-foreground: #0a0a0a;
 	--popover: #ffffff;
-	--popover-foreground: #0a1830;
-	--primary: #1e6fd9;
-	--primary-foreground: #ffffff;
-	--secondary: #eef1f7;
-	--secondary-foreground: #0a1830;
-	--muted: #eef1f7;
-	--muted-foreground: #4f5c78;
-	--accent: #eef1f7;
-	--accent-foreground: #0a1830;
+	--popover-foreground: #0a0a0a;
+	--primary: #0a0a0a;
+	--primary-foreground: #fafafa;
+	--secondary: #f5f5f5;
+	--secondary-foreground: #0a0a0a;
+	--muted: #f5f5f5;
+	--muted-foreground: #737373;
+	--accent: #f5f5f5;
+	--accent-foreground: #0a0a0a;
 	--destructive: #b42318;
-	--input: #dce1ec;
-	--ring: #1e6fd9;
+	--input: #e5e5e5;
+	--ring: #a3a3a3;
 	--sidebar: #ffffff;
-	--sidebar-foreground: #0a1830;
-	--sidebar-primary: #1e6fd9;
-	--sidebar-primary-foreground: #ffffff;
-	--sidebar-accent: #eef1f7;
-	--sidebar-accent-foreground: #0a1830;
-	--sidebar-border: #dce1ec;
-	--sidebar-ring: #1e6fd9;
+	--sidebar-foreground: #0a0a0a;
+	--sidebar-primary: #0a0a0a;
+	--sidebar-primary-foreground: #fafafa;
+	--sidebar-accent: #f5f5f5;
+	--sidebar-accent-foreground: #0a0a0a;
+	--sidebar-border: #e5e5e5;
+	--sidebar-ring: #a3a3a3;
 }
 
 .dark {
@@ -286,6 +292,34 @@
 		@apply bg-background text-foreground;
 	}
 
+	/* NPX brand easter-egg — paint the NPXai aurora photo fixed behind
+	   the page so it stays in frame while content scrolls (the parallax
+	   feel on npxai.com). Direct body background — no pseudo-element or
+	   z-index trickery — so surfaced children (bg-surface, bg-bg,
+	   bg-surface-2) automatically cover it and content-heavy panels
+	   stay legible. Plain url() gives JPEG-only browsers *an* image;
+	   @supports upgrades modern browsers to AVIF (11 KB vs 250 KB). */
+	.npx body {
+		background-color: var(--bg);
+		background-image: url("/npx-background.jpg");
+		background-size: cover;
+		background-position: center center;
+		background-repeat: no-repeat;
+		background-attachment: fixed;
+	}
+	@supports (
+			background-image: image-set(
+				url("/npx-background.avif") type("image/avif")
+			)
+		) {
+		.npx body {
+			background-image: image-set(
+				url("/npx-background.avif") type("image/avif"),
+				url("/npx-background.jpg") type("image/jpeg")
+			);
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
 		*,
 		*::before,
@@ -360,9 +394,11 @@
 	}
 }
 
-/* Marketing-only aurora hero. GPU-friendly: only transform + opacity
-   animate, the underlying gradient is static. `prefers-reduced-motion`
-   (handled above) freezes the bands in a static pose. */
+/* Marketing-only aurora hero. Drift motion lives on the React side
+   (motion/react in AuroraHero.tsx) so easing + orchestration are
+   co-located with the component; this stylesheet owns only the static
+   shape, color, and blur of each band. `useReducedMotion` in the
+   component freezes the bands in their initial pose. */
 @layer utilities {
 	.aurora-band {
 		position: absolute;
@@ -380,7 +416,6 @@
 			color-mix(in oklab, var(--accent-brand) 70%, transparent) 0%,
 			transparent 70%
 		);
-		animation: aurora-drift-a 22s ease-in-out infinite alternate;
 	}
 
 	.aurora-band-b {
@@ -389,7 +424,6 @@
 			color-mix(in oklab, #6366f1 60%, transparent) 0%,
 			transparent 65%
 		);
-		animation: aurora-drift-b 28s ease-in-out infinite alternate;
 		opacity: 0.42;
 	}
 
@@ -399,43 +433,39 @@
 			color-mix(in oklab, #2dd4bf 45%, transparent) 0%,
 			transparent 70%
 		);
-		animation: aurora-drift-c 34s ease-in-out infinite alternate;
 		opacity: 0.28;
 	}
 
+	/* Light-mode aurora — same hues as dark (blue / indigo / teal) but
+	   darker shades so they tint a white surface instead of washing out.
+	   `mix-blend-mode: multiply` deliberately dropped — it was the source
+	   of the muddy look; with darker colors at moderate opacity, plain
+	   `normal` blend reads as a gentle luminous backdrop. */
 	:root:not(.dark):not(.npx) .aurora-band {
-		opacity: 0.28;
-		mix-blend-mode: multiply;
+		mix-blend-mode: normal;
+	}
+	:root:not(.dark):not(.npx) .aurora-band-a {
+		background: radial-gradient(
+			60% 55% at 30% 40%,
+			color-mix(in oklab, #4338ca 85%, transparent) 0%,
+			transparent 70%
+		);
+		opacity: 0.52;
 	}
 	:root:not(.dark):not(.npx) .aurora-band-b {
-		opacity: 0.22;
+		background: radial-gradient(
+			55% 50% at 70% 35%,
+			color-mix(in oklab, #8b5cf6 80%, transparent) 0%,
+			transparent 65%
+		);
+		opacity: 0.46;
 	}
 	:root:not(.dark):not(.npx) .aurora-band-c {
-		opacity: 0.16;
-	}
-}
-
-@keyframes aurora-drift-a {
-	0% {
-		transform: translate3d(-6%, -2%, 0) scale(1.05);
-	}
-	100% {
-		transform: translate3d(8%, 3%, 0) scale(1.15);
-	}
-}
-@keyframes aurora-drift-b {
-	0% {
-		transform: translate3d(4%, 2%, 0) scale(1.1);
-	}
-	100% {
-		transform: translate3d(-8%, -4%, 0) scale(1);
-	}
-}
-@keyframes aurora-drift-c {
-	0% {
-		transform: translate3d(-2%, 3%, 0) scale(0.95);
-	}
-	100% {
-		transform: translate3d(6%, -5%, 0) scale(1.2);
+		background: radial-gradient(
+			45% 40% at 50% 20%,
+			color-mix(in oklab, #6495ed 95%, transparent) 0%,
+			transparent 70%
+		);
+		opacity: 0.6;
 	}
 }

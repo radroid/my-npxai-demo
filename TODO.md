@@ -78,6 +78,10 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] End-to-end sign-in smoke **after** hybrid thread persistence ships: anon creates 2 threads → sign in → threads visible on server, rename works, second device sees the same threads
 - [ ] End-to-end Generator cache smoke: generate Unit 3 Evening → wait → regenerate (should be cached with "nothing has changed") → force-click Regenerate → confirm new OpenAI call fires
 
+### Phase 7 — Post-launch website polish (backlog, opened 2026-04-17)
+- [ ] Decide which sections of the homepage survive vs move to a `/behind-the-demo` consolidation page (agent drafts the cut; Raj approves the voice)
+- [ ] Daylight re-check of light mode on a real device after 7B + 7C land (palette swap is the one change Browserbase can't judge for you)
+
 ### Tuesday Apr 21 — Outreach (paused behind Phase 6 completion)
 - [ ] 9 AM — LinkedIn DM to Kshitij Ahuja
 - [ ] 11 AM — LinkedIn DM to Bharath Nangia
@@ -261,7 +265,33 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Browserbase verification (new flows): homepage aurora + CTA click-through, theme toggle light ⇄ dark on every page, KH streaming indicator appears then disappears, citation chip opens the source URL in a new tab, thread rename persists across reload for signed-in users, Generator streams tokens progressively, shadcn Selects open/close correctly, Recent Reports rail loads a cached report without re-hitting OpenAI, snapshot-hash dedupe triggers when nothing has changed.
 - [ ] `bun run preflight` + `bun run build` + `bun run eval:kb` stay green after all 6A–6F changes.
 
-### Ongoing / cross-phase
+### Phase 7 — Post-launch website polish (backlog, opened 2026-04-17)
+
+> Raj flagged three refinements after reviewing the live app — these are non-blocking for outreach and get tackled once the sign-up flow + Loom have landed. Scope is marketing-surface only; the app shell (Knowledge Hub, Generator) is not in scope for Phase 7.
+
+**7A · Prune marketing copy (take inspiration from npxai.com's brevity)**
+- [ ] Audit prose across `app/(marketing)/page.tsx`, `app/(marketing)/insights/page.tsx`, `app/(marketing)/equivalency/page.tsx`, `app/(marketing)/faq/page.tsx` and cut ~60% of the word count. Target: single-screen landing, CTAs do the work, no long explainer blocks inline.
+- [ ] Hero subhead is the biggest offender — the current two-sentence block under "A CNSC Knowledge Hub and a CANDU shift generator…" should compress to one sentence of ≤ 20 words. Keep the "NPX Innovation" link.
+- [ ] Collapse the "Why NPX AI?" three-card block to one tight sentence each (the current body paragraphs average 40+ words — aim for ≤ 15). Keep the three icons; kill the redundant headline-then-paragraph pattern.
+- [ ] Trim feature card blurbs to one line each. Drop the "Working feature" / "Explainer" labels — the icons + CTA verbs (`Try it` / `Read more`) already encode that distinction.
+- [ ] Move the detailed build rationale (security posture, RAG eval numbers, deploy stack, design-system notes) off the homepage. Consolidate into a single `/behind-the-demo` route inside `(marketing)/` that absorbs Insights + Equivalency + "Why NPX AI?" narrative. Link to it with one small footer chip. *(A separate blog on Raj's personal site is the alternative — flagged for human decision above. Default to the in-repo route for scope.)*
+- [ ] FAQ page: keep questions, halve each answer. If an answer needs more than ~40 words it probably belongs in `/behind-the-demo`.
+
+**7B · Light-mode hero gradient (darker shades of the current aurora colors)**
+- [ ] Current light-mode aurora uses `mix-blend-mode: multiply` + low opacity (`app/globals.css:434-443`), which reads muddy on the near-white surface. Direction per Raj 2026-04-17: **same hues as today — `--accent-brand` blue, `#6366f1` indigo, `#2dd4bf` teal — but darkened so they visibly tint the light background instead of washing out.**
+- [ ] Drop `mix-blend-mode: multiply` in the light branch; it's the source of the smear. Either use `mix-blend-mode: normal` with reduced opacity or no blend mode at all.
+- [ ] Introduce darker-shade variants for each band in the light override — e.g. `color-mix(in oklab, var(--accent-brand) 80%, #000 30%)` style — so the tint is visible against white. Keep dark-mode CSS untouched.
+- [ ] Verify every hero element (`h1`, subhead, both CTAs) stays WCAG AA against the heaviest tinted pixel the gradient produces.
+- [ ] `prefers-reduced-motion` branch still freezes the bands (already handled); reconfirm after the rework.
+
+**7C · Light palette swap — Tweakcn Vercel preset**
+- [ ] Pull the Vercel preset from [tweakcn.com](https://tweakcn.com/editor/theme). Port the `--background / --foreground / --card / --card-foreground / --muted / --muted-foreground / --border / --primary / --accent / --ring` values into `:root` in `app/globals.css`, mapping them onto our existing semantic tokens (`--bg / --text / --surface / --surface-2 / --text-muted / --border / --accent-brand / --accent`). Do **not** rename our tokens — the whole app consumes them.
+- [ ] Preserve the domain-semantic tokens (`--requirement`, `--guidance`, `--success`, `--warning`, `--danger`) — they carry regulatory meaning, not shadcn branding. Only the neutrals + the single brand accent get swapped.
+- [ ] WCAG AA audit against the new light palette — text-on-surface, text-on-surface-2, chip fills, severity callouts, citation pills, `SignInButton`, `NewsletterCapture` input/button, theme-toggle focus ring. Fix every token pair under 4.5:1 before merging.
+- [ ] Dark mode is out of scope for this swap. `.dark` block stays untouched.
+- [ ] Run `bun run build` + `bun run eval:kb` + Browserbase smoke on every page after the swap — the CLAUDE.md "both themes must survive" rule means the matrix here is 2 themes × N pages.
+
+
 - [ ] Keep `PLAN.md` current phase updated when phase transitions happen
 - [ ] Before advancing `Current phase`, verify the relevant Appendix H checklist is green
 - [ ] Log notable decisions in `PLAN.md` decisions log
