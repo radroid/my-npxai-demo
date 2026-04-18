@@ -108,7 +108,7 @@ function assembleSectionText(section: Section): string {
 
 function buildSectionUrl(section: Section, doc: Doc): string {
 	if (section.anchor && section.anchor.length > 0) {
-		return `${doc.url}${section.anchor}`;
+		return `${doc.url}#${section.anchor}`;
 	}
 	return doc.url;
 }
