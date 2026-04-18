@@ -130,19 +130,19 @@ export function useKnowledgeHubHistoryAdapter(): ThreadHistoryAdapter {
 					const { messages } = await apiJson<{
 						messages: Array<ServerMessage>;
 					}>(`/api/threads/${threadId}`);
-					// Server stores raw UIMessage in `content`. The format adapter's
-					// `decode` wraps the stored payload in the `{parentId, message}`
-					// shape the runtime expects — we just have to rebuild the
-					// MessageStorageEntry shape it decodes from.
+					// The DB schema doesn't persist parent_id — messages are stored in
+					// a flat list ordered by created_at. Chain each row to its
+					// predecessor here so assistant-ui renders one linear thread.
+					// Without this, every row lands with parent_id=null and the
+					// runtime treats them as N sibling branches off the root, which
+					// shows up in the UI as a "1/N" branch picker instead of a
+					// conversation.
 					return {
-						messages: messages.map((m) => {
+						messages: messages.map((m, i) => {
 							const stored = {
 								id: m.message_id,
-								parent_id: null,
+								parent_id: i === 0 ? null : messages[i - 1].message_id,
 								format: formatAdapter.format,
-								// `content` on the server is the full UIMessage jsonb;
-								// the AI SDK format adapter's decode spreads it onto the
-								// message, and id comes from the stored.id separately.
 								content: m.content as unknown as TStorageFormat,
 							};
 							return formatAdapter.decode(stored);

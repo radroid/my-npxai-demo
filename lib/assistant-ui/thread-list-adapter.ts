@@ -158,14 +158,13 @@ export function useKnowledgeHubThreadListAdapter(): RemoteThreadListAdapter {
 			unarchive: async () => {},
 			delete: effectiveMode === "signed_in" ? deleteSigned : deleteAnon,
 			// Title generation is handled out-of-band via /api/threads/title on
-			// onFinish. Returning the normal thread path here would require
-			// streaming an AssistantStream, which is overkill for our short,
-			// single-shot titler. Throwing tells the runtime to skip auto-title
-			// at this layer — the Knowledge Hub still renames threads after the
-			// first user+assistant pair lands.
-			generateTitle: async () => {
-				throw new Error("generateTitle not implemented — see autoTitle flow");
-			},
+			// onFinish, so this adapter hook is a no-op. We still have to satisfy
+			// the `Promise<AssistantStream>` contract — returning an empty
+			// ReadableStream (what the upstream in-memory adapter does) lets the
+			// runtime await and move on without writing anything. Throwing here
+			// used to surface as an unhandled rejection every time a thread was
+			// created.
+			generateTitle: async () => new ReadableStream(),
 			fetch: async (threadId: string) => {
 				// No single-thread metadata endpoint — fall back to the list.
 				const { threads } =
