@@ -26,7 +26,7 @@ export function Footer() {
 					</Link>
 					.
 				</p>
-				<div className="flex items-center gap-3 text-fg-muted">
+				<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-fg-muted">
 					<Link
 						href="/faq"
 						className="hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-sm"
