@@ -292,32 +292,37 @@
 		@apply bg-background text-foreground;
 	}
 
-	/* NPX brand easter-egg — paint the NPXai aurora photo fixed behind
-	   the page so it stays in frame while content scrolls (the parallax
-	   feel on npxai.com). Direct body background — no pseudo-element or
-	   z-index trickery — so surfaced children (bg-surface, bg-bg,
-	   bg-surface-2) automatically cover it and content-heavy panels
-	   stay legible. Plain url() gives JPEG-only browsers *an* image;
-	   @supports upgrades modern browsers to AVIF (11 KB vs 250 KB). */
+	/* NPX brand easter-egg — plain starry-sky photo fixed behind the page;
+	   the animated aurora curtains are drawn on top by <NpxAuroraSky />
+	   (see components/site/NpxAuroraSky.tsx). JPEG for Safari-old,
+	   @supports upgrades modern browsers to AVIF. */
 	.npx body {
 		background-color: var(--bg);
-		background-image: url("/npx-background.jpg");
+		background-image: url("/npx-sky.jpg");
 		background-size: cover;
 		background-position: center center;
 		background-repeat: no-repeat;
 		background-attachment: fixed;
 	}
 	@supports (
-			background-image: image-set(
-				url("/npx-background.avif") type("image/avif")
-			)
+			background-image: image-set(url("/npx-sky.avif") type("image/avif"))
 		) {
 		.npx body {
 			background-image: image-set(
-				url("/npx-background.avif") type("image/avif"),
-				url("/npx-background.jpg") type("image/jpeg")
+				url("/npx-sky.avif") type("image/avif"),
+				url("/npx-sky.jpg") type("image/jpeg")
 			);
 		}
+	}
+
+	/* Animated aurora curtains — only visible under the NPX brand theme.
+	   z-index 0 sits above the body background image, below page content
+	   (AppShell/marketing wrappers render with their own stacking). */
+	.npx-aurora-root {
+		z-index: 0;
+	}
+	html:not(.npx) .npx-aurora-root {
+		display: none;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

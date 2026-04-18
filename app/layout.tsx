@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { NpxAuroraSky } from "@/components/site/NpxAuroraSky";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { defaultThemeForEmail } from "@/lib/npx-domains";
+import { createSupabaseServerClient } from "@/lib/supabase";
 import "./globals.css";
 
 const inter = Inter({
@@ -61,11 +64,22 @@ export const metadata: Metadata = {
 	},
 };
 
-export default function RootLayout({
+export default async function RootLayout({
 	children,
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
+	let defaultTheme: "npx" | "system" = "system";
+	try {
+		const supabase = await createSupabaseServerClient();
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		defaultTheme = defaultThemeForEmail(user?.email);
+	} catch {
+		// Supabase env not wired in this environment — fall back to system default.
+	}
+
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<body
@@ -73,11 +87,12 @@ export default function RootLayout({
 			>
 				<ThemeProvider
 					attribute="class"
-					defaultTheme="system"
+					defaultTheme={defaultTheme}
 					enableSystem
 					themes={["light", "dark", "npx"]}
 					disableTransitionOnChange
 				>
+					<NpxAuroraSky />
 					<TooltipProvider>{children}</TooltipProvider>
 				</ThemeProvider>
 			</body>
