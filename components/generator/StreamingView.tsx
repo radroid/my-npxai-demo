@@ -64,11 +64,15 @@ function useDrainedText(
 		};
 	}, [baseCharsPerSec, maxBehind]);
 
-	// When the source shortens (e.g. new generation resets), snap the
-	// displayed text back so we don't render stale characters.
-	useEffect(() => {
-		setDisplayed((prev) => (prev.length > source.length ? source : prev));
-	}, [source]);
+	// When the source shortens (e.g. new generation resets), snap the displayed
+	// text back. Adjust-state-during-render pattern (§1.4): cheaper than a
+	// post-commit useEffect because React re-runs immediately with the new
+	// value instead of repainting with stale text first.
+	const [prevSourceLen, setPrevSourceLen] = useState(source.length);
+	if (source.length !== prevSourceLen) {
+		setPrevSourceLen(source.length);
+		if (displayed.length > source.length) setDisplayed(source);
+	}
 
 	return displayed;
 }
