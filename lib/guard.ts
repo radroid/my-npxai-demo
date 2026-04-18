@@ -23,7 +23,10 @@ const LIMITS: Record<
 	Record<Tier, { minute: number; hour: number; day: number }>
 > = {
 	"knowledge-hub/query": {
-		anon: { minute: 3, hour: 10, day: 5 },
+		// day caps the 24h window; minute + hour are spike-protection inside
+		// that window. Keep hour <= day so the hour bucket can actually fire
+		// (previous hour: 10 with day: 5 was dead code).
+		anon: { minute: 3, hour: 5, day: 5 },
 		signed_in: { minute: 10, hour: 40, day: 50 },
 		npx_circle: { minute: 15, hour: 80, day: 200 },
 	},
@@ -58,18 +61,26 @@ export function getRedis(): Redis {
 	return redisSingleton;
 }
 
+// Cache keyed by prefix + window + limit value. The limit has to be part of
+// the key: if you tighten e.g. hour 10 → 5, the cached Ratelimit instance
+// built with limit=10 would keep approving requests up to 10 until the
+// process restarts. Including the limit in the key means a config edit
+// invalidates the stale instance on the next request. The Redis bucket
+// prefix uses only prefix+window (unchanged) so the server-side counter
+// itself is continuous across limit edits — only the per-request math
+// picks up the new ceiling.
 const limiterCache = new Map<string, Ratelimit>();
 function getLimiter(prefix: string, limit: number, window: Window): Ratelimit {
-	const key = `${prefix}:${window}`;
-	const cached = limiterCache.get(key);
+	const cacheKey = `${prefix}:${window}:${limit}`;
+	const cached = limiterCache.get(cacheKey);
 	if (cached) return cached;
 	const rl = new Ratelimit({
 		redis: getRedis(),
 		limiter: Ratelimit.slidingWindow(limit, window),
-		prefix: key,
+		prefix: `${prefix}:${window}`,
 		analytics: false,
 	});
-	limiterCache.set(key, rl);
+	limiterCache.set(cacheKey, rl);
 	return rl;
 }
 
@@ -167,6 +178,10 @@ export function withGuard(
 								? "Anon daily quota reached. Sign in to unlock a higher tier."
 								: "You've hit your daily quota. Try again tomorrow.",
 						window,
+						// Include the server-resolved tier so the client can detect a
+						// stale-cookie mismatch (UI thinks signed_in, server sees anon)
+						// and kick a refresh + retry before surfacing this to the user.
+						tier,
 					},
 					{ status: 429, headers: { "X-Ratelimit-Tier": tier } },
 				);

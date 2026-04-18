@@ -1,6 +1,14 @@
 "use client";
 
-import { BookOpen, FileText, Home, Lightbulb, Menu, Scale, X } from "lucide-react";
+import {
+	BookOpen,
+	FileText,
+	Home,
+	Lightbulb,
+	Menu,
+	Scale,
+	X,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -76,7 +84,10 @@ export function MobileNav() {
 					</SheetClose>
 				</SheetHeader>
 
-				<nav aria-label="Primary" className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
+				<nav
+					aria-label="Primary"
+					className="flex flex-1 flex-col gap-6 overflow-y-auto p-4"
+				>
 					<div className="flex flex-col gap-1">
 						<p className="px-3 pb-1 text-xs font-medium uppercase tracking-[0.12em] text-fg-muted">
 							Working demos

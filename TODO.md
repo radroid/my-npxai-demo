@@ -347,6 +347,26 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] *Optional:* `bun run build` full production build — not blocking given tsc + preflight are green; worth a run before the next deploy.
 
 
+### Phase 9 — Auth + rate-limit hardening (opened 2026-04-18 evening)
+
+**9A · Server-authoritative auth state** *(shipped 2026-04-18)*
+- [x] `/api/auth/whoami` endpoint — server-validated via `getUser()` so client can reconcile instead of trusting `getSession()` (stale-cookie-proof).
+- [x] `AuthProvider` (`lib/auth-context.tsx`) replaces the localStorage-persisted `useThreadStore`. Server-seeds via `initialMode`, reconciles on mount + focus.
+- [x] Guard's 429 response includes the server-resolved `tier` so the client can detect "I thought signed_in, server sees anon" mismatches.
+- [x] Custom transport `fetch` in `KnowledgeHubRuntimeProvider`: on 429/403 tier-mismatch, call `supabase.auth.refreshSession()` once; retry on success; on failure flip client to anon and surface the session-expired banner.
+- [x] On anon → signed_in transition, wipe `npxai-kh-anon-threads` + `npxai-kh-anon-msgs:*` from localStorage (option C — nuke on sign-in).
+- [x] Anon KH window ordering cleanup: `hour: 10 → 5` so the hour bucket isn't dead code under the `day: 5` cap.
+
+**9B · Anon-thread migration prompt (option D — deferred backlog)**
+- [ ] On first signed-in mount, if `npxai-kh-anon-threads` is non-empty, show a one-time prompt: "Keep your N guest threads?" with Keep / Discard buttons.
+  - Keep → iterate anon threads and POST each to `/api/threads` (title + messages), then wipe localStorage.
+  - Discard → wipe localStorage immediately (current option-C behavior).
+  - Dismiss state persisted in a separate localStorage key so the prompt doesn't re-fire across sessions on the same device.
+- [ ] Handle partial-migration failure: if any thread POST fails, keep the remaining anon threads in localStorage so the user can retry. Don't lose work.
+- [ ] Update `PLAN.md` Appendix J (auth flow) to document the migration path.
+
+---
+
 - [ ] Before advancing `Current phase`, verify the relevant Appendix H checklist is green
 - [ ] Log notable decisions in `PLAN.md` decisions log
 - [ ] Flag any scope creep or new blockers to the human in chat

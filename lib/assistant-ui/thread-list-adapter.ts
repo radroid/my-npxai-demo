@@ -7,8 +7,9 @@
 // the runtimeKey-remount-on-switch dance in the prior Zustand-only flow.
 //
 // Mode-awareness lives inside each method so we keep one adapter identity
-// across sign-in/sign-out and don't force the runtime to tear down. The auth
-// mode is read from useThreadStore (the trimmed-down store still owns that).
+// across sign-in/sign-out and don't force the runtime to tear down. Auth
+// mode comes from the AuthProvider context (server-seeded, server-reconciled
+// via /api/auth/whoami) — no localStorage-backed mirror to drift out of sync.
 
 import type {
 	RemoteThreadInitializeResponse,
@@ -17,7 +18,7 @@ import type {
 } from "@assistant-ui/core";
 import type { RemoteThreadListAdapter } from "@assistant-ui/react";
 import { useMemo } from "react";
-import { useThreadStore } from "@/lib/thread-store";
+import { useAuth } from "@/lib/auth-context";
 
 const ANON_THREADS_KEY = "npxai-kh-anon-threads";
 
@@ -79,11 +80,7 @@ function anonToMetadata(t: AnonThreadRow): RemoteThreadMetadata {
 }
 
 export function useKnowledgeHubThreadListAdapter(): RemoteThreadListAdapter {
-	const mode = useThreadStore((s) => s.mode);
-	// mode can be "unknown" during the brief window between mount and session
-	// detection; treat that as anon until we know otherwise, since the
-	// localStorage path is read-only-safe and never hits the server.
-	const effectiveMode = mode === "signed_in" ? "signed_in" : "anon";
+	const { mode } = useAuth();
 
 	return useMemo<RemoteThreadListAdapter>(() => {
 		const listSigned = async (): Promise<RemoteThreadListResponse> => {
@@ -148,15 +145,14 @@ export function useKnowledgeHubThreadListAdapter(): RemoteThreadListAdapter {
 		};
 
 		return {
-			list: effectiveMode === "signed_in" ? listSigned : listAnon,
-			initialize:
-				effectiveMode === "signed_in" ? initializeSigned : initializeAnon,
-			rename: effectiveMode === "signed_in" ? renameSigned : renameAnon,
+			list: mode === "signed_in" ? listSigned : listAnon,
+			initialize: mode === "signed_in" ? initializeSigned : initializeAnon,
+			rename: mode === "signed_in" ? renameSigned : renameAnon,
 			// Archive is a capability we don't currently surface in the sidebar.
 			// Stub both so the runtime doesn't throw if something calls them.
 			archive: async () => {},
 			unarchive: async () => {},
-			delete: effectiveMode === "signed_in" ? deleteSigned : deleteAnon,
+			delete: mode === "signed_in" ? deleteSigned : deleteAnon,
 			// Title generation is handled out-of-band via /api/threads/title on
 			// onFinish, so this adapter hook is a no-op. We still have to satisfy
 			// the `Promise<AssistantStream>` contract — returning an empty
@@ -168,11 +164,11 @@ export function useKnowledgeHubThreadListAdapter(): RemoteThreadListAdapter {
 			fetch: async (threadId: string) => {
 				// No single-thread metadata endpoint — fall back to the list.
 				const { threads } =
-					effectiveMode === "signed_in" ? await listSigned() : await listAnon();
+					mode === "signed_in" ? await listSigned() : await listAnon();
 				const hit = threads.find((t) => t.remoteId === threadId);
 				if (!hit) throw new Error(`thread_not_found:${threadId}`);
 				return hit;
 			},
 		};
-	}, [effectiveMode]);
+	}, [mode]);
 }

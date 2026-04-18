@@ -411,7 +411,8 @@
 	}
 
 	.aurora-band-a {
-		background: radial-gradient(
+		background:
+			radial-gradient(
 				34% 78% at 66% 7%,
 				color-mix(in oklab, var(--accent-brand) 72%, transparent) 0%,
 				transparent 68%
@@ -425,12 +426,13 @@
 				24% 52% at 72% 18%,
 				color-mix(in oklab, var(--requirement) 38%, transparent) 0%,
 				transparent 76%
-		);
+			);
 		opacity: 0.6;
 	}
 
 	.aurora-band-b {
-		background: radial-gradient(
+		background:
+			radial-gradient(
 				52% 82% at 24% 6%,
 				color-mix(in oklab, var(--requirement) 66%, transparent) 0%,
 				transparent 70%
@@ -444,12 +446,13 @@
 				44% 64% at 17% 18%,
 				color-mix(in oklab, var(--accent-brand) 24%, transparent) 0%,
 				transparent 78%
-		);
+			);
 		opacity: 0.46;
 	}
 
 	.aurora-band-c {
-		background: radial-gradient(
+		background:
+			radial-gradient(
 				64% 95% at 50% -4%,
 				color-mix(in oklab, var(--success) 48%, transparent) 0%,
 				transparent 74%
@@ -458,7 +461,7 @@
 				38% 58% at 48% 22%,
 				color-mix(in oklab, var(--requirement) 36%, transparent) 0%,
 				transparent 76%
-		);
+			);
 		opacity: 0.3;
 	}
 
@@ -471,7 +474,8 @@
 		mix-blend-mode: normal;
 	}
 	:root:not(.dark):not(.npx) .aurora-band-a {
-		background: radial-gradient(
+		background:
+			radial-gradient(
 				36% 74% at 63% 8%,
 				color-mix(in oklab, var(--requirement) 95%, transparent) 0%,
 				transparent 72%
@@ -480,11 +484,12 @@
 				30% 56% at 56% 24%,
 				color-mix(in oklab, var(--success) 75%, transparent) 0%,
 				transparent 78%
-		);
+			);
 		opacity: 0.7;
 	}
 	:root:not(.dark):not(.npx) .aurora-band-b {
-		background: radial-gradient(
+		background:
+			radial-gradient(
 				52% 80% at 28% 8%,
 				color-mix(in oklab, var(--requirement) 88%, transparent) 0%,
 				transparent 74%
@@ -493,11 +498,12 @@
 				35% 58% at 38% 28%,
 				color-mix(in oklab, var(--guidance) 45%, transparent) 0%,
 				transparent 78%
-		);
+			);
 		opacity: 0.58;
 	}
 	:root:not(.dark):not(.npx) .aurora-band-c {
-		background: radial-gradient(
+		background:
+			radial-gradient(
 				62% 92% at 50% -3%,
 				color-mix(in oklab, var(--success) 65%, transparent) 0%,
 				transparent 78%
@@ -506,7 +512,7 @@
 				36% 56% at 52% 22%,
 				color-mix(in oklab, var(--requirement) 55%, transparent) 0%,
 				transparent 80%
-		);
+			);
 		opacity: 0.48;
 	}
 

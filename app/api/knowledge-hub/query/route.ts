@@ -53,8 +53,7 @@ const NAMED_DOC_BOOST = 0.2;
 
 // Recognizes "REGDOC-X.X", "REGDOC-X.X.X", "REGDOC 2.5.2", "NSCA" in user
 // query text. Returns the canonical regdoc_id form.
-const QUERY_DOC_RE =
-	/\b(?:REGDOC[\s-]?(\d+(?:\.\d+){1,3})|(NSCA))\b/gi;
+const QUERY_DOC_RE = /\b(?:REGDOC[\s-]?(\d+(?:\.\d+){1,3})|(NSCA))\b/gi;
 
 // Concept → REGDOC map for queries that don't name the doc explicitly but
 // lean on a CNSC term of art. Used only as a hint for the query-expansion
@@ -125,9 +124,18 @@ function pickContextNoun(query: string): string | null {
 // "single-failure criterion" living in REGDOC-2.5.2 §7.6.2 even though
 // the question headline is about design extension conditions in §7.3.4.
 const CONCEPT_EXPANSIONS: Array<{ re: RegExp; seed: string }> = [
-	{ re: /\bsingle[-\s]failure criterion\b/i, seed: "single-failure criterion safety groups" },
-	{ re: /\bCanada Labour Code\b/i, seed: "Canada Labour Code federal acts regulations" },
-	{ re: /\bwaste acceptance criteria\b/i, seed: "waste acceptance criteria chemical physical radiological" },
+	{
+		re: /\bsingle[-\s]failure criterion\b/i,
+		seed: "single-failure criterion safety groups",
+	},
+	{
+		re: /\bCanada Labour Code\b/i,
+		seed: "Canada Labour Code federal acts regulations",
+	},
+	{
+		re: /\bwaste acceptance criteria\b/i,
+		seed: "waste acceptance criteria chemical physical radiological",
+	},
 	{
 		// Splits like #25 that ask about federal vs provincial/territorial reach
 		// of legislation — the key chunk (REGDOC-2.8.1 §2) talks about
@@ -555,9 +563,9 @@ export const POST = withGuard(
 
 				// Cache only clean, successful answers (not output-guard truncations).
 				// Raised from 60 → 400 so truncated/timeout responses that only emit
-			// one sentence before the upstream fetch aborts can't poison the cache
-			// and get served to later identical queries.
-			if (!outputGuardTripped && accumulated.trim().length > 400) {
+				// one sentence before the upstream fetch aborts can't poison the cache
+				// and get served to later identical queries.
+				if (!outputGuardTripped && accumulated.trim().length > 400) {
 					redis
 						.set(
 							cKey,

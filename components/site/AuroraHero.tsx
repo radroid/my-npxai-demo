@@ -6,7 +6,7 @@ import {
 	useMotionValue,
 	useReducedMotion,
 } from "motion/react";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 const BANDS = [
 	{
@@ -45,7 +45,8 @@ const BANDS = [
 const INTRO_SECS = 5;
 const CYCLE_SECS = 10;
 const BURST_MULTIPLIER = 5;
-const BASELINE_HALF_SECS = (CYCLE_SECS * BURST_MULTIPLIER) / (BURST_MULTIPLIER + 1);
+const BASELINE_HALF_SECS =
+	(CYCLE_SECS * BURST_MULTIPLIER) / (BURST_MULTIPLIER + 1);
 const BURST_HALF_SECS = CYCLE_SECS / (BURST_MULTIPLIER + 1);
 
 type StreakCfg = {
@@ -98,7 +99,11 @@ function GreenStreak({
 		let cancelled = false;
 		let currentAnim: { stop: () => void } | null = null;
 
-		const moveTo = (targetPct: number, durSecs: number, ease: "easeInOut" | "easeOut") => {
+		const moveTo = (
+			targetPct: number,
+			durSecs: number,
+			ease: "easeInOut" | "easeOut",
+		) => {
 			const a = animate(x, `${targetPct}%`, { duration: durSecs, ease });
 			currentAnim = a;
 			return a;
@@ -145,7 +150,9 @@ function GreenStreak({
 		};
 	}, [cfg.fromPct, cfg.toPct, cfg.phaseOffsetMs, prefersReducedMotion, x]);
 
-	return <motion.div className={cfg.className} style={{ x }} aria-hidden="true" />;
+	return (
+		<motion.div className={cfg.className} style={{ x }} aria-hidden="true" />
+	);
 }
 
 export function AuroraHero({ children }: { children: ReactNode }) {

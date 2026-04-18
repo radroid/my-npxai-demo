@@ -439,4 +439,3 @@ const EditComposer: FC = () => (
 		</ComposerPrimitive.Root>
 	</MessagePrimitive.Root>
 );
-

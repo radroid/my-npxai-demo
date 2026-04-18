@@ -21,7 +21,7 @@ import type {
 } from "@assistant-ui/react";
 import { useAui } from "@assistant-ui/react";
 import { useMemo } from "react";
-import { useThreadStore } from "@/lib/thread-store";
+import { useAuth } from "@/lib/auth-context";
 
 const ANON_MESSAGES_PREFIX = "npxai-kh-anon-msgs:";
 
@@ -85,8 +85,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function useKnowledgeHubHistoryAdapter(): ThreadHistoryAdapter {
 	const aui = useAui();
-	const mode = useThreadStore((s) => s.mode);
-	const effectiveMode = mode === "signed_in" ? "signed_in" : "anon";
+	const { mode } = useAuth();
 
 	return useMemo<ThreadHistoryAdapter>(() => {
 		// `currentRemoteId` is resolved at call time rather than bound up-front.
@@ -205,18 +204,17 @@ export function useKnowledgeHubHistoryAdapter(): ThreadHistoryAdapter {
 					load: async () => {
 						const remoteId = getRemoteId();
 						if (!remoteId) return { messages: [] };
-						if (effectiveMode === "signed_in") return loadSigned(remoteId);
+						if (mode === "signed_in") return loadSigned(remoteId);
 						return loadAnon(remoteId);
 					},
 					append: async (item) => {
 						if (aui.threadListItem.source === null) return;
 						const { remoteId } = await aui.threadListItem().initialize();
-						if (effectiveMode === "signed_in")
-							return appendSigned(remoteId, item);
+						if (mode === "signed_in") return appendSigned(remoteId, item);
 						return appendAnon(remoteId, item);
 					},
 				};
 			},
 		};
-	}, [aui, effectiveMode]);
+	}, [aui, mode]);
 }
