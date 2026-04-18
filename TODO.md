@@ -82,6 +82,10 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Decide which sections of the homepage survive vs move to a `/behind-the-demo` consolidation page (agent drafts the cut; Raj approves the voice)
 - [ ] Daylight re-check of light mode on a real device after 7B + 7C land (palette swap is the one change Browserbase can't judge for you)
 
+### Phase 8 — Mobile polish (opened 2026-04-18, pre-outreach)
+- [ ] Raj manual-test the home page on iPhone 14 Pro Max (both Safari + Chrome) after agent lands 8A–8D — especially: hamburger drawer opens/closes, Sign in dialog is reachable, NPX theme background looks right in portrait, no horizontal scrolling anywhere.
+- [ ] Raj visual-check on a second device class (regular iPhone / Android) — the outreach audience is 3 people on unknown phones.
+
 ### Tuesday Apr 21 — Outreach (paused behind Phase 6 completion)
 - [ ] 9 AM — LinkedIn DM to Kshitij Ahuja
 - [ ] 11 AM — LinkedIn DM to Bharath Nangia
@@ -292,7 +296,60 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Run `bun run build` + `bun run eval:kb` + Browserbase smoke on every page after the swap — the CLAUDE.md "both themes must survive" rule means the matrix here is 2 themes × N pages.
 
 
-- [ ] Keep `PLAN.md` current phase updated when phase transitions happen
+### Phase 8 — Mobile polish (opened 2026-04-18, pre-outreach)
+
+> Raj flagged mobile readiness on 2026-04-18 — outreach DMs will open on iPhones first. Scope is the **marketing shell + home page** (TopNav, hero, NPX theme background). Knowledge Hub, Generator, Insights, Equivalency confirmed acceptable on mobile already and are out of scope. Ordering: foundations (8A) first so later work consumes the corrected viewport, then navbar (8B) — that's the visible regression — then background (8C), then the sweep (8D–8E).
+>
+> iPhone 14 Pro Max reference viewport: 430×932 CSS px, DPR 3, notch + home indicator.
+
+**8A · Viewport + safe-area foundations**
+- [ ] Add a root `viewport` export in `app/layout.tsx` — Next.js 15 supports `export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" }`. Without `viewport-fit=cover` iOS ignores `env(safe-area-inset-*)` under the notch.
+- [ ] Swap `min-h-screen` → `min-h-dvh` in `app/(marketing)/layout.tsx:7` and any other `min-h-screen` / `h-screen` usage under `app/(marketing)/**` and `components/site/**`. `dvh` accounts for iOS Safari's dynamic URL bar.
+- [ ] Add safe-area utility classes to `app/globals.css` under `@layer utilities` — `.pt-safe`, `.pb-safe`, `.pl-safe`, `.pr-safe`, `.px-safe` using `env(safe-area-inset-*)`. These feed later tasks (hamburger drawer, sticky header under notch).
+
+**8B · TopNav mobile rebuild** (the visible regression in screenshot 1 + 2)
+- [ ] Root cause of the horizontal overflow in `components/site/TopNav.tsx`: `justify-between` + three flex children with long content (brand lockup text "NPXai Demo" wrapping to two lines, `UserChip`'s `max-w-[10rem]` email, `ThemeToggle` with three icons) and no `min-w-0` on children — so the row can't shrink below its content width and pushes the right edge off-screen. Fix requires: (a) collapsing nav items into a hamburger below `md`, (b) shortening or truncating the brand lockup on mobile, (c) `min-w-0` on flex children that contain truncating text.
+- [ ] Build `components/site/MobileNav.tsx` — hamburger trigger (`<Menu />` icon in a 44×44 button) that opens a slide-in drawer via Radix Dialog (already on). Drawer contents: Home + Knowledge Hub + Generator + Insights + Equivalency as full-width rows with icon + label, plus a divider and the Theme toggles. Drawer closes on navigation. Below `md` this replaces the current horizontal nav row; `md+` keeps the existing desktop layout.
+- [ ] Update `components/site/TopNav.tsx`: wrap the `WORKING_APPS` list + `ConceptsMenu` in `hidden md:flex` (already present) and render `<MobileNav />` in a sibling `md:hidden` slot. Left cluster becomes `<MobileNav /> + <BrandThemeToggle /> + <Home-pill>` below `md`; desktop stays unchanged.
+- [ ] Shorten the brand lockup below `sm`: `components/site/BrandThemeToggle.tsx` currently shows "NPXai Demo" text always. Wrap the `<span>NPXai Demo</span>` in `hidden xs:inline` (use existing Tailwind `sm` breakpoint if custom `xs` isn't defined — just `hidden sm:inline`). Brand logo stays visible on all sizes.
+- [ ] `components/site/UserChip.tsx` — on mobile, render avatar-only (hide the email text below `sm`). Change `<span className="max-w-[10rem] truncate">{email}</span>` to `<span className="hidden sm:inline max-w-[10rem] truncate">{email}</span>`. The full email stays reachable via the dropdown menu, which should also gain a top row showing the email in full.
+- [ ] `UserChip` dropdown positioning — `absolute right-0 mt-2 min-w-48` can overflow off-screen when the trigger itself is near the viewport edge on mobile. Switch to Radix `DropdownMenu` with `align="end"` + `collisionPadding` so the menu auto-flips inside the viewport. Alternatively, port to shadcn `DropdownMenu` (already imported in `ConceptsMenu`).
+- [ ] Hide the `ThemeToggle` tri-state pill below `sm` in the header — move it inside the `MobileNav` drawer instead. The three icons + rounded container are the single biggest width consumer after the email chip.
+- [ ] Make sure the nav row has no horizontal overflow at 320 CSS px (iPhone SE width). Add `overflow-x-clip` on the `<header>` as a belt-and-braces guard so any residual overflow inside doesn't bleed to the page scroll.
+
+**8C · NPX theme background fit**
+- [ ] Root cause: `app/globals.css:299-306` uses `background-size: cover` + `background-attachment: fixed`. On mobile Safari, `fixed` is clamped to device-viewport size and `cover` crops aggressively in portrait — the user sees only a vertical slice of the aurora photo, not the full frame.
+- [ ] Drop `background-attachment: fixed` in the `.npx body` rule unconditionally (it's broken on iOS and the perceived parallax benefit is zero on mobile).
+- [ ] Below `md`, switch to `background-size: contain` + `background-repeat: no-repeat` + `background-position: center top` with `background-color: var(--bg)` filling the letterbox — this shows the full aurora image without crop. Desktop stays on `cover`. Use a media query inside the `.npx body` block.
+- [ ] Verify the `@supports` AVIF upgrade block also inherits the `contain` size override on mobile (either nest the media query inside, or drop the redundant `background-size: cover` from the supports block so it inherits from the base rule).
+- [ ] Confirm the hero text (h1, subhead, CTAs) stays AA-legible against the new `contain` background — with the aurora letterboxed, the top and bottom of the viewport fall back to `var(--bg)` which should be the deep-indigo npx `--bg` (#151834). Text tokens already target that.
+
+**8D · Touch-target pass (44×44 minimum per Apple HIG)**
+- [ ] `components/site/SignInButton.tsx:72-78` — trigger is `h-8 px-3 text-xs` (32px tall). Bump to `h-11 px-4 text-sm` below `sm` (`h-8 sm:h-11` is the wrong direction; use `h-11 sm:h-8` so desktop keeps the compact chip and mobile gets the 44px target). Same adjustment on the modal's submit button — already `h-10`, bump to `h-11` on mobile.
+- [ ] `components/site/UserChip.tsx:17` — trigger is `h-8`. Same treatment: `h-11 sm:h-8`. The tap region already wraps avatar + email; just needs vertical padding.
+- [ ] `components/theme/ThemeToggle.tsx` — verify each segment of the tri-state pill is ≥44×44 on mobile. If the whole group is currently under 36px tall, wrap in a 44px-tall container on mobile (`h-11 sm:h-auto`).
+- [ ] Home pill in `TopNav.tsx` (via `PILL_CLASSES`) is `py-1.5` (~28px tall). Add `md:py-1.5` and bump to `py-2.5` (~38px) on mobile; combined with the hamburger button (44×44) the left cluster reads balanced. For the hamburger itself, use `h-11 w-11` — Radix Dialog trigger as a standalone button.
+- [ ] Hero CTAs in `app/(marketing)/page.tsx:76-89` are `h-11` (44px) — already compliant, leave as-is.
+
+**8E · Homepage + hero fit**
+- [ ] Reduce hero heading size below `md`: `text-4xl md:text-5xl lg:text-6xl` — on 430px wide the `text-4xl` headline wraps to 5 lines in screenshot 1. Step down to `text-[2rem] leading-[1.1] md:text-5xl lg:text-6xl` (32px → 48px → 60px). Keep `text-balance`.
+- [ ] Reduce hero vertical padding below `md`: `py-20 md:py-28` → `py-12 md:py-28`. On mobile the current `py-20` (80px) plus headline whitespace creates a mostly-empty viewport in the screenshot.
+- [ ] Feature cards in the Showcase section `grid gap-4 sm:grid-cols-2 xl:grid-cols-4` — the mobile stack is already correct. Verify each card's tap region (the whole `<Link>`) is ≥56px tall; add `py-5` or `min-h-[96px]` if current padding feels tight.
+- [ ] "Sign up" / contact section `p-8 md:p-12` — shrink to `p-6 md:p-12`. On mobile the `NewsletterCapture` input + button shouldn't require horizontal scroll; confirm it stacks to full-width below `sm`.
+
+**8F · Cross-cutting sweep**
+- [ ] Horizontal-overflow hunt: add `body { overflow-x: clip }` or equivalent on the marketing group only (keep app group untouched — the KH sidebar relies on overflow behavior). This is belt-and-braces for any component that leaks horizontally on mobile. Preferred fix is still per-component (`min-w-0`, `break-words`, etc.); this guard catches the residual.
+- [ ] Confirm `AuroraHero` blurred bands (`inset: -25% -10% auto -10%` in `globals.css:399-405`) don't leak out of the `overflow-hidden` parent on mobile — they shouldn't because `AuroraHero` wraps in `relative isolate overflow-hidden`, but re-verify with DevTools mobile emulation.
+- [ ] Add `prefers-reduced-motion` fallback verification for the aurora on mobile — the motion.div already honors `useReducedMotion` (`AuroraHero.tsx:41-46`), just confirm the frozen-pose still looks right on mobile portrait.
+- [ ] Audit all `hidden md:…` / `md:hidden` breakpoints on marketing surfaces (Home, Insights, Equivalency, FAQ) to confirm no critical content is hidden on mobile without a mobile-specific alternative. The current nav is the known offender; the other pages are already flagged as OK but verify the Footer + NewsletterCapture.
+- [ ] `Footer.tsx` — verify its flex layout collapses gracefully on mobile (no horizontal overflow, no long links truncating the disclaimer). Not visible in screenshots; spot-check.
+
+**8G · Test + ship**
+- [ ] Open the live site in Chrome DevTools iPhone 14 Pro Max emulation (portrait + landscape) and walk: Home → tap hamburger → Knowledge Hub → back → tap Sign in → close modal → tap NPX theme toggle → scroll → tap feature card. Flag every tap that misses or scrolls the page horizontally.
+- [ ] Run Browserbase / ui-test against the homepage in mobile viewport after 8A–8F lands — check touch targets + horizontal overflow + safe-area padding. Use 430×932 viewport with DPR 3.
+- [ ] `bun run build` + `bun run preflight` + `bun run eval:kb` stay green after all 8A–8F changes (no server-side regressions expected, but verify).
+
+
 - [ ] Before advancing `Current phase`, verify the relevant Appendix H checklist is green
 - [ ] Log notable decisions in `PLAN.md` decisions log
 - [ ] Flag any scope creep or new blockers to the human in chat
