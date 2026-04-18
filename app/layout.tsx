@@ -99,7 +99,9 @@ export default async function RootLayout({
 					disableTransitionOnChange
 				>
 					<NpxAuroraSky />
-					<TooltipProvider>{children}</TooltipProvider>
+					<div className="relative z-10">
+						<TooltipProvider>{children}</TooltipProvider>
+					</div>
 				</ThemeProvider>
 			</body>
 		</html>

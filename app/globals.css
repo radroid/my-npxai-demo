@@ -316,11 +316,11 @@
 	}
 
 	/* Animated aurora curtains — only visible under the NPX brand theme.
-	   z-index 0 sits above the body background image, below page content
-	   (AppShell/marketing wrappers render with their own stacking). */
-	.npx-aurora-root {
-		z-index: 0;
-	}
+	   We intentionally do NOT set z-index here: adding z-index would
+	   isolate the ribbons in their own stacking context and break
+	   `mix-blend-mode: screen` against the body background photo. Instead
+	   page content is wrapped in `<div class="relative z-10">` (see
+	   app/layout.tsx) so content always stacks above the aurora. */
 	html:not(.npx) .npx-aurora-root {
 		display: none;
 	}
