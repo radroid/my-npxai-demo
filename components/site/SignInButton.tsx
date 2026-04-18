@@ -71,7 +71,7 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 				{trigger ?? (
 					<button
 						type="button"
-						className="inline-flex h-8 cursor-pointer items-center rounded-md bg-brand px-3 text-xs font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+						className="inline-flex h-11 cursor-pointer items-center rounded-md bg-brand px-4 text-sm font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:h-8 sm:px-3 sm:text-xs"
 					>
 						Sign in
 					</button>

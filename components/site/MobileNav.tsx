@@ -69,7 +69,7 @@ export function MobileNav() {
 						<button
 							type="button"
 							aria-label="Close navigation menu"
-							className="inline-flex h-10 w-10 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+							className="inline-flex h-11 w-11 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 						>
 							<X className="h-5 w-5" aria-hidden="true" />
 						</button>

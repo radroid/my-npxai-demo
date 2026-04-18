@@ -30,8 +30,13 @@ export function ThemeToggle({ size = "md" }: { size?: ToggleSize }) {
 			? resolvedTheme
 			: theme
 		: undefined;
-	const btnSize = size === "sm" ? "h-6 w-6" : "h-7 w-7";
-	const iconSize = size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5";
+	// On mobile, each pill stretches to a comfortable tap target (~44px tall)
+	// so the drawer-mounted toggle is thumb-friendly. Desktop keeps the
+	// compact size baked into the original Appendix G layout.
+	const btnSize =
+		size === "sm" ? "h-9 w-9 sm:h-6 sm:w-6" : "h-10 w-10 sm:h-7 sm:w-7";
+	const iconSize =
+		size === "sm" ? "h-4 w-4 sm:h-3 sm:w-3" : "h-4 w-4 sm:h-3.5 sm:w-3.5";
 
 	return (
 		<fieldset
