@@ -15,11 +15,14 @@ export default async function AppGroupLayout({
 
 	// Runtime provider hoisted above AppShell so the ThreadSidebar (rendered
 	// in the shell's sidebar slot, not inside the page) can read from the
-	// assistant-ui runtime. See the provider's header comment for the
-	// tradeoff — one thread-list probe on every (app) route, in exchange for
-	// not reshuffling the shell/page layout.
+	// assistant-ui runtime. `initialMode` comes from the server-determined
+	// session so the adapter spins up in the correct tier on first render —
+	// without this the client starts in "unknown"/"anon", can run a stray
+	// initialize() with an anon id, and later tries to load that localId as
+	// a server uuid when the session probe flips mode to "signed_in".
+	const initialMode = user ? "signed_in" : "anon";
 	return (
-		<KnowledgeHubRuntimeProvider>
+		<KnowledgeHubRuntimeProvider initialMode={initialMode}>
 			<AppShell userEmail={user?.email ?? null}>{children}</AppShell>
 		</KnowledgeHubRuntimeProvider>
 	);

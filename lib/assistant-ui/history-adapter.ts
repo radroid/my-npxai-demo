@@ -93,9 +93,19 @@ export function useKnowledgeHubHistoryAdapter(): ThreadHistoryAdapter {
 		// useExternalHistory calls load() after the thread has switched and
 		// append() after awaiting `threadListItem().initialize()`, so the value
 		// is stable by the time we read it.
+		//
+		// `__LOCALID_*` is the runtime's own placeholder id for a not-yet-
+		// initialized thread (see RemoteThreadListThreadListRuntimeCore.js).
+		// In signed-in mode it can leak into remoteId during a tier transition
+		// — anon initialize stamped the localId as remoteId, then mode flipped.
+		// Treating it as "no remote id" here prevents a bogus
+		// GET /api/threads/__LOCALID_xxx that the route happily rejects as a
+		// uuid validation 400.
 		const getRemoteId = (): string | undefined => {
 			if (aui.threadListItem.source === null) return undefined;
-			return aui.threadListItem().getState().remoteId ?? undefined;
+			const rid = aui.threadListItem().getState().remoteId;
+			if (!rid || rid.startsWith("__LOCALID_")) return undefined;
+			return rid;
 		};
 
 		return {

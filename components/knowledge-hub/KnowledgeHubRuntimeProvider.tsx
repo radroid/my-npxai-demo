@@ -48,12 +48,29 @@ function useKnowledgeHubThreadRuntime() {
 
 export function KnowledgeHubRuntimeProvider({
 	children,
+	initialMode,
 }: {
 	children: ReactNode;
+	initialMode: "anon" | "signed_in";
 }) {
-	const setMode = useThreadStore((s) => s.setMode);
+	// Bootstrap mode from the server-determined session value BEFORE the
+	// adapter hooks read from the store. This runs during render — safe
+	// because Zustand's setState is synchronous and we only write when the
+	// current value disagrees, so no render loop. Without this seeding, the
+	// client's first render builds the adapter with `mode: "unknown"` (falls
+	// back to "anon"), and a stray initialize() before the client-side
+	// session probe resolves can stamp a `__LOCALID_*` into remoteId — which
+	// later blows up on loadSigned as GET /api/threads/__LOCALID_* → 400.
+	if (useThreadStore.getState().mode !== initialMode) {
+		useThreadStore.setState({ mode: initialMode });
+	}
+
 	const threadListAdapter = useKnowledgeHubThreadListAdapter();
 
+	// Client-side session reconciliation — picks up sign-in/sign-out that
+	// happens without a full page reload (Supabase auth UI redirect, etc.).
+	// The server-seeded mode handles the normal first-paint case above; this
+	// effect is just for mid-session tier transitions.
 	useEffect(() => {
 		let cancelled = false;
 		(async () => {
@@ -63,15 +80,18 @@ export function KnowledgeHubRuntimeProvider({
 					data: { session },
 				} = await supabase.auth.getSession();
 				if (cancelled) return;
-				await setMode(session?.user ? "signed_in" : "anon");
+				const next = session?.user ? "signed_in" : "anon";
+				if (useThreadStore.getState().mode !== next) {
+					await useThreadStore.getState().setMode(next);
+				}
 			} catch {
-				if (!cancelled) await setMode("anon");
+				// Server-seeded mode stands.
 			}
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [setMode]);
+	}, []);
 
 	const runtime = useRemoteThreadListRuntime({
 		runtimeHook: useKnowledgeHubThreadRuntime,
