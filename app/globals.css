@@ -292,17 +292,22 @@
 		@apply bg-background text-foreground;
 	}
 
-	/* NPX brand easter-egg — plain starry-sky photo fixed behind the page;
-	   the animated aurora curtains are drawn on top by <NpxAuroraSky />
-	   (see components/site/NpxAuroraSky.tsx). JPEG for Safari-old,
-	   @supports upgrades modern browsers to AVIF. */
+	/* NPX brand easter-egg — plain starry-sky photo behind the page; the
+	   animated aurora curtains are drawn on top by <NpxAuroraSky /> (see
+	   components/site/NpxAuroraSky.tsx). JPEG for Safari-old, @supports
+	   upgrades modern browsers to AVIF.
+
+	   `background-attachment: fixed` is intentionally NOT set — iOS Safari
+	   clamps fixed backgrounds to the device viewport and crops the photo
+	   aggressively in portrait. Letting the image scroll with the page
+	   looks identical on desktop (the photo is larger than the first
+	   viewport anyway) and keeps the full composition visible on mobile. */
 	.npx body {
 		background-color: var(--bg);
 		background-image: url("/npx-sky.jpg");
 		background-size: cover;
 		background-position: center center;
 		background-repeat: no-repeat;
-		background-attachment: fixed;
 	}
 	@supports (
 			background-image: image-set(url("/npx-sky.avif") type("image/avif"))
@@ -312,6 +317,16 @@
 				url("/npx-sky.avif") type("image/avif"),
 				url("/npx-sky.jpg") type("image/jpeg")
 			);
+		}
+	}
+	/* Below md the photo is letterboxed with `contain` + center-top so the
+	   full aurora is visible in portrait instead of center-cropping; the
+	   surrounding fill uses --bg (deep NPX indigo) so the letterbox reads
+	   as intentional. Above md we return to `cover` for full-bleed. */
+	@media (max-width: 767px) {
+		.npx body {
+			background-size: contain;
+			background-position: center top;
 		}
 	}
 
