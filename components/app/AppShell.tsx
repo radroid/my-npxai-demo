@@ -36,7 +36,6 @@ import {
 	SheetDescription,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { initialsFromEmail } from "@/lib/initials";
 
 const PRIMARY_NAV = [
 	{ href: "/knowledge-hub", label: "Knowledge Hub", Icon: BookOpen },
@@ -341,6 +340,14 @@ function CollapsedSignIn() {
 }
 
 function CollapsedUserAvatar({ email }: { email: string }) {
+	const local = email.split("@")[0] ?? "";
+	const parts = local.split(/[._-]+/).filter(Boolean);
+	const first = parts[0]?.[0];
+	const second = parts[1]?.[0];
+	const initials =
+		first && second
+			? (first + second).toUpperCase()
+			: (local.slice(0, 2) || "??").toUpperCase();
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
@@ -350,7 +357,7 @@ function CollapsedUserAvatar({ email }: { email: string }) {
 					title={email}
 					className="flex size-8 items-center justify-center rounded-full bg-brand font-semibold text-[11px] text-white shadow-sm ring-1 ring-border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
 				>
-					{initialsFromEmail(email)}
+					{initials}
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent side="right" align="end" className="min-w-48">
