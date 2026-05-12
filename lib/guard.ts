@@ -200,6 +200,11 @@ export function withGuard(
 							headers: {
 								"X-Ratelimit-Tier": tier,
 								"Retry-After": String(RETRY_AFTER_SECONDS[window]),
+								// Don't let any client (Arc's link-preview / page-prefetch
+								// is the known offender) latch onto a transient error
+								// response. Browsers shouldn't cache non-cacheable status
+								// codes per spec, but a few do under specific UI flows.
+								"Cache-Control": "no-store",
 							},
 						},
 					);
@@ -241,7 +246,10 @@ export function withGuard(
 				},
 				{
 					status: 429,
-					headers: { "Retry-After": String(RETRY_AFTER_SECONDS["24 h"]) },
+					headers: {
+						"Retry-After": String(RETRY_AFTER_SECONDS["24 h"]),
+						"Cache-Control": "no-store",
+					},
 				},
 			);
 		}
@@ -265,7 +273,7 @@ export function withGuard(
 			console.error("handler_error", err);
 			response = NextResponse.json(
 				{ error: "internal_error", message: "Something went wrong." },
-				{ status: 500 },
+				{ status: 500, headers: { "Cache-Control": "no-store" } },
 			);
 		}
 
