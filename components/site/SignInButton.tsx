@@ -77,7 +77,7 @@ export function SignInButton({ trigger }: { trigger?: ReactNode } = {}) {
 					</button>
 				)}
 			</DialogTrigger>
-			<DialogContent className="border-border bg-surface text-fg sm:max-w-md max-sm:h-full max-sm:max-w-full max-sm:rounded-none">
+			<DialogContent className="border-border bg-surface text-fg sm:max-w-md max-sm:top-4 max-sm:translate-y-0 max-sm:max-h-[calc(100dvh-2rem)] max-sm:overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle className="text-fg">{COPY.title}</DialogTitle>
 					<DialogDescription className="text-fg-muted">
