@@ -76,6 +76,7 @@ export function logRequest(fields: RequestLogFields): void {
 
 export type GuardReason =
 	| "rate_limit"
+	| "rate_limit_degraded"
 	| "validation"
 	| "circuit_breaker"
 	| "output_guard"
