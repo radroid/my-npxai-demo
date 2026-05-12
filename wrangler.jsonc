@@ -17,6 +17,15 @@
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2025-09-23",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	// Disable esbuild's keepNames pass on the worker bundle. With it enabled
+	// (Wrangler's default), inner functions get wrapped in `__name(fn, "fn")`
+	// calls. next-themes inlines its theme-init script via `M.toString()`,
+	// which emits those `__name(...)` calls into a `<script>` in the HTML but
+	// NOT the `__name` helper definition — so the browser blows up with
+	// `ReferenceError: __name is not defined` and hydration never starts.
+	// Trade-off: function names in prod stack traces may be mangled.
+	// See https://opennext.js.org/cloudflare/howtos/keep_names.
+	"keep_names": false,
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS",
