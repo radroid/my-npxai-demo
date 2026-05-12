@@ -3,7 +3,7 @@
 import {
 	type ReasoningGroupComponent,
 	type ReasoningMessagePartComponent,
-	useAssistantState,
+	useAuiState,
 	useScrollLock,
 } from "@assistant-ui/react";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -221,7 +221,8 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({
 	startIndex,
 	endIndex,
 }) => {
-	const isReasoningStreaming = useAssistantState(({ message }) => {
+	const isReasoningStreaming = useAuiState((s) => {
+		const message = s.message;
 		if (message.status?.type !== "running") return false;
 		const lastIndex = message.parts.length - 1;
 		if (lastIndex < 0) return false;

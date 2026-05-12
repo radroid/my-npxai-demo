@@ -18,6 +18,12 @@ const WINDOWS = [
 	["day", "24 h"],
 ] as const;
 
+const RETRY_AFTER_SECONDS: Record<Window, number> = {
+	"1 m": 60,
+	"1 h": 60 * 60,
+	"24 h": 60 * 60 * 24,
+};
+
 const LIMITS: Record<
 	string,
 	Record<Tier, { minute: number; hour: number; day: number }>
@@ -154,6 +160,11 @@ export function withGuard(
 			Boolean(bypassKey) && req.headers.get("x-eval-bypass") === bypassKey;
 
 		// Rate limits (per-minute / per-hour / per-day) — check cheapest first.
+		// Upstash being unreachable (network blip, missing env, account paused)
+		// must NOT take the whole worker down — that's how this surfaced as a
+		// page-wide 503 in production. Fail-open with a logged warning: the
+		// demo stays usable, we just stop enforcing limits until Upstash is
+		// back. The global circuit breaker below is the second line of defense.
 		const guardBase = {
 			route: opts.route,
 			ip_hash: ipHash,
@@ -165,43 +176,73 @@ export function withGuard(
 		let remaining = Number.POSITIVE_INFINITY;
 		for (const [key, window] of WINDOWS) {
 			if (bypassed) break;
-			const rl = getLimiter(prefix, limits[key], window);
-			const result = await rl.limit(identifier);
-			if (result.remaining < remaining) remaining = result.remaining;
-			if (!result.success) {
-				logGuardEvent({ ...guardBase, reason: "rate_limit", detail: window });
-				return NextResponse.json(
-					{
-						error: "rate_limited",
-						message:
-							tier === "anon"
-								? "Anon daily quota reached. Sign in to unlock a higher tier."
-								: "You've hit your daily quota. Try again tomorrow.",
-						window,
-						// Include the server-resolved tier so the client can detect a
-						// stale-cookie mismatch (UI thinks signed_in, server sees anon)
-						// and kick a refresh + retry before surfacing this to the user.
-						tier,
-					},
-					{ status: 429, headers: { "X-Ratelimit-Tier": tier } },
-				);
+			try {
+				const rl = getLimiter(prefix, limits[key], window);
+				const result = await rl.limit(identifier);
+				if (result.remaining < remaining) remaining = result.remaining;
+				if (!result.success) {
+					logGuardEvent({ ...guardBase, reason: "rate_limit", detail: window });
+					return NextResponse.json(
+						{
+							error: "rate_limited",
+							message:
+								tier === "anon"
+									? "Anon daily quota reached. Sign in to unlock a higher tier."
+									: "You've hit your daily quota. Try again tomorrow.",
+							window,
+							// Include the server-resolved tier so the client can detect a
+							// stale-cookie mismatch (UI thinks signed_in, server sees anon)
+							// and kick a refresh + retry before surfacing this to the user.
+							tier,
+						},
+						{
+							status: 429,
+							headers: {
+								"X-Ratelimit-Tier": tier,
+								"Retry-After": String(RETRY_AFTER_SECONDS[window]),
+							},
+						},
+					);
+				}
+			} catch (err) {
+				console.error("rate_limit_unavailable", { window, err });
+				logGuardEvent({
+					...guardBase,
+					reason: "rate_limit_degraded",
+					detail: window,
+				});
+				// Break so we don't keep retrying every window in the same request.
+				break;
 			}
 		}
 
-		// Global daily circuit breaker (skipped when bypassed)
-		const dayKey = `openai:calls:${new Date().toISOString().slice(0, 10)}`;
-		const currentCalls = bypassed
-			? 0
-			: Number((await getRedis().get<number>(dayKey)) ?? 0);
+		// Global daily circuit breaker (skipped when bypassed).
+		// Same fail-open posture as the per-tier limits: a Redis hiccup here
+		// previously crashed the route and surfaced as 5xx on every call.
+		let currentCalls = 0;
+		if (!bypassed) {
+			try {
+				const dayKey = `openai:calls:${new Date().toISOString().slice(0, 10)}`;
+				currentCalls = Number((await getRedis().get<number>(dayKey)) ?? 0);
+			} catch (err) {
+				console.error("circuit_breaker_unavailable", err);
+			}
+		}
 		if (currentCalls >= GLOBAL_DAILY_CAP) {
 			logGuardEvent({ ...guardBase, reason: "circuit_breaker" });
+			// 429, not 503: the *service* is up — this specific quota is spent.
+			// 503 caused Arc / link previewers / CDNs to render a full-page
+			// "Loading Error" instead of letting the client parse the JSON.
 			return NextResponse.json(
 				{
 					error: "demo_rate_limit",
 					message:
 						"This live demo has hit its daily request cap. Please try again tomorrow or reach out to Raj directly.",
 				},
-				{ status: 503 },
+				{
+					status: 429,
+					headers: { "Retry-After": String(RETRY_AFTER_SECONDS["24 h"]) },
+				},
 			);
 		}
 

@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initialsFromEmail } from "@/lib/initials";
 
 export function UserChip({ email }: { email: string }) {
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement | null>(null);
+	const local = email.split("@")[0] ?? "";
+	const parts = local.split(/[._-]+/).filter(Boolean);
+	const first = parts[0]?.[0];
+	const second = parts[1]?.[0];
+	const initials =
+		first && second
+			? (first + second).toUpperCase()
+			: (local.slice(0, 2) || "??").toUpperCase();
 
 	// Close the menu on outside click + Escape so it doesn't linger after a
 	// user taps elsewhere on mobile.
@@ -37,7 +44,7 @@ export function UserChip({ email }: { email: string }) {
 				className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-surface-2 pr-1 pl-1 text-xs font-medium text-fg transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:h-8 sm:pr-3"
 			>
 				<span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-[11px] font-semibold text-white sm:h-6 sm:w-6 sm:text-[10px]">
-					{initialsFromEmail(email)}
+					{initials}
 				</span>
 				<span className="hidden max-w-[10rem] truncate sm:inline">{email}</span>
 			</button>

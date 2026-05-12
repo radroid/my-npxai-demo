@@ -27,6 +27,7 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -91,6 +92,12 @@ export function AuthProvider({
 	const [reconciled, setReconciled] = useState(false);
 	const [sessionExpired, setSessionExpired] = useState(false);
 	const prevModeRef = useRef<AuthMode>(initialMode);
+	// Window focus fires on every tab return; without a floor we'd hit
+	// /api/auth/whoami every flip. 30s is short enough to catch real session
+	// changes after the user signs in elsewhere, long enough to absorb rapid
+	// focus thrash (devtools open/close, alt-tab during a deploy).
+	const lastReconcileAtRef = useRef(0);
+	const RECONCILE_MIN_INTERVAL_MS = 30_000;
 
 	const reconcile = useCallback(async (): Promise<AuthMode> => {
 		try {
@@ -136,7 +143,13 @@ export function AuthProvider({
 			wipeAnonLocalStorage();
 		}
 		void reconcile();
-		const onFocus = () => void reconcile();
+		lastReconcileAtRef.current = Date.now();
+		const onFocus = () => {
+			const now = Date.now();
+			if (now - lastReconcileAtRef.current < RECONCILE_MIN_INTERVAL_MS) return;
+			lastReconcileAtRef.current = now;
+			void reconcile();
+		};
 		window.addEventListener("focus", onFocus);
 		return () => window.removeEventListener("focus", onFocus);
 	}, [reconcile, initialMode]);
@@ -158,14 +171,28 @@ export function AuthProvider({
 		router.refresh();
 	}, [router]);
 
-	const value: AuthContextValue = {
-		mode,
-		reconciled,
-		sessionExpired,
-		dismissSessionExpired,
-		reconcile,
-		markSessionExpired,
-	};
+	// Memoize so every useAuth() consumer doesn't re-render on unrelated
+	// AuthProvider re-renders. With the runtime + sidebar + adapters all
+	// subscribing, an unmemoized object cascaded into per-render adapter
+	// rebuilds → per-render thread list refetches.
+	const value = useMemo<AuthContextValue>(
+		() => ({
+			mode,
+			reconciled,
+			sessionExpired,
+			dismissSessionExpired,
+			reconcile,
+			markSessionExpired,
+		}),
+		[
+			mode,
+			reconciled,
+			sessionExpired,
+			dismissSessionExpired,
+			reconcile,
+			markSessionExpired,
+		],
+	);
 
 	authSnapshot = value;
 
