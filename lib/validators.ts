@@ -17,15 +17,59 @@ export const OUTPUT_MAX_TOKENS: Record<Tier, number> = {
 // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control chars is the point
 const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g;
 
+// Zero-width / invisible chars used to smuggle jailbreak markers past the
+// regex scan ("ig<ZWSP>nore previous"). ZWSP, ZWNJ, ZWJ, word joiner, BOM.
+const ZERO_WIDTH_CHARS = /[\u200B-\u200D\u2060\uFEFF]/g;
+
+// Absolute input ceiling, enforced before the per-tier char cap. Above any
+// current or future tier cap — a long wall-of-noise + needle attack must
+// never reach the model even if a tier's cap is later raised.
+export const HARD_INPUT_CEILING = 8000;
+
 export const JAILBREAK_PATTERNS: RegExp[] = [
 	/ignore (all )?previous/i,
 	/disregard (the )?above/i,
 	/you are now/i,
 	/system:\s/i,
+	/\bDAN\b/,
+	/pretend (you|to be)/i,
+	/repeat (the|your) (words|instructions|prompt)/i,
+	/translate (your|the|these) instructions/i,
+	/(last|first) sentence of (your|the) (system )?prompt/i,
+	/in a (fictional|hypothetical) scenario/i,
+	/(developer|debug|audit) mode/i,
+	/system prompt/i,
+	/i('?m| am) an? (npx|engineer|auditor|recruiter)/i,
 ];
 
+// NFKC folds compatibility variants (full-width chars, ligatures) back to
+// their canonical form so obfuscated jailbreak text matches the patterns;
+// then strip zero-width smuggling chars and control chars.
 export function sanitizeQueryText(raw: string): string {
-	return raw.replace(CONTROL_CHARS, "").trim();
+	return raw
+		.normalize("NFKC")
+		.replace(ZERO_WIDTH_CHARS, "")
+		.replace(CONTROL_CHARS, "")
+		.trim();
+}
+
+// Find long base64 runs in the text, decode them, and return the
+// concatenated decoded text (NFKC-normalized) for a second jailbreak scan.
+// The 40-char floor keeps ordinary tokens out; returns null when nothing
+// decodes — callers treat null as "no probe".
+export function decodeBase64Probe(text: string): string | null {
+	const runs = text.match(/[A-Za-z0-9+/]{40,}={0,2}/g);
+	if (!runs) return null;
+	const decoded: string[] = [];
+	for (const run of runs) {
+		try {
+			const out = atob(run);
+			if (out) decoded.push(out.normalize("NFKC"));
+		} catch {
+			// Not valid base64 — skip.
+		}
+	}
+	return decoded.length > 0 ? decoded.join(" ") : null;
 }
 
 // Strip HTML tags + JS function-call leftovers from user input before

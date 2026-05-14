@@ -24,7 +24,9 @@ import {
 	PROMPT_VERSION,
 } from "@/lib/prompts";
 import {
+	decodeBase64Probe,
 	detectJailbreakMarkers,
+	HARD_INPUT_CEILING,
 	sanitizeQueryText,
 	stripHtmlTags,
 } from "@/lib/validators";
@@ -270,15 +272,45 @@ export const POST = withGuard(
 		};
 
 		if (!query) return validationError("empty_query", "Query is required.");
+		// Absolute ceiling first — a long wall-of-noise + needle attack must
+		// never reach the model even if a tier's cap is later raised.
+		if (query.length > HARD_INPUT_CEILING)
+			return validationError("hard_ceiling", "Query exceeds maximum length.");
 		if (query.length > ctx.inputCharCap)
 			return validationError(
 				`char_cap_${ctx.inputCharCap}`,
 				`Query exceeds ${ctx.inputCharCap} character limit for your tier.`,
 			);
 
-		const markers = detectJailbreakMarkers(query);
-		if (markers.length > 0)
+		// Jailbreak short-circuit: scan the raw query AND any base64 payload
+		// hidden inside it. On any marker hit, refuse with the canonical
+		// out-of-scope line via the same streaming path the cache-hit branch
+		// uses — skips embed + RPC + LLM, so the attacker gets no feedback
+		// channel and the call costs nothing.
+		const decodedProbe = decodeBase64Probe(query);
+		const markers = [
+			...detectJailbreakMarkers(query),
+			...(decodedProbe ? detectJailbreakMarkers(decodedProbe) : []),
+		];
+		if (markers.length > 0) {
 			logValidation(`jailbreak_markers:${markers.length}`);
+			ctx.logFields.jailbreak_blocked = true;
+			ctx.logFields.fallback_taken = true;
+			ctx.logFields.output_tokens = 0;
+			const refusalStream = createUIMessageStream({
+				execute: async ({ writer }) => {
+					const msgId = crypto.randomUUID();
+					writer.write({ type: "text-start", id: msgId });
+					writer.write({
+						type: "text-delta",
+						id: msgId,
+						delta: KNOWLEDGE_HUB_OUT_OF_SCOPE,
+					});
+					writer.write({ type: "text-end", id: msgId });
+				},
+			});
+			return createUIMessageStreamResponse({ stream: refusalStream });
+		}
 
 		// Cache hit check — skips embed + RPC + LLM for repeat queries.
 		// Regenerate requests bypass the cache AND drop the stored entry, so

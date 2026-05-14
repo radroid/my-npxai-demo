@@ -52,5 +52,9 @@ export function buildContextEnvelope(
 		requiredCites.length >= 2
 			? `\n\nMULTI-DOC SCOPE: The user's question spans ${requiredCites.join(", ")}. Your response MUST cite at least one snippet from EACH of these documents.`
 			: "";
-	return `${chunks.map(wrapChunk).join("\n")}${multiDocCue}\n\nUSER QUESTION:\n${userQuery}`;
+	// Spotlight the user query: wrap it in a delimited block and HTML-escape
+	// the body, mirroring the <context_snippet> treatment. The system prompt
+	// names <user_query> as untrusted data, so the boundary is enforced from
+	// both sides (OpenAI / MS-Research spotlighting pattern).
+	return `${chunks.map(wrapChunk).join("\n")}${multiDocCue}\n\n<user_query>\n${htmlEscape(userQuery)}\n</user_query>`;
 }
