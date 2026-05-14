@@ -365,6 +365,19 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Handle partial-migration failure: if any thread POST fails, keep the remaining anon threads in localStorage so the user can retry. Don't lose work.
 - [ ] Update `PLAN.md` Appendix J (auth flow) to document the migration path.
 
+### Phase 10 — Prompt-injection hardening (opened 2026-05-14)
+
+**10A · Bot survives the red-team battery** *(shipped 2026-05-14)*
+- [x] `KNOWLEDGE_HUB_SYSTEM` rewritten — security consolidated into a tight preamble (extraction / persona-swap / scope / NPX-impersonation refusals); answer rules 1–4, 2a–2c, 7 kept verbatim. `PROMPT_VERSION` → `2026-05-14.3`. (The first rewrite was refuse-first and regressed the hard eval 20/20→18/20 — terse in-corpus queries like "turnover" got refused. Restructured to answer-first: "Your job is to answer … Default to answering" leads, "Security boundary — refuse ONLY these" follows. Restored 20/20 with all 30 security rows still green.)
+- [x] User query spotlighted — `buildContextEnvelope` wraps it in `<user_query>` with HTML-escaped body, mirroring the `<context_snippet>` treatment.
+- [x] `lib/validators.ts` — `sanitizeQueryText` adds NFKC normalize + zero-width strip; `JAILBREAK_PATTERNS` expanded 4→16 (incl. French — Canada is bilingual, this is a CNSC bot); new `decodeBase64Probe` (re-scan base64 payloads); new `leetFold` so `detectJailbreakMarkers` also scans a leetspeak-folded copy; new `HARD_INPUT_CEILING = 8000`.
+- [x] `route.ts` — jailbreak markers now short-circuit to the canonical out-of-scope reply (raw + base64-decoded scan) via the cache-hit streaming path; `HARD_INPUT_CEILING` enforced before the tier cap. `ctx.logFields.jailbreak_blocked` set so blocked rows are observable.
+- [x] Adversarial eval harness — `evals/security.jsonl` (30 rows across extraction / persona / scope / hallucination / obfuscation / adversarial / social + grounded regression guards) + `scripts/eval-security.ts`, wired as `bun run evals:security`. Output is a grouped-by-category markdown table.
+- [x] Final verification against the live dev server: `bun run evals:security` **30/30** (all attack categories + grounded 2/2) and `bun run eval:kb` **20/20** (Ship bar ✅, Adversarial 3/3). tsc + biome green.
+- [x] Root-caused the `grounded` HTTP 500s: the Supabase project `ptepxophdneugvcziqny` was **paused** (free-tier inactivity — initially misdiagnosed as deleted because `nslookup` returned NXDOMAIN; a paused project can drop DNS too). Raj unpaused it; retrieval recovered, corpus intact. During the hunt, found the foundational RAG schema (`regdoc_chunks` + HNSW, `match_regdoc_chunks` / `get_turnover_snapshot` / `get_user_tier` RPCs, `profiles` + `handle_new_user`) was applied pre-CLI and never committed as migrations — so a fresh project couldn't be rebuilt.
+- [x] Reconstructed the 5 missing foundational migrations from PLAN.md Appendix A (`20260416120000`–`20260416120400`, slotted before the earliest committed migration). RPC signatures + column names verified against the calling code; dependency chain confirmed. Repo's 14-migration set is now self-sufficient for `supabase db push` — closes the schema-drift gap even though the project recovered via unpause this time.
+- [x] Added `supabase/RECOVERY.md` — runbook for a paused/lost project + exact rebuild steps (create project → link → `db push` → update `.env.local` → `bun run ingest` → re-run evals).
+
 ---
 
 - [ ] Before advancing `Current phase`, verify the relevant Appendix H checklist is green
