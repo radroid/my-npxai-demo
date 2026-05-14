@@ -40,7 +40,30 @@ export const JAILBREAK_PATTERNS: RegExp[] = [
 	/(developer|debug|audit) mode/i,
 	/system prompt/i,
 	/i('?m| am) an? (npx|engineer|auditor|recruiter)/i,
+	// French — Canada is bilingual and this is a CNSC bot, so a French
+	// jailbreak is a realistic vector, not an exotic one.
+	/ignorez (toutes )?(les )?instructions/i,
+	/oubliez (toutes )?(les )?(vos )?instructions/i,
+	/révélez (votre|le|moi|nous)/i,
 ];
+
+// Leetspeak fold: map common digit/symbol substitutions back to letters so
+// obfuscated text ("1gn0r3 4ll pr3v10u5") still matches the patterns. Applied
+// ONLY to the scan copy — the query sent downstream is untouched, so
+// regulatory tokens like "REGDOC-2.7.1" are never corrupted.
+const LEET_MAP: Record<string, string> = {
+	"0": "o",
+	"1": "i",
+	"3": "e",
+	"4": "a",
+	"5": "s",
+	"7": "t",
+	"@": "a",
+	$: "s",
+};
+function leetFold(text: string): string {
+	return text.replace(/[013457@$]/g, (c) => LEET_MAP[c] ?? c);
+}
 
 // NFKC folds compatibility variants (full-width chars, ligatures) back to
 // their canonical form so obfuscated jailbreak text matches the patterns;
@@ -91,10 +114,15 @@ export function stripHtmlTags(raw: string): string {
 		.trim();
 }
 
+// Scan both the raw text and a leetspeak-folded copy so digit/symbol
+// substitution can't slip a jailbreak phrase past the patterns.
 export function detectJailbreakMarkers(text: string): string[] {
-	return JAILBREAK_PATTERNS.filter((re) => re.test(text)).map(
-		(re) => re.source,
-	);
+	const folded = leetFold(text);
+	const hits = new Set<string>();
+	for (const re of JAILBREAK_PATTERNS) {
+		if (re.test(text) || re.test(folded)) hits.add(re.source);
+	}
+	return [...hits];
 }
 
 export const STATIONS = ["Bruce A"] as const;

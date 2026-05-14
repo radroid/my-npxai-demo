@@ -370,10 +370,11 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 **10A · Bot survives the red-team battery** *(shipped 2026-05-14)*
 - [x] `KNOWLEDGE_HUB_SYSTEM` rewritten — security consolidated into a tight preamble (extraction / persona-swap / scope / NPX-impersonation refusals); answer rules 1–4, 2a–2c, 7 kept verbatim so the hard eval holds. `PROMPT_VERSION` → `2026-05-14.1`.
 - [x] User query spotlighted — `buildContextEnvelope` wraps it in `<user_query>` with HTML-escaped body, mirroring the `<context_snippet>` treatment.
-- [x] `lib/validators.ts` — `sanitizeQueryText` adds NFKC normalize + zero-width strip; `JAILBREAK_PATTERNS` expanded 4→13; new `decodeBase64Probe` (re-scan base64 payloads); new `HARD_INPUT_CEILING = 8000`.
+- [x] `lib/validators.ts` — `sanitizeQueryText` adds NFKC normalize + zero-width strip; `JAILBREAK_PATTERNS` expanded 4→16 (incl. French — Canada is bilingual, this is a CNSC bot); new `decodeBase64Probe` (re-scan base64 payloads); new `leetFold` so `detectJailbreakMarkers` also scans a leetspeak-folded copy; new `HARD_INPUT_CEILING = 8000`.
 - [x] `route.ts` — jailbreak markers now short-circuit to the canonical out-of-scope reply (raw + base64-decoded scan) via the cache-hit streaming path; `HARD_INPUT_CEILING` enforced before the tier cap. `ctx.logFields.jailbreak_blocked` set so blocked rows are observable.
 - [x] Adversarial eval harness — `evals/security.jsonl` (30 rows across extraction / persona / scope / hallucination / obfuscation / adversarial / social + grounded regression guards) + `scripts/eval-security.ts`, wired as `bun run evals:security`. Output is a grouped-by-category markdown table.
-- [!] Run `bun run evals:security` + `bun run eval:kb --suite all` against a live endpoint — blocked: needs the dev server running with OpenAI/Supabase/Upstash credentials, not available in the implementation environment. Static checks (tsc, biome, validator unit logic, jsonl parse) are green.
+- [x] Ran `bun run evals:security` against the live dev server — **28/28 attack rows pass** (extraction, persona, scope, social, obfuscation, adversarial, hallucination). French + leetspeak weak links found in review and fixed (obf-03/obf-04 now caught deterministically). tsc + biome green.
+- [!] 2 `grounded` regression rows return HTTP 500 (`"Retrieval failed."` — the `match_regdoc_chunks` RPC) — pre-existing infra issue, NOT introduced by this branch (the retrieval path in `route.ts` is unchanged from main). Blocked on: the Supabase instance `.env.local` points at needs the REGDOC corpus ingested / the RPC migrated. Re-run `bun run evals:security` once retrieval is healthy to confirm grounded 2/2.
 
 ---
 
