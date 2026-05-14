@@ -2,15 +2,22 @@
 
 ## What happened
 
-The Supabase project this repo was built against (`ptepxophdneugvcziqny`) was
-**deleted**. Confirmed by `nslookup ptepxophdneugvcziqny.supabase.co` →
-`NXDOMAIN` (a *paused* project still resolves and returns a "paused" response;
-a deleted one is gone from DNS entirely).
+The Supabase project this repo was built against (`ptepxophdneugvcziqny`) went
+unreachable — `nslookup ptepxophdneugvcziqny.supabase.co` returned `NXDOMAIN`,
+REST + auth endpoints returned no connection. Root cause: the free-tier
+project was **paused** for inactivity (a paused project can drop its DNS
+record, so NXDOMAIN does not by itself prove deletion — that was an initial
+misdiagnosis). Un-pausing it from the Supabase dashboard restored everything;
+the corpus and seed data were intact.
 
-Symptom: every database-backed route returns HTTP 500 —
+Symptom while down: every database-backed route returns HTTP 500 —
 `app/api/knowledge-hub/query` returns `"Retrieval failed."`, the Generator
 returns `"Snapshot retrieval failed."`, auth/tier lookups fail. The app code is
-fine; the database it points at no longer exists.
+fine; the database it points at is unreachable.
+
+If a project is only paused, **un-pausing is the whole fix** — no rebuild
+needed. The steps below are for the worse case: a project that is genuinely
+gone and must be recreated from scratch.
 
 ## What was missing (and is now fixed)
 
