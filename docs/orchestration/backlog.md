@@ -2,7 +2,7 @@
 
 Sprint brief (Raj, 2026-07-13): (1) Knowledge Hub "Artifact" mode — a search-time toggle that, instead of the chat interface, generates a high-quality self-contained HTML explainer ("artifact", as the AI labs call it) for a complex topic; success criteria: HTML files that explain boring nuclear regulations well, aligned with the NPX theme, containing diagrams and visuals that aid the text. (2) A RAG-pipeline evaluation framework: experiments comparing what is in the ingested files vs what the agent answers, using established metrics (web-researched), with heavy logging, delivering realistic percentages across multiple rating categories. Timelapse-file cleanup was a pre-item (done inline by the orchestrator).
 
-**Progress:** item-1 in planning. Nothing shipped yet this sprint. Last completed: scaffolding + timelapse cleanup (pre-items).
+**Progress:** item-1 planner + item-2 metrics research running in parallel. Shipped: PR #5 (scaffolding, merged after review). Ledger/friction updates ride in the next PR (staged by explicit path by the next executor).
 
 ## Items
 
