@@ -18,7 +18,7 @@ import {
 	PencilIcon,
 	SquareIcon,
 } from "lucide-react";
-import { type FC, useEffect, useMemo, useState } from "react";
+import { type FC, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
 	ComposerAddAttachment,
 	ComposerAttachments,
@@ -34,7 +34,12 @@ import {
 } from "@/components/knowledge-hub/citation-sources";
 import { Button } from "@/components/ui/button";
 
-export const Thread: FC = () => (
+// `composerHeader` is an additive slot rendered immediately above the
+// composer (item-1 slice 1.2 — the Knowledge Hub mode toggle). Default
+// undefined renders markup identical to the prop-less Thread.
+export const Thread: FC<{ composerHeader?: ReactNode }> = ({
+	composerHeader,
+}) => (
 	<ThreadPrimitive.Root
 		className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
 		style={{
@@ -60,6 +65,7 @@ export const Thread: FC = () => (
 
 			<ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mx-auto mt-auto flex w-full max-w-(--thread-max-width) flex-col gap-4 overflow-visible rounded-t-(--composer-radius) bg-background pb-4 md:pb-6">
 				<ThreadScrollToBottom />
+				{composerHeader}
 				<Composer />
 			</ThreadPrimitive.ViewportFooter>
 		</ThreadPrimitive.Viewport>
