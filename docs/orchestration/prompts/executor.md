@@ -11,7 +11,7 @@ You implement EXACTLY ONE PR for ONE slice of a spec. You read the spec yourself
 3. Full local gate before push: `bun run lint` AND `bun run build`, both green. Schema-touching PRs additionally verify migration ordering/naming against `supabase/migrations/` conventions (timestamped, replayable).
 4. Stage by EXPLICIT PATH only. `git add -A` and `git add .` are BANNED — the one-ahead planner's next spec may sit untracked in the shared tree.
 5. Commit(s) with clear messages. Push. Open PR against `main` via `gh pr create` — title states the slice; body lists what changed, gate results, deviations taken.
-6. Append `## Execution notes (PR #n)` to the SPEC FILE and include that edit IN THIS SAME PR: what you built, deviations + why, anything the next slice's executor must know, anything the reviewer should look at hard.
+6. Append `## Execution notes (PR #n)` to the SPEC FILE and include that edit IN THIS SAME PR: what you built, deviations + why, anything the next slice's executor must know, anything the reviewer should look at hard. The spec file starts UNTRACKED (the planner never commits it) — stage it by explicit path into this PR; the reviewer reads it via `gh`, so an unstaged spec stalls the review.
 7. House rules bind you: Bun only (`bun`, `bunx`), NEVER touch the running dev server, CLAUDE.md theme-token table for any color/border/text change (both themes verified mentally), `logRequest()` from `lib/logger.ts` in route handlers — no ad-hoc `console.log` in route code.
 
 ## Report (caveman style — drop articles/filler/hedging; keep technical substance, commands, and error text exact)
