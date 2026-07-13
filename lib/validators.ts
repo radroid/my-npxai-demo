@@ -140,3 +140,10 @@ export const generatorInputSchema = z.object({
 	unit: z.enum(UNITS),
 	shift: z.enum(SHIFTS),
 });
+
+// Artifact mode takes a single question, not a UIMessage[] thread. Length /
+// emptiness are enforced by the route AFTER sanitizeQueryText + stripHtmlTags
+// (mirroring the chat route), so the schema only pins the shape.
+export const artifactInputSchema = z.object({
+	query: z.string(),
+});

@@ -36,6 +36,15 @@ const LIMITS: Record<
 		signed_in: { minute: 10, hour: 40, day: 50 },
 		npx_circle: { minute: 15, hour: 80, day: 200 },
 	},
+	"knowledge-hub/artifact": {
+		// Per-artifact cost is ~4× a chat answer (ARTIFACT_MAX_TOKENS=3000 vs
+		// the anon chat cap of 800), so every tier/window here is strictly
+		// tighter than knowledge-hub/query's (invariant I1.9). Anon matches
+		// the generator's anon posture.
+		anon: { minute: 1, hour: 2, day: 2 },
+		signed_in: { minute: 2, hour: 6, day: 10 },
+		npx_circle: { minute: 3, hour: 12, day: 30 },
+	},
 	"generator/turnover": {
 		anon: { minute: 1, hour: 3, day: 2 },
 		signed_in: { minute: 3, hour: 12, day: 20 },
