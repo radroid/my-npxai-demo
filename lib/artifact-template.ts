@@ -35,7 +35,8 @@ export interface ArtifactAssemblyInput {
 	/** Sanitized user question (never raw input). */
 	query: string;
 	sources: ArtifactSource[];
-	/** Server-injected warning when retrieval avg-sim < LOW_SIM_DISCLAIMER. */
+	/** Server-injected warning when the raw-pool mean similarity
+	 * (poolAvgSim, pre-MIN_CHUNK_SIM filter) < LOW_SIM_DISCLAIMER. */
 	limitedCoverage: boolean;
 	/** Completion hit the token cap — append the regenerate warning. */
 	truncated: boolean;

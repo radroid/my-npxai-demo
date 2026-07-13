@@ -212,7 +212,13 @@ export const POST = withGuard(
 			}
 			throw err;
 		}
-		const { envelope: chunks, topSim, avgSim, mentionedDocs } = retrieval;
+		const {
+			envelope: chunks,
+			topSim,
+			avgSim,
+			poolAvgSim,
+			mentionedDocs,
+		} = retrieval;
 		ctx.logFields.retrieval_top_sim = Number(topSim.toFixed(4));
 		ctx.logFields.retrieval_avg_sim = Number(avgSim.toFixed(4));
 
@@ -225,7 +231,13 @@ export const POST = withGuard(
 
 		// Weak retrieval: generation proceeds, but the assembled document gets
 		// a server-injected "limited corpus coverage" callout (not LLM-prompted).
-		const limitedCoverage = avgSim < LOW_SIM_DISCLAIMER;
+		// Gate on the RAW-POOL mean (fix round 1): the post-filter envelope
+		// `avgSim` is always >= MIN_CHUNK_SIM (0.35 == LOW_SIM_DISCLAIMER) in
+		// the non-OOS branch, so gating on it was unreachable dead code. One
+		// 0.42 chunk clearing the OOS gate atop many weak ones drags the pool
+		// mean under 0.35 — exactly the "mostly-weak corpus coverage" case
+		// this callout exists for.
+		const limitedCoverage = poolAvgSim < LOW_SIM_DISCLAIMER;
 
 		const envelope = buildContextEnvelope(chunks, query, mentionedDocs);
 		const sources: ArtifactSource[] = chunks.map((c) => ({

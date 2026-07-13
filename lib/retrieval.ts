@@ -220,6 +220,15 @@ export interface RetrievalResult {
 	envelope: RetrievedChunk[];
 	topSim: number;
 	avgSim: number;
+	// ADDITIVE (PR #6 fix round 1): mean similarity over the FULL ranked
+	// candidate pool BEFORE the MIN_CHUNK_SIM filter. In the non-OOS branch
+	// the envelope only contains chunks >= MIN_CHUNK_SIM (0.35), so the
+	// post-filter `avgSim` can never dip below LOW_SIM_DISCLAIMER (0.35) —
+	// a limited-coverage signal must read the raw pool instead. Semantics
+	// match the pool the OOS branch already averages (chat's logged
+	// full-pool `retrieval_avg_sim` quirk). `avgSim` is untouched: the chat
+	// route's disclaimer logic and logging consume it byte-identically.
+	poolAvgSim: number;
 	mentionedDocs: string[];
 }
 
@@ -332,11 +341,20 @@ export async function retrieveChunks(
 		chunks.length > 0
 			? chunks.reduce((acc, c) => acc + c.similarity, 0) / chunks.length
 			: 0;
+	// Raw-pool mean (see RetrievalResult.poolAvgSim). `ranked` is the full
+	// merged candidate pool — the NAMED_DOC_BOOST only reorders it, so the
+	// mean is identical to the pre-boost pool's. In the OOS branch this
+	// equals `avgSim` exactly (there `chunks` IS the full pool).
+	const poolAvgSim =
+		ranked.length > 0
+			? ranked.reduce((acc, c) => acc + c.similarity, 0) / ranked.length
+			: 0;
 
 	return {
 		envelope: chunks,
 		topSim,
 		avgSim,
+		poolAvgSim,
 		mentionedDocs: Array.from(mentionedDocs),
 	};
 }

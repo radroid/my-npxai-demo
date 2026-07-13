@@ -2,7 +2,7 @@
 
 Sprint brief (Raj, 2026-07-13): (1) Knowledge Hub "Artifact" mode — a search-time toggle that, instead of the chat interface, generates a high-quality self-contained HTML explainer ("artifact", as the AI labs call it) for a complex topic; success criteria: HTML files that explain boring nuclear regulations well, aligned with the NPX theme, containing diagrams and visuals that aid the text. (2) A RAG-pipeline evaluation framework: experiments comparing what is in the ingested files vs what the agent answers, using established metrics (web-researched), with heavy logging, delivering realistic percentages across multiple rating categories. Timelapse-file cleanup was a pre-item (done inline by the orchestrator).
 
-**Progress:** item-1 planner + item-2 metrics research running in parallel. Shipped: PR #5 (scaffolding, merged after review). Ledger/friction updates ride in the next PR (staged by explicit path by the next executor).
+**Progress:** item-1 slice 1.1 built (PR #6, gates green) — adversarial review in flight. Both specs written (docs/orchestration/specs/). Shipped: PR #5 (scaffolding). Next: PR #6 review → fix → merge, then slice 1.2 + item-2 slice 2.1 in parallel.
 
 ## Items
 
@@ -11,7 +11,7 @@ ONE numbering scheme: backlog item IDs (`item-N`), slices (`N.M`). PR numbers ar
 | ID | Item | Slices | Needs | Status |
 |---|---|---|---|---|
 | item-1 | Knowledge Hub Artifact mode | 1.1 artifact generation backend (RAG → themed self-contained HTML w/ inline-SVG diagrams); 1.2 UI toggle + sandboxed artifact viewer (planner may re-slice) | — | planning |
-| item-2 | RAG eval framework + experiments | 2.1 framework core (golden dataset, metrics, experiment runner w/ logging + cost guard); 2.2 run experiments + committed scored report (realistic % per category) | metrics research pre-step (orchestrator-dispatched, parallel) | queued |
+| item-2 | RAG eval framework + experiments | 2.1 framework core (golden dataset, metrics, experiment runner w/ logging + cost guard); 2.2 run experiments + committed scored report (realistic % per category) | `lib/retrieval.ts` from item-1 slice 1.1 (PR #6) — REUSE, do not re-extract; metrics research done (docs/orchestration/research/rag-eval-metrics.md) | planned |
 
 ## item-1 — Knowledge Hub Artifact mode
 
@@ -24,6 +24,10 @@ ONE numbering scheme: backlog item IDs (`item-N`), slices (`N.M`). PR numbers ar
 - I1.6 Diagrams/visuals are inline SVG (or CSS), self-contained in the file.
 
 ## item-2 — RAG eval framework + experiments
+
+**Corpus-of-record:** the Supabase `regdoc_chunks` table (19 docs — 18 REGDOCs + NSCA, ~1,945 chunks). `scraped_regdocs/` is gitignored and NOT authoritative. Older "15 REGDOCs" references in README/PLAN describe the original plan, not the ingested corpus.
+
+**Resolved DELTAs (2026-07-13):** retrieval access = reuse `lib/retrieval.ts` from PR #6 (never re-extract); `EVAL_COST_CAP_USD=4` authorized for the gpt-4o-judge baseline run (battery worst case ~$5–8 one-time, judge cache makes re-runs cents); report lands at `evals/rag-eval-report.md`.
 
 **Invariants:**
 - I2.1 Eval runs are manual `bun run` scripts — never part of lint/build gate or any CI.
