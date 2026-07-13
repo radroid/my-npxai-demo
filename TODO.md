@@ -86,6 +86,10 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Raj manual-test the home page on iPhone 14 Pro Max (both Safari + Chrome) after agent lands 8A–8D — especially: hamburger drawer opens/closes, Sign in dialog is reachable, NPX theme background looks right in portrait, no horizontal scrolling anywhere.
 - [ ] Raj visual-check on a second device class (regular iPhone / Android) — the outreach audience is 3 people on unknown phones.
 
+### Phase 11 — Artifact mode + RAG eval framework (opened 2026-07-13)
+- [ ] Raj live-verify Artifact mode in the browser once merged: toggle to Artifact, ask a complex regulatory question, confirm the generated HTML explainer renders in both light + dark app themes, diagrams display, download works (see `docs/orchestration/manual-verification.md` for the exact recipe).
+- [ ] Raj review the committed RAG evaluation report (scores per category + methodology) and decide whether any score warrants a follow-up hardening phase.
+
 ### Tuesday Apr 21 — Outreach (paused behind Phase 6 completion)
 - [ ] 9 AM — LinkedIn DM to Kshitij Ahuja
 - [ ] 11 AM — LinkedIn DM to Bharath Nangia
@@ -377,6 +381,15 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Root-caused the `grounded` HTTP 500s: the Supabase project `ptepxophdneugvcziqny` was **paused** (free-tier inactivity — initially misdiagnosed as deleted because `nslookup` returned NXDOMAIN; a paused project can drop DNS too). Raj unpaused it; retrieval recovered, corpus intact. During the hunt, found the foundational RAG schema (`regdoc_chunks` + HNSW, `match_regdoc_chunks` / `get_turnover_snapshot` / `get_user_tier` RPCs, `profiles` + `handle_new_user`) was applied pre-CLI and never committed as migrations — so a fresh project couldn't be rebuilt.
 - [x] Reconstructed the 5 missing foundational migrations from PLAN.md Appendix A (`20260416120000`–`20260416120400`, slotted before the earliest committed migration). RPC signatures + column names verified against the calling code; dependency chain confirmed. Repo's 14-migration set is now self-sufficient for `supabase db push` — closes the schema-drift gap even though the project recovered via unpause this time.
 - [x] Added `supabase/RECOVERY.md` — runbook for a paused/lost project + exact rebuild steps (create project → link → `db push` → update `.env.local` → `bun run ingest` → re-run evals).
+
+### Phase 11 — Artifact mode + RAG eval framework (opened 2026-07-13, orchestrated-delivery loop)
+
+> Live sprint state (slice→PR mapping, progress line) lives in `docs/orchestration/backlog.md`; this list mirrors the item level only.
+
+- [~] item-1 · Knowledge Hub Artifact mode — search-time toggle (chat ↔ artifact); backend route generates a self-contained NPX-themed HTML explainer with inline-SVG diagrams via the existing RAG pipeline; sandboxed-iframe viewer + download; same guard/rate-limit surface as chat; both themes.
+- [ ] item-2 · RAG eval framework — golden dataset from ingested corpus; metrics module (faithfulness, answer relevancy, context precision, context recall, consistency — web-researched definitions, cited); experiment runner with structured JSONL logs + per-run cost guard; run experiments; commit scored report with realistic percentages per category.
+- [x] pre-item · Timelapse cleanup — `.timelapse.yaml` deleted, `.gitignore` reverted, `.timelapse/` + `.env.timelapse` removed (2026-07-13).
+- [x] pre-item · Orchestration scaffolding — `docs/orchestration/` (role templates, backlog, ledger, friction log, changelog, manual-verification queue) (2026-07-13).
 
 ---
 
