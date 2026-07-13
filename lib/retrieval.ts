@@ -207,6 +207,12 @@ export class RetrievalError extends Error {
 export interface RetrievalDeps {
 	supabase: GuardedHandlerArgs["supabase"];
 	openai: OpenAI;
+	// ADDITIVE (item-2 DELTA D2): OpenAI-call accounting hook. Defaults to
+	// recordOpenAICall — the global daily circuit-breaker increment — so both
+	// production routes keep byte-identical behavior without passing anything.
+	// The RAG eval harness passes an explicit no-op so direct (non-HTTP)
+	// retrieval calls never consume the production GLOBAL_DAILY_CAP budget.
+	recordUsage?: (costUsd?: number) => Promise<void>;
 }
 
 export interface RetrievalOptions {
@@ -214,12 +220,65 @@ export interface RetrievalOptions {
 	// calibrated 8 (ENVELOPE_CHUNKS above); the artifact route passes 12
 	// because explainers span more sections than chat answers.
 	envelopeChunks: number;
+	// ADDITIVE (item-2 DELTA D1): when true, the result carries a
+	// RetrievalTrace for eval instrumentation. Neither production route sets
+	// this, so their behavior and result shape are unchanged.
+	withTrace?: boolean;
+}
+
+// ADDITIVE (item-2 DELTA D1): one entry per candidate chunk in the merged
+// pool, in POST-boost rank order. `similarity` is the raw cosine sim the
+// pool was merged on; `score` is what the reranker actually sorted by.
+export interface TracePoolEntry {
+	chunk: RetrievedChunk;
+	similarity: number;
+	boosted: boolean;
+	score: number;
+	rankPreBoost: number;
+	rankPostBoost: number;
+}
+
+// ADDITIVE (item-2 DELTA D1): everything the eval framework needs to score
+// retrieval offline — expansion queries used, the full ranked pool with
+// pre/post-boost ranks, and the fallback decision the chat route would take.
+// `decision` mirrors the CHAT route's branch order: OOS gate on raw-pool
+// top-1, then the disclaimer check on the post-filter envelope average
+// (which is structurally >= MIN_CHUNK_SIM in the non-OOS branch — kept for
+// fidelity, see poolAvgSim above for the live limited-coverage signal).
+export interface RetrievalTrace {
+	query: string;
+	expansions: string[];
+	mentionedDocs: string[];
+	mentionedSections: string[];
+	topSim: number;
+	decision: "oos" | "disclaimer" | "normal";
+	pool: TracePoolEntry[];
+}
+
+// ADDITIVE (item-2 DELTA D1): replay the route's envelope selection at any k
+// from a captured trace — same MIN_CHUNK_SIM filter, same doc-diversity pass,
+// same OOS branch (full ranked pool). Lets the eval k-sweep derive envelopes
+// for k ∈ {3,5,8,10} from ONE retrieval (one embedding spend), guaranteed
+// identical to what retrieveChunks would select at that envelopeChunks.
+export function deriveEnvelopeAtK(
+	trace: RetrievalTrace,
+	k: number,
+): RetrievedChunk[] {
+	const ranked = trace.pool.map((e) => e.chunk);
+	if (trace.topSim < LOW_SIM_OOS) return ranked;
+	return selectDiverseEnvelope(
+		ranked.filter((c) => c.similarity >= MIN_CHUNK_SIM),
+		new Set(trace.mentionedDocs),
+		k,
+	);
 }
 
 export interface RetrievalResult {
 	envelope: RetrievedChunk[];
 	topSim: number;
 	avgSim: number;
+	// ADDITIVE (item-2 DELTA D1): present ONLY when opts.withTrace is true.
+	trace?: RetrievalTrace;
 	// ADDITIVE (PR #6 fix round 1): mean similarity over the FULL ranked
 	// candidate pool BEFORE the MIN_CHUNK_SIM filter. In the non-OOS branch
 	// the envelope only contains chunks >= MIN_CHUNK_SIM (0.35), so the
@@ -260,7 +319,7 @@ export async function retrieveChunks(
 		if (embeddings.length !== embedInputs.length) {
 			throw new Error("embedding count mismatch");
 		}
-		await recordOpenAICall(0);
+		await (deps.recordUsage ?? recordOpenAICall)(0);
 	} catch (err) {
 		console.error("embedding_error", err);
 		throw new RetrievalError("embedding", err);
@@ -350,10 +409,43 @@ export async function retrieveChunks(
 			? ranked.reduce((acc, c) => acc + c.similarity, 0) / ranked.length
 			: 0;
 
+	// ADDITIVE (item-2 DELTA D1): trace is built AFTER every production value
+	// above so it can never influence them; gated on withTrace so the routes
+	// (which never set it) pay nothing.
+	let trace: RetrievalTrace | undefined;
+	if (opts.withTrace) {
+		const preBoostRank = new Map<number, number>(
+			rawPool.map((c, i) => [c.id, i + 1]),
+		);
+		trace = {
+			query,
+			expansions,
+			mentionedDocs: Array.from(mentionedDocs),
+			mentionedSections,
+			topSim,
+			decision:
+				topSim < LOW_SIM_OOS
+					? "oos"
+					: avgSim < LOW_SIM_DISCLAIMER
+						? "disclaimer"
+						: "normal",
+			pool: ranked.map((c, i) => ({
+				chunk: c,
+				similarity: c.similarity,
+				boosted: mentionedDocs.has(c.regdoc_id),
+				score:
+					c.similarity + (mentionedDocs.has(c.regdoc_id) ? NAMED_DOC_BOOST : 0),
+				rankPreBoost: preBoostRank.get(c.id) ?? 0,
+				rankPostBoost: i + 1,
+			})),
+		};
+	}
+
 	return {
 		envelope: chunks,
 		topSim,
 		avgSim,
+		trace,
 		poolAvgSim,
 		mentionedDocs: Array.from(mentionedDocs),
 	};
