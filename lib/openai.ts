@@ -12,15 +12,22 @@ export function getOpenAIClient() {
 
 export const OPENAI_MODELS = {
 	chat: "gpt-4o-mini",
+	// Artifact explainers are a premium, 24h-cached, one-shot HTML+SVG
+	// generation where structure and valid inline SVG matter — gpt-4o-mini
+	// produces flat, clipped diagrams. gpt-4.1 follows the strict fragment
+	// contract far better and renders clean flow diagrams; the higher unit
+	// cost is bounded by the 24h artifact cache and low demo volume.
+	artifact: "gpt-4.1",
 	embedding: "text-embedding-3-large",
 } as const;
 
 // Artifact explainer model (DELTA D1): overridable per-deploy via env so a
-// stronger model can be swapped in without a code change (`wrangler`-managed
-// in production). Resolved lazily so the env var is read at request time,
-// consistent with getOpenAIClient above. Both routes share the one client.
+// stronger/cheaper model can be swapped in without a code change
+// (`wrangler`-managed in production). Resolved lazily so the env var is read
+// at request time, consistent with getOpenAIClient above. Both routes share
+// the one client.
 export function getArtifactModel(): string {
-	return process.env.OPENAI_ARTIFACT_MODEL || OPENAI_MODELS.chat;
+	return process.env.OPENAI_ARTIFACT_MODEL || OPENAI_MODELS.artifact;
 }
 
 // Full-dimension text-embedding-3-large. The 3072-dim vectors measurably beat
