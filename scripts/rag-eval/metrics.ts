@@ -150,28 +150,43 @@ export function scoreRetrievalStages(args: {
 	/** The offline retrieval trace, or null when it could not be captured. */
 	trace: RetrievalTrace | null;
 	traceError?: string | null;
+	/**
+	 * Set when the item is a HARD ERROR — a guard-rejected (4xx) or malformed
+	 * response (PR #8 fix round 3, issue 2), NEVER a legitimate oos_or_guard
+	 * route behaviour. `servedEnvelopeIds` is null for both an oos_or_guard
+	 * refusal AND a hard error, and the two must not share a reason string: a
+	 * validation rejection or a stream stall is not "the deterministic guard
+	 * or the similarity gate fired". When set, this OVERRIDES both exclusion
+	 * reasons below (every retrieval metric is excluded — a hard error means
+	 * we do not know what, if anything, the server actually retrieved).
+	 */
+	hardErrorReason?: string | null;
 }): RetrievalStageScores {
 	const { goldIds, k } = args;
 	const noGold = goldIds.size === 0;
 
-	const envelopeExcludedReason = noGold
-		? "no_gold_chunks:denominator_is_empty"
-		: args.servedEnvelopeIds === null
-			? "no_envelope_emitted:oos_or_guard_branch"
-			: args.servedEnvelopeIds.length === 0
-				? "empty_envelope:nothing_surfaced"
-				: null;
+	const envelopeExcludedReason =
+		args.hardErrorReason ??
+		(noGold
+			? "no_gold_chunks:denominator_is_empty"
+			: args.servedEnvelopeIds === null
+				? "no_envelope_emitted:oos_or_guard_branch"
+				: args.servedEnvelopeIds.length === 0
+					? "empty_envelope:nothing_surfaced"
+					: null);
 
 	// The pool stage is EMPTY on the OOS branch — a different condition from the
 	// envelope's, so it carries its own reason rather than borrowing one.
 	const pool = args.trace ? postFilterRankedIdsFromTrace(args.trace) : null;
-	const mrrExcludedReason = noGold
-		? "no_gold_chunks:denominator_is_empty"
-		: pool === null
-			? `no_trace:${args.traceError ?? "unknown"}`
-			: pool.length === 0
-				? "oos_gate:no_eligible_pool"
-				: null;
+	const mrrExcludedReason =
+		args.hardErrorReason ??
+		(noGold
+			? "no_gold_chunks:denominator_is_empty"
+			: pool === null
+				? `no_trace:${args.traceError ?? "unknown"}`
+				: pool.length === 0
+					? "oos_gate:no_eligible_pool"
+					: null);
 
 	const env = args.servedEnvelopeIds ?? [];
 	return {
@@ -249,6 +264,75 @@ export function contextRecallAtK(
 	let hit = 0;
 	for (const id of goldIds) if (top.has(id)) hit++;
 	return hit / goldIds.size;
+}
+
+// ---------------------------------------------------------------------------
+// 1d. Judge-skip decisions for the GENERATION metrics (PR #8 fix round 3,
+// issue 1, BLOCKING). Pure functions, mirroring the scoreRetrievalStages /
+// kSweepExclusion pattern above, so the decision is unit-testable and a call
+// site cannot silently drift from it.
+//
+// THE BUG. `runBaseline` called `judgeRelevancyQuestions` UNCONDITIONALLY.
+// On the oos_or_guard branch the route emits a canonical constant with NO LLM
+// CALL AT ALL — that string is not model output — and the relevancy rubric
+// even instructs the judge to "write questions capturing what it refuses" for
+// a refusal. The reverse-engineered questions are about OUR boilerplate,
+// orthogonal to the user's actual question, so the cosine (and the score)
+// drops for a reason that has nothing to do with the model. Faithfulness and
+// citation-support had the mirror bug: a claim extracted from the OOS
+// constant against an EMPTY context (the route built no envelope) was
+// defended only by the judge correctly recognizing it as a meta-statement —
+// "judge-luck", not a guarantee.
+//
+// THE NUANCE THAT MATTERS. RAGAS's Response Relevancy legitimately scores a
+// *noncommittal LLM answer* low BY DESIGN — that is not a bug. The bug is
+// narrower: (a) on oos_or_guard the scored text is NOT model output at all,
+// and (b) there was no flag, no reason, and no companion row, so the number
+// silently disagreed with every neighbouring row's denominator. An
+// `llm_refusal` or `low_confidence` branch is the model GENUINELY speaking
+// (even if noncommittally) with a real envelope behind it — those are scored
+// as designed, never excluded here.
+
+/**
+ * Should the relevancy judge be skipped? Only when the route made NO LLM call
+ * at all (`sourcesIsNull` — the data-sources frame is absent iff no answerer
+ * call happened, per route.ts: every real generation call, even a refusal,
+ * emits the frame). NOT for a genuine model refusal, which RAGAS is entitled
+ * to score low on its own merits.
+ */
+export function relevancyExclusionReason(args: {
+	/** `answer.sources === null` — true iff the route never called the model. */
+	sourcesIsNull: boolean;
+	/** A hard-error label (guard-rejected / malformed) always wins — issue 2. */
+	hardError?: string | null;
+}): string | null {
+	if (args.hardError) return args.hardError;
+	if (args.sourcesIsNull) {
+		return "no_llm_call:oos_or_guard_branch:route_constant_is_not_model_output";
+	}
+	return null;
+}
+
+/**
+ * Should faithfulness / citation-support be judged, or structurally assigned
+ * `noClaims` without spending a token? Gated on the CONTEXT actually being
+ * empty — the literal condition that makes the judge call meaningless (there
+ * is nothing any claim could be inferable from), rather than on branch
+ * classification. This also correctly catches an `empty_envelope` item (sources
+ * present but the served envelope ended up with zero chunks), which
+ * branch-based gating alone would miss.
+ */
+export function noContextExclusionReason(args: {
+	/** Number of context chunks that would be shown to the judge. */
+	contextChunkCount: number;
+	/** A hard-error label (guard-rejected / malformed) always wins — issue 2. */
+	hardError?: string | null;
+}): string | null {
+	if (args.hardError) return args.hardError;
+	if (args.contextChunkCount === 0) {
+		return "empty_context:no_chunks_shown_to_the_model:nothing_any_claim_could_be_inferable_from";
+	}
+	return null;
 }
 
 // ---------------------------------------------------------------------------

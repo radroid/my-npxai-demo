@@ -57,6 +57,7 @@ import {
 	type AnswerResult,
 	askServer,
 	freeEncoder,
+	hardErrorReasonFor,
 	recordAnswerCost,
 	reserveAnswerCost,
 	serverReachable,
@@ -80,8 +81,11 @@ import {
 	readHeadroom,
 } from "./headroom";
 import {
+	type CitationSupportValue,
 	type ContextChunk,
+	type FaithfulnessValue,
 	type JudgeDeps,
+	type JudgeOutcome,
 	RUBRIC_VERSION,
 	judgeAnswerEquivalence,
 	judgeCitationSupport,
@@ -96,7 +100,9 @@ import {
 	cosineSimilarity,
 	kSweepExclusion,
 	mean,
+	noContextExclusionReason,
 	reciprocalRank,
+	relevancyExclusionReason,
 	scoreConsistency,
 	scoreEnvelopeAtK,
 	scoreParaphrasePair,
@@ -366,6 +372,11 @@ async function main(): Promise<void> {
 	const cap = costCapUsd();
 	const cost = new CostAccountant(cap);
 	const judgeErrors = newJudgeErrors();
+	// PR #8 fix round 3 (issue 2): guard-rejected / malformed responses are
+	// counted here, SEPARATELY from judge_errors and from any refusal branch —
+	// never as a refusal, never silently folded into an exclusion reason that
+	// implies legitimate route behaviour.
+	let hardErrors = 0;
 	const startedAt = new Date().toISOString();
 
 	console.log(
@@ -593,6 +604,9 @@ async function main(): Promise<void> {
 		},
 		golden_set: { path: GOLDEN_PATH, sha256: goldenHash, records: golden.length },
 		judge_errors: judgeErrors,
+		// Issue 2: guard-rejected / malformed responses, counted SEPARATELY from
+		// judge_errors and never folded into any refusal-branch count.
+		hard_errors: hardErrors,
 		cost: cost.snapshot(),
 		daily_cap_headroom: headroom,
 		// Issue 5: what we projected before the run vs what the counter said at
@@ -609,6 +623,10 @@ async function main(): Promise<void> {
 	console.log(
 		`\n--- judge errors ---\n  ${JSON.stringify(judgeErrors)}` +
 			"\n  (>5% of judged items in a category invalidates that category — Edge case 3)",
+	);
+	console.log(
+		`\n--- hard errors (guard-rejected / malformed — never scored as model behaviour) ---\n` +
+			`  ${hardErrors}`,
 	);
 	console.log(`\n${aborted ? "ABORTED" : "DONE"} — ${runLog.items()} items → ${runLog.dir}`);
 	freeEncoder();
@@ -663,6 +681,13 @@ async function main(): Promise<void> {
 			const envelopeIds = sources.map((s) => s.id);
 			const goldIds = new Set(rec.gold_chunks.map((g) => g.chunk_id));
 			const fallback = fallbackTaken(answer);
+			// PR #8 fix round 3 (issue 2). A guard-rejected (4xx) or malformed
+			// (empty 2xx, no sources frame) response is a HARD ERROR — never a
+			// refusal, never silently folded into the oos_or_guard exclusion
+			// reason below. `null` for a genuine "ok" response, which includes
+			// every real refusal branch (oos_or_guard / llm_refusal / etc).
+			const hardError = hardErrorReasonFor(answer);
+			if (hardError) hardErrors++;
 
 			// The trace supplies the stages the SSE frame cannot: the raw candidate
 			// pool and the MIN_CHUNK_SIM-eligible ranked pool (fix round 2, issue 2).
@@ -691,6 +716,10 @@ async function main(): Promise<void> {
 				servedEnvelopeIds: answer.sources === null ? null : envelopeIds,
 				trace,
 				traceError,
+				// Issue 2: a hard error (guard-rejected / malformed) excludes every
+				// retrieval metric under its OWN reason — never the oos_or_guard
+				// label a legitimate route refusal would carry.
+				hardErrorReason: hardError,
 			});
 			const { envelopeExcludedReason, mrrExcludedReason } = retrievalMetrics;
 			const envelopeMeasurable = envelopeExcludedReason === null;
@@ -725,42 +754,90 @@ async function main(): Promise<void> {
 			const judged = judgedText(answer);
 			const boilerplateStripped = judged !== answer.text;
 
-			const faith = await judgeFaithfulness(deps, {
-				question: rec.question,
-				answer: judged,
-				chunks: ctx,
+			// PR #8 fix round 3 (issue 1, BLOCKING). Faithfulness/citation-support
+			// need a non-empty CONTEXT to check claims against — that is their
+			// entire definition. `noContextExclusionReason` is the pure, tested
+			// gate: when it fires (empty context — the oos_or_guard branch always
+			// lands here, since it built no envelope — or a hard error), the judge
+			// call is skipped ENTIRELY and `noClaims` is asserted STRUCTURALLY
+			// rather than relying on the judge correctly recognizing the OOS
+			// constant as containing no verifiable claims ("judge-luck").
+			const faithExcludedReason = noContextExclusionReason({
+				contextChunkCount: ctx.length,
+				hardError,
 			});
-			if (!faith.ok) judgeErrors.faithfulness++;
+			const faith: JudgeOutcome<FaithfulnessValue> = faithExcludedReason
+				? {
+						ok: true,
+						value: { claims: [], score: null, noClaims: true },
+						reasons: `skipped structurally (fix round 3, issue 1): ${faithExcludedReason}`,
+						cached: false,
+					}
+				: await judgeFaithfulness(deps, {
+						question: rec.question,
+						answer: judged,
+						chunks: ctx,
+					});
+			if (!faithExcludedReason && !faith.ok) judgeErrors.faithfulness++;
 
-			const support = await judgeCitationSupport(deps, {
-				question: rec.question,
-				answer: judged,
-				chunks: ctx,
-			});
-			if (!support.ok) judgeErrors.citation_support++;
+			const support: JudgeOutcome<CitationSupportValue> = faithExcludedReason
+				? {
+						ok: true,
+						value: { claims: [], score: null, noClaims: true },
+						reasons: `skipped structurally (fix round 3, issue 1): ${faithExcludedReason}`,
+						cached: false,
+					}
+				: await judgeCitationSupport(deps, {
+						question: rec.question,
+						answer: judged,
+						chunks: ctx,
+					});
+			if (!faithExcludedReason && !support.ok) judgeErrors.citation_support++;
 
 			// RAGAS Response Relevancy: judge writes 3 questions from the answer,
-			// we embed them and score mean cosine vs the original question. Fed the
-			// raw text, the judge reverse-engineers a question ABOUT THE DISCLAIMER —
-			// which is orthogonal to the user's question, so the cosine (and the score)
-			// drops for a reason that has nothing to do with the model.
+			// we embed them and score mean cosine vs the original question.
+			//
+			// `relevancyExclusionReason` fires ONLY when the route made NO LLM call
+			// at all (`answer.sources === null` — oos_or_guard, or a hard error).
+			// The scored text there is a ROUTE CONSTANT, not model output, and the
+			// rubric even instructs the judge to "write questions capturing what it
+			// refuses" for a refusal — reverse-engineering a question about OUR
+			// boilerplate, orthogonal to the user's, dragging the cosine down for a
+			// reason that has nothing to do with the model. A GENUINE model
+			// refusal (llm_refusal / low_confidence) is NOT excluded here: RAGAS is
+			// entitled to score a noncommittal LLM answer low, by design — this fix
+			// preserves that, it does not blanket-exclude every refusal branch.
 			let relevancyRaw: number | null = null;
-			const rq = await judgeRelevancyQuestions(deps, {
-				question: rec.question,
-				answer: judged,
+			let rq: JudgeOutcome<string[]> | null = null;
+			let relevancyExcludedReason = relevancyExclusionReason({
+				sourcesIsNull: answer.sources === null,
+				hardError,
 			});
-			if (!rq.ok || !rq.value) {
-				judgeErrors.relevancy++;
-			} else {
-				const embs = await embedTexts(
-					rawOpenai,
-					cost,
-					[rec.question, ...rq.value],
-					`relevancy:${rec.question_id}`,
-				);
-				relevancyRaw = mean(
-					embs.slice(1).map((e) => cosineSimilarity(embs[0], e)),
-				);
+			// Full-denominator companion (issue 1): was the model actually
+			// INVOKED for this item, structurally — independent of whether the
+			// judge call that follows happens to fail. That is what makes the
+			// "no model output at all" exclusion visible in the report, the same
+			// shape as the citation/claim coverage companions.
+			const relevancyModelInvoked = relevancyExcludedReason === null;
+			if (!relevancyExcludedReason) {
+				rq = await judgeRelevancyQuestions(deps, {
+					question: rec.question,
+					answer: judged,
+				});
+				if (!rq.ok || !rq.value) {
+					judgeErrors.relevancy++;
+					relevancyExcludedReason = "judge_error";
+				} else {
+					const embs = await embedTexts(
+						rawOpenai,
+						cost,
+						[rec.question, ...rq.value],
+						`relevancy:${rec.question_id}`,
+					);
+					relevancyRaw = mean(
+						embs.slice(1).map((e) => cosineSimilarity(embs[0], e)),
+					);
+				}
 			}
 
 			const validity = scoreCitationValidity(judged, sources);
@@ -782,6 +859,11 @@ async function main(): Promise<void> {
 				},
 				http_status: answer.status,
 				latency_ms: answer.latencyMs,
+				// Issue 2: which of the three response shapes this was, and — when it
+				// was a hard error — why. Never conflated with fallback_taken, which
+				// only classifies genuine route/model behaviour.
+				response_kind: answer.kind,
+				hard_error_reason: hardError,
 				fallback_taken: fallback,
 				gold_chunk_ids: Array.from(goldIds),
 				retrieved: sources,
@@ -846,11 +928,24 @@ async function main(): Promise<void> {
 						: null,
 					answer_relevancy_raw: relevancyRaw,
 					answer_relevancy: relevancyRaw === null ? null : clamp01(relevancyRaw),
+					// null (EXCLUDED) only when the route made NO LLM call at all, or a
+					// hard error occurred, or the judge itself errored — never for a
+					// genuine model refusal, which RAGAS scores on its own merits
+					// (fix round 3, issue 1).
+					relevancy_excluded_reason: relevancyExcludedReason,
+					// FULL-denominator companion: 1 iff the model was actually invoked
+					// (structurally — independent of a later judge error), 0 for
+					// oos_or_guard / hard-error items. Makes the exclusion above visible
+					// in the report rather than silently disagreeing with every
+					// neighbouring row's denominator.
+					relevancy_measurable: relevancyModelInvoked ? 1 : 0,
 				},
 				judge: {
 					faithfulness: { ok: faith.ok, cached: faith.cached, reasons: faith.reasons, error: faith.error, claims: faith.value?.claims },
 					citation_support: { ok: support.ok, cached: support.cached, reasons: support.reasons, error: support.error, claims: support.value?.claims },
-					relevancy: { ok: rq.ok, cached: rq.cached, reasons: rq.reasons, error: rq.error, questions: rq.value },
+					relevancy: rq
+						? { ok: rq.ok, cached: rq.cached, reasons: rq.reasons, error: rq.error, questions: rq.value }
+						: { ok: true, cached: false, reasons: relevancyExcludedReason ?? undefined, error: undefined, questions: undefined },
 				},
 				timestamp: new Date().toISOString(),
 				cost_so_far_usd: cost.totalUsd(),
@@ -986,6 +1081,11 @@ async function main(): Promise<void> {
 				reserveAnswer(cost, rec.question, label);
 				const a = await askServer(rec.question);
 				await chargeAnswer(supabase, cost, a, rec.question, label);
+				// Issue 2: a hard-error repeat is counted separately, never as a
+				// refusal — it already lands in `noEnvelope` below (sources===null)
+				// and is excluded by scoreConsistency's existing discipline, so this
+				// is a count for the operator, not a scoring change.
+				if (hardErrorReasonFor(a)) hardErrors++;
 				runs.push(a);
 			}
 			// ISSUE 4: compare the MODEL's output, not the route's boilerplate. The
@@ -1048,6 +1148,12 @@ async function main(): Promise<void> {
 				runs: runs.map((a, idx) => ({
 					repeat: idx,
 					http_status: a.status,
+					// Issue 2: logged per-repeat for diagnosability — a hard error
+					// (guard-rejected / malformed) already lands in `noEnvelope` via
+					// `a.sources === null` and is excluded by scoreConsistency's
+					// existing discipline, but this makes the WHY visible per repeat
+					// rather than inferred solely from an empty citation set.
+					response_kind: a.kind,
 					latency_ms: a.latencyMs,
 					answer: a.text,
 					judged_answer: judgedRuns[idx],
@@ -1109,6 +1215,9 @@ async function main(): Promise<void> {
 			reserveAnswer(cost, rec.question, canonLabel);
 			const canonical = await askServer(rec.question);
 			await chargeAnswer(supabase, cost, canonical, rec.question, canonLabel);
+			// Issue 2: counted separately, never as a refusal — see the consistency
+			// experiment's identical comment.
+			if (hardErrorReasonFor(canonical)) hardErrors++;
 			const canonicalIds = new Set(sourcesOf(canonical).map((s) => s.id));
 			// ISSUE 4: the route's disclaimer is boilerplate, not model output — strip
 			// it before any comparison or judgement.
@@ -1121,6 +1230,7 @@ async function main(): Promise<void> {
 				reserveAnswer(cost, p.question, `paraphrase:${p.paraphrase_id}`);
 				const a = await askServer(p.question);
 				await chargeAnswer(supabase, cost, a, p.question, `paraphrase:${p.paraphrase_id}`);
+				if (hardErrorReasonFor(a)) hardErrors++;
 				const ids = new Set(sourcesOf(a).map((s) => s.id));
 				const pJudged = judgedText(a);
 
@@ -1169,6 +1279,8 @@ async function main(): Promise<void> {
 					paraphrase_id: p.paraphrase_id,
 					question: p.question,
 					http_status: a.status,
+					// Issue 2: logged for diagnosability, same reasoning as consistency.
+					response_kind: a.kind,
 					answer: a.text,
 					judged_answer: pJudged,
 					retrieved: sourcesOf(a),
@@ -1199,6 +1311,7 @@ async function main(): Promise<void> {
 				models: { answerer: ANSWERER_MODEL, judge: judgeModel() },
 				canonical: {
 					answer: canonical.text,
+					response_kind: canonical.kind,
 					judged_answer: canonicalJudged,
 					retrieved: sourcesOf(canonical),
 					citation_set: canonicalCitations,
@@ -1227,12 +1340,31 @@ async function main(): Promise<void> {
 			reserveAnswer(cost, probe.question, `negative:${probe.probe_id}`);
 			const a = await askServer(probe.question);
 			await chargeAnswer(supabase, cost, a, probe.question, `negative:${probe.probe_id}`);
+			// Issue 2: a guard-rejected 4xx is a DELIBERATELY-MODELLED case here
+			// (Edge case 4 / R7 metric 7 — scoreRejection below already scores it a
+			// rejection SUCCESS), so it is NOT counted as a hard error for this
+			// experiment. A malformed 2xx (empty stream) genuinely is one — it is
+			// already excluded (not scored) by scoreRejection's existing
+			// discipline; this just makes it a counted, operator-visible category.
+			if (a.kind === "malformed") hardErrors++;
 			// Markers come from lib/prompts.ts now — no re-derived sentinels (issue 2).
 			const verdict = scoreRejection({
 				status: a.status,
 				text: a.text,
 				hasSourcesFrame: a.sources !== null,
 			});
+			// PR #8 fix round 3 (issue 3 — consistency nit). baseline logs
+			// `citations: extractCitations(judged)` — the STRIPPED text — but this
+			// used to log `extractCitations(a.text)`, the RAW text, inconsistent
+			// with round 2's "every citation extractor reads stripped text". A
+			// probe that trips the low-similarity disclaimer (still possible for
+			// an OOC probe that embeds close enough to answer weakly) would have
+			// the disclaimer sentence itself scanned for a citation pattern it can
+			// never contain — harmless today, but a citation extractor reading raw
+			// text is exactly the class of bug round 2 stamped out elsewhere.
+			// `scoreRejection` above is the ONE exception and must keep the RAW
+			// text — it exists to detect the route's own disclaimer/refusal lines.
+			const negJudged = judgedText(a);
 			runLog.append({
 				experiment: "negative",
 				probe_id: probe.probe_id,
@@ -1242,9 +1374,15 @@ async function main(): Promise<void> {
 				models: { answerer: ANSWERER_MODEL },
 				http_status: a.status,
 				latency_ms: a.latencyMs,
+				// Issue 2: which of the three response shapes this was — a
+				// guard-rejected 4xx is already scored a rejection SUCCESS below
+				// (Edge case 4 / R7 metric 7), never conflated with an LLM-level
+				// refusal; logged here for diagnosability.
+				response_kind: a.kind,
 				answer: a.text,
+				judged_answer: negJudged,
 				retrieved: sourcesOf(a),
-				citations: extractCitations(a.text),
+				citations: extractCitations(negJudged),
 				metrics: {
 					// null = EXCLUDED (a 200 that streamed no text is not a refusal and
 					// not an answer — scoring it 0 would be a false FAILURE that drags the

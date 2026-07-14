@@ -530,3 +530,128 @@ reachable from a reported metric — every call site now guards them — but the
 future caller and are called out here rather than left to be rediscovered. Judge-error rate
 >5% still invalidates a category by convention (Edge case 3); it is counted in the manifest and
 printed, but not machine-enforced.
+
+### Fix round 3
+
+Applied against the final adversarial review, which **approved the wallet/cost machinery
+outright (0/5 refuters)** — untouched in this round — and found two BLOCKING defects plus one
+consistency nit. Both blocking findings are the same class of bug rounds 1-2 spent themselves
+stamping out (a metric reporting a number for the wrong reason, in either direction), just in
+two spots those rounds had not reached yet: the ONE generation metric with no exclusion path
+(answer relevancy), and the framework's first-ever live HTTP contact (which had literally never
+happened before this slice). Each fix carries a regression test in `scripts/test-rag-eval.ts`
+(§§21-23) that was **mutation-tested**: the fix was reverted, the suite was confirmed RED, the
+fix was restored. 6/6 targeted mutations caught (two per blocking issue, one for the nit).
+
+1. **Answer relevancy had no exclusion path — the last metric with a silent vacuous score
+   (BLOCKING).** `runBaseline` called `judgeRelevancyQuestions` UNCONDITIONALLY. On the
+   `oos_or_guard` branch the route emits a canonical constant with **no LLM call at all** — that
+   string is not model output — and the relevancy rubric literally instructs the judge to "write
+   questions capturing what it refuses" for a refusal. The reverse-engineered questions are about
+   OUR boilerplate, orthogonal to the user's actual question, so the cosine (and therefore the
+   score) drops for a reason that has nothing to do with the model. `answer_relevancy` was never
+   `null` for this case, never carried an exclusion reason, and had no coverage companion — the
+   exact mirror of round 1's citation-validity bug, in a metric round 1 never reached.
+   **The nuance that made this fix non-trivial**: RAGAS's Response Relevancy legitimately scores
+   a *noncommittal LLM answer* low BY DESIGN — that is not a bug, and blanket-excluding every
+   refusal branch would have thrown that honest signal away. The fix is narrower than "exclude
+   refusals": `relevancyExclusionReason()` (`scripts/rag-eval/metrics.ts`) fires **only** when
+   `answer.sources === null` — i.e. the route made no LLM call at all (`oos_or_guard`, or a hard
+   error from issue 2 below). A genuine model refusal (`llm_refusal` / `low_confidence`) is a
+   real envelope, a real completion call, and a real noncommittal answer — RAGAS is entitled to
+   score that low on its own merits, and this fix does not touch it. `runBaseline` now skips the
+   judge call entirely on the excluded path (saving the spend), logs `relevancy_excluded_reason`,
+   and `report.ts` gained a full-denominator **"Answer relevancy coverage"** row — the same
+   shape as the existing citation/claim coverage companions — so the exclusion is visible, never
+   silent.
+   **Swept the same bug, made structural, in faithfulness/citation-support.** On `oos_or_guard`
+   the served envelope is empty, so `runBaseline` was still calling `judgeFaithfulness` /
+   `judgeCitationSupport` with an EMPTY context and the OOS constant as the "answer" — defended
+   only by the judge correctly recognizing that string as a meta-statement with zero claims
+   ("judge-luck", not a guarantee — nothing in the code made it true). `noContextExclusionReason()`
+   gates both calls on the context actually being empty (`ctx.length === 0`, a more general and
+   more honest condition than branch-matching — it also correctly catches an `empty_envelope`
+   item, which round 1/2's `oos_or_guard`-only reasoning would have missed) and, when it fires,
+   assigns `{claims: [], score: null, noClaims: true}` **without spending a token**. The judge is
+   no longer asked a question whose only defensible answer is structurally forced.
+
+2. **The framework did not fail loudly on first live contact (BLOCKING).** `askServer` threw
+   ONLY on 429. Every other non-2xx (500, 502, an empty body, malformed SSE, a guard error JSON)
+   fell through to `parseStream()` and was scored as MODEL BEHAVIOUR: an empty body parses to
+   `{text:"", sources:null}`, indistinguishable downstream from the `oos_or_guard` branch's
+   canonical refusal — so a genuine server outage got LAUNDERED into a "rejection success" or a
+   "retrieval not measurable" exclusion, i.e. a plausible-looking number instead of the error it
+   actually was. Nothing in this PR had EVER made a live HTTP request before slice 2.2, which made
+   this the single highest-risk residual named by the review. Fixed with a three-way
+   classification (`ResponseKind` in `scripts/rag-eval/answer.ts`):
+   - **5xx → loud abort.** `askServer` now throws `ServerFailureError` (message names the status
+     and the response body) on ANY 5xx, before `parseStream` ever runs. This is a transport/server
+     failure, not a deliberately-modelled outcome — it aborts the run exactly as 429 already did,
+     rather than risk scoring an outage as a refusal.
+   - **4xx (excl. 429) → `"guard_rejected"`, its own counted category.** The route's request-
+     boundary validation rejection is a deliberately-modelled outcome for the negative experiment
+     (Edge case 4 / R7 metric 7 already score any 4xx as a rejection success) but it is NOT a
+     model refusal. It is returned, not thrown, and tagged distinctly so no downstream consumer
+     mistakes it for `oos_or_guard`'s canonical-text-no-sources shape.
+   - **2xx with no text and no sources frame → `"malformed"`.** Every genuine route behaviour —
+     a normal answer, an LLM refusal, the low-confidence line, the limited-context disclaimer,
+     and the `oos_or_guard` canonical constant — emits NON-EMPTY text. Empty text is therefore
+     never a legitimate "the model said nothing"; it is a stream that produced nothing (upstream
+     stall, truncated proxy response), a failure, not an empty answer.
+   `hardErrorReasonFor()` maps `guard_rejected` / `malformed` to a labelled, counted "hard error"
+   — never a refusal, never silently folded into an exclusion reason that implies legitimate
+   route behaviour. `runBaseline` threads it into `scoreRetrievalStages` (extended with an
+   optional `hardErrorReason` param that overrides BOTH exclusion reasons — a hard error means we
+   do not know what, if anything, the server retrieved) and into the relevancy/faithfulness skip
+   reasons above, so a guard-rejected or malformed item is never mislabeled `oos_or_guard_branch`.
+   Hard errors are counted in the manifest (`hard_errors`), printed in the run summary, and
+   `report.ts` gained a dedicated **"Hard errors"** row plus a corrected **"Route branch
+   census"** (a hard error is its own bucket, never folded into `normal_answer`) and a
+   **"False-rejection rate"** that now excludes hard-error items from its denominator (a server
+   failure is neither "answered" nor "refused"). `runConsistency` / `runParaphrase` log
+   `response_kind` per repeat/side for diagnosability; a 4xx/malformed repeat there still lands in
+   round 2's existing exclude-with-reason discipline (`noEnvelope` / `citationSetKey === null`) —
+   see Residual risks below for the honest scope of that.
+
+3. **Consistency nit — `runNegative` read RAW text where every other citation extractor reads
+   stripped text.** `runNegative` logged `citations: extractCitations(a.text)` while baseline
+   logs `citations: extractCitations(judged)` — inconsistent with round 2's "every citation
+   extractor reads stripped text" (issue 4). Fixed: `runNegative` now derives `negJudged =
+   judgedText(a)` and logs `extractCitations(negJudged)`. `scoreRejection` is the one documented
+   exception (`lib/prompts.ts`'s `stripLimitedContextPrefix` doc comment says so explicitly) and
+   keeps reading `a.text` — it exists to detect the route's own disclaimer/refusal lines, which
+   stripping would hide. §23's symmetry test forces a negative-probe-shaped answer through the
+   limited-context branch and pins both the fixed call site and the scoreRejection exception.
+
+**What rounds 1-2 got wrong, corrected here.** Round 1 (fix 4) said "our own boilerplate never
+reaches a judge" — true for the `limited_context` disclaimer (issue 4's target), **false** for
+the `oos_or_guard` constant feeding the relevancy/faithfulness judges unconditionally, which this
+round fixes. Round 1/2's framing of "the framework fails loudly" (issue 4b / the cost-cap
+finalize-path fix) was about COST CAP aborts specifically; it was never true of a live HTTP
+failure, because nothing had made a live HTTP call yet. Issue 2 above is the first time that
+claim is actually exercised end-to-end.
+
+**Report honesty (round 3 additions).** Two new companion rows (`Answer relevancy coverage`,
+`Hard errors`), a corrected `Route branch census`, and a hard-error-aware `False-rejection rate`
+denominator. `hard_errors` joins `judge_errors` in the manifest and the cost appendix table.
+
+**Residual risks (stated, not hidden — an honest answer to "could a number still be wrong?").**
+- A guard-rejected (4xx) or malformed (empty-body) repeat inside `consistency` or a side inside
+  `paraphrase` is excluded via round 2's existing `noEnvelope` / `citationSetKey === null`
+  discipline, which is CORRECT (never scored as a pass or a fail) but whose reason STRING still
+  says `"no_llm_call_in_any_repeat:guard_or_oos_gate_..."` even when the true cause was a hard
+  error, not the guard/OOS gate. The number is never wrong; the prose next to it can be
+  imprecise in this one narrow case. `response_kind` is now logged per repeat/side specifically
+  so an operator can tell the difference by inspecting the item log. Not fixed structurally here
+  to avoid rewiring `scoreConsistency`/`scoreParaphrasePair`'s reason taxonomy for a case that,
+  post-issue-2, can only be a 4xx/malformed repeat mixed among otherwise-successful ones (a 5xx
+  anywhere in the run now aborts the whole run before this code path is reached at all).
+- `runKSweep` never calls `askServer` (it is embeddings-only, offline, per R10) — none of issue
+  2's HTTP classification applies there; it was already correctly scoped in round 2.
+- The judge itself can still be wrong within its own rubric (position/verbosity bias mitigations
+  are prompted, not proven); Edge case 3's >5% judge-error threshold is still enforced by
+  convention, not machine-checked, unchanged from round 2.
+- `chargeAnswer`/the cost accountant were explicitly NOT touched this round (review approved
+  0/5) — a hard-error item still reserves/charges the worst-case answerer estimate before the
+  response classification is known, same as before; this is a wallet-safety over-charge, not an
+  under-charge, and is out of scope for a 0/5-approved subsystem.

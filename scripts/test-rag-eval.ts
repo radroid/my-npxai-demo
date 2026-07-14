@@ -51,7 +51,9 @@ import {
 } from "./rag-eval/config";
 import {
 	SNIPPET_TO_FULL_CHUNK_FACTOR,
+	askServer,
 	countTokens,
+	hardErrorReasonFor,
 	recordAnswerCost,
 	reserveAnswerCost,
 	serverEmbeddingInputTokens,
@@ -84,7 +86,12 @@ import {
 	headroomBlocksRun,
 	projectDailyCapCalls,
 } from "./rag-eval/headroom";
-import { type JudgeDeps, judgeFaithfulness, judged } from "./rag-eval/judge";
+import {
+	type FaithfulnessValue,
+	type JudgeDeps,
+	judgeFaithfulness,
+	judged,
+} from "./rag-eval/judge";
 import {
 	REFUSAL_BRANCHES,
 	RETRIEVAL_METRIC_STAGE,
@@ -98,8 +105,10 @@ import {
 	jaccard,
 	kSweepExclusion,
 	mean,
+	noContextExclusionReason,
 	normalizeText,
 	reciprocalRank,
+	relevancyExclusionReason,
 	scoreConsistency,
 	scoreEnvelopeAtK,
 	scoreParaphrasePair,
@@ -1783,6 +1792,403 @@ check(
 	claimRow("Cited-claim coverage").measured === "50.0%" &&
 		claimRow("Cited-claim coverage").n === "2",
 	claimRow("Cited-claim coverage"),
+);
+
+// ---------------------------------------------------------------------------
+section(
+	"21. Issue 2 (round 3, BLOCKING) — askServer fails LOUDLY on transport/server " +
+		"failure, never launders it into a score",
+);
+
+// THE BUG. askServer threw ONLY on 429. Any other non-2xx (500, 502, an empty
+// body, malformed SSE, a guard error JSON) fell through to parseStream() and
+// was scored as MODEL BEHAVIOUR: an empty body parses to {text:"",
+// sources:null}, indistinguishable downstream from the oos_or_guard branch's
+// canonical refusal. This framework had NEVER made a live HTTP request before
+// slice 2.2 — an outage on first contact would have quietly become a
+// plausible-looking eval number instead of an error.
+
+const REAL_FETCH_STUB = globalThis.fetch;
+async function withFetch<T>(
+	status: number,
+	body: string,
+	fn: () => Promise<T>,
+): Promise<T> {
+	globalThis.fetch = (async () =>
+		new Response(body, { status })) as unknown as typeof fetch;
+	try {
+		return await fn();
+	} finally {
+		globalThis.fetch = REAL_FETCH_STUB;
+	}
+}
+
+let threw500 = false;
+let caught500: Error | undefined;
+await withFetch(
+	500,
+	'{"error":"internal_error","message":"Retrieval failed."}',
+	async () => {
+		try {
+			await askServer("what is the panel walkdown requirement?");
+		} catch (err) {
+			threw500 = true;
+			caught500 = err as Error;
+		}
+	},
+);
+check(
+	"a 500 (server failure) THROWS — it is never scored as model behaviour (the bug)",
+	threw500 && caught500?.name === "ServerFailureError",
+	caught500?.message,
+);
+check(
+	"…and the error names the STATUS and BODY so the operator knows the server broke",
+	(caught500?.message ?? "").includes("HTTP 500") &&
+		(caught500?.message ?? "").includes("Retrieval failed"),
+	caught500?.message,
+);
+
+let threw502 = false;
+await withFetch(502, "<html>Bad Gateway</html>", async () => {
+	try {
+		await askServer("q");
+	} catch {
+		threw502 = true;
+	}
+});
+check("ANY 5xx throws, not just 500 (a bare proxy 502 is still a server failure)", threw502);
+
+let threw429 = false;
+await withFetch(429, '{"error":"rate_limited"}', async () => {
+	try {
+		await askServer("q");
+	} catch (err) {
+		threw429 = (err as Error).name === "RateLimitedError";
+	}
+});
+check(
+	"429 still throws RateLimitedError — unchanged, the pre-existing deliberately-modelled case",
+	threw429,
+);
+
+const guardRejected = await withFetch(
+	400,
+	'{"error":"validation","message":"Query is required."}',
+	() => askServer("q"),
+);
+check(
+	"a 4xx (guard rejection) does NOT throw — a deliberately-modelled PER-ITEM outcome",
+	guardRejected.kind === "guard_rejected" && guardRejected.status === 400,
+	guardRejected,
+);
+
+const malformedResult = await withFetch(200, "", () => askServer("q"));
+check(
+	"a 200 with NO text and NO sources frame is MALFORMED, not an empty answer (the bug's other half)",
+	malformedResult.kind === "malformed" &&
+		malformedResult.text === "" &&
+		malformedResult.sources === null,
+	malformedResult,
+);
+
+const okRefusalSse = `data: ${JSON.stringify({ type: "text-delta", delta: KNOWLEDGE_HUB_OUT_OF_SCOPE })}\n`;
+const okRefusal = await withFetch(200, okRefusalSse, () => askServer("q"));
+check(
+	"a GENUINE oos_or_guard refusal (non-empty canonical text, no sources) is kind 'ok', NOT malformed",
+	okRefusal.kind === "ok" && okRefusal.text.length > 0 && okRefusal.sources === null,
+	okRefusal,
+);
+
+const okNormalSse =
+	`data: ${JSON.stringify({ type: "text-delta", delta: "Licensees shall X [REGDOC-2.3.4 §3.2]." })}\n` +
+	`data: ${JSON.stringify({
+		type: "data-sources",
+		data: { chunks: [{ id: 1, regdoc_id: "REGDOC-2.3.4", section_number: "3.2", similarity: 0.8, snippet: "…" }] },
+	})}\n`;
+const okNormal = await withFetch(200, okNormalSse, () => askServer("q"));
+check(
+	"a normal 200 answer with a sources frame is kind 'ok'",
+	okNormal.kind === "ok" && okNormal.sources?.length === 1,
+);
+
+// hardErrorReasonFor — the mapping from ResponseKind to a counted, never-a-refusal label.
+check(
+	"hardErrorReasonFor: 'ok' → null (nothing to flag, including a genuine oos_or_guard refusal)",
+	hardErrorReasonFor({ kind: "ok", status: 200 }) === null,
+);
+const guardReason = hardErrorReasonFor({ kind: "guard_rejected", status: 400 });
+check(
+	"hardErrorReasonFor: guard_rejected names the HTTP status and is NEVER mislabeled oos_or_guard",
+	guardReason?.includes("guard_rejected_http_400") === true && !guardReason?.includes("oos_or_guard"),
+	guardReason,
+);
+const malformedReason = hardErrorReasonFor({ kind: "malformed", status: 200 });
+check(
+	"hardErrorReasonFor: malformed names itself distinctly too",
+	malformedReason?.includes("malformed_response") === true,
+	malformedReason,
+);
+
+// scoreRetrievalStages: a hard error excludes EVERY retrieval metric under its
+// OWN reason — never the oos_or_guard label a legitimate route refusal carries.
+const hardErrorScores = scoreRetrievalStages({
+	goldIds: new Set([1]),
+	k: 8,
+	servedEnvelopeIds: null,
+	trace: null,
+	hardErrorReason: guardReason,
+});
+check(
+	"scoreRetrievalStages: a hard error excludes every metric (never scored, never a refusal)",
+	hardErrorScores.hit_rate_at_k === null &&
+		hardErrorScores.context_recall_at_k === null &&
+		hardErrorScores.context_precision_at_k === null &&
+		hardErrorScores.reciprocal_rank === null,
+	hardErrorScores,
+);
+check(
+	"…under its OWN reason, never mislabeled 'oos_or_guard_branch' (THE LAUNDERING BUG, made executable)",
+	hardErrorScores.envelopeExcludedReason?.startsWith("hard_error:") === true &&
+		!hardErrorScores.envelopeExcludedReason?.includes("oos_or_guard_branch") &&
+		hardErrorScores.mrrExcludedReason?.startsWith("hard_error:") === true,
+	hardErrorScores,
+);
+// The pre-existing oos_or_guard path is UNCHANGED when no hard error is present.
+const legitOosScores = scoreRetrievalStages({
+	goldIds: new Set([1]),
+	k: 8,
+	servedEnvelopeIds: null,
+	trace: null,
+});
+check(
+	"…while a GENUINE oos_or_guard item (no hardErrorReason given) still carries its own label",
+	legitOosScores.envelopeExcludedReason === "no_envelope_emitted:oos_or_guard_branch",
+	legitOosScores,
+);
+
+// The call sites: run.ts must actually WIRE hardErrorReasonFor into
+// scoreRetrievalStages, not merely define the function.
+const RUN_SRC5 = readSrc("scripts/rag-eval/run.ts");
+check(
+	"run.ts computes a hard-error label right after the server response",
+	RUN_SRC5.includes("const hardError = hardErrorReasonFor(answer)"),
+);
+check(
+	"…and threads it into scoreRetrievalStages (never silently drifting to the oos_or_guard reason)",
+	RUN_SRC5.includes("hardErrorReason: hardError"),
+);
+check(
+	"askServer itself throws on 5xx before parseStream ever runs",
+	readSrc("scripts/rag-eval/answer.ts").includes(
+		"if (res.status >= 500) throw new ServerFailureError(res.status, raw);",
+	),
+);
+check(
+	"…and tags a 4xx 'guard_rejected' distinctly from a 2xx malformed response",
+	readSrc("scripts/rag-eval/answer.ts").includes('kind: "guard_rejected"') &&
+		readSrc("scripts/rag-eval/answer.ts").includes(
+			"const malformed = parsed.text.trim() === \"\" && parsed.sources === null;",
+		),
+);
+
+// ---------------------------------------------------------------------------
+section(
+	"22. Issue 1 (round 3, BLOCKING) — relevancy must not judge a ROUTE CONSTANT " +
+		"as model output; faithfulness/citation-support must not rely on judge-luck",
+);
+
+// THE BUG. judgeRelevancyQuestions was called UNCONDITIONALLY. On oos_or_guard
+// the scored text is a ROUTE CONSTANT — no LLM call was made at all — and the
+// rubric literally tells the judge to "write questions capturing what it
+// refuses" for a refusal, reverse-engineering a question about OUR
+// boilerplate, orthogonal to the user's actual question.
+//
+// THE NUANCE THAT MATTERS. RAGAS's Response Relevancy legitimately scores a
+// *noncommittal LLM answer* low BY DESIGN — that is not a bug, and this fix
+// must not blanket-exclude every refusal branch. llm_refusal / low_confidence
+// are the model GENUINELY speaking (even if noncommittally), with a real
+// envelope behind them, and are scored exactly as before.
+
+check(
+	"relevancyExclusionReason: oos_or_guard (sourcesIsNull=true, no LLM call) IS excluded",
+	relevancyExclusionReason({ sourcesIsNull: true }) !== null,
+);
+check(
+	"…and the reason names it a route constant, never a 'judge error'",
+	relevancyExclusionReason({ sourcesIsNull: true })?.includes(
+		"route_constant_is_not_model_output",
+	) === true,
+);
+check(
+	"relevancyExclusionReason: a GENUINE model answer (sources present) is NOT excluded " +
+		"(preserves honest RAGAS semantics — the critical nuance)",
+	relevancyExclusionReason({ sourcesIsNull: false }) === null,
+);
+check(
+	"…true even when that model answer IS a refusal (llm_refusal / low_confidence) — " +
+		"RAGAS scores those low BY DESIGN, this fix does not exclude them",
+	relevancyExclusionReason({ sourcesIsNull: false, hardError: null }) === null,
+);
+check(
+	"relevancyExclusionReason: a hard error (issue 2) always wins over sourcesIsNull",
+	relevancyExclusionReason({ sourcesIsNull: false, hardError: "hard_error:x" }) === "hard_error:x",
+);
+
+check(
+	"noContextExclusionReason: an EMPTY context (0 chunks) is excluded structurally",
+	noContextExclusionReason({ contextChunkCount: 0 })?.includes("empty_context") === true,
+);
+check(
+	"noContextExclusionReason: a non-empty context is judged normally",
+	noContextExclusionReason({ contextChunkCount: 3 }) === null,
+);
+check(
+	"noContextExclusionReason: a hard error always wins",
+	noContextExclusionReason({ contextChunkCount: 5, hardError: "hard_error:y" }) === "hard_error:y",
+);
+
+// The structural skip outcome run.ts constructs — noClaims=true / score=null,
+// NEVER a judged 0. This is what eliminates "judge-luck": the OOS constant no
+// longer needs the judge to correctly recognize it as a meta-statement.
+const structuralFaith: FaithfulnessValue = { claims: [], score: null, noClaims: true };
+check(
+	"the structural skip outcome is noClaims=true / score=null (never a judged/guessed 0)",
+	structuralFaith.noClaims === true && structuralFaith.score === null,
+);
+
+// The call sites. run.ts must GATE all three judge calls on these functions —
+// not merely define them and never wire them in.
+check(
+	"run.ts gates faithfulness/citation-support on noContextExclusionReason",
+	RUN_SRC5.includes("const faithExcludedReason = noContextExclusionReason({"),
+);
+check(
+	"…judgeFaithfulness is called ONLY inside the non-excluded ternary branch, never unconditionally",
+	!RUN_SRC5.includes("const faith = await judgeFaithfulness") &&
+		RUN_SRC5.includes(": await judgeFaithfulness(deps, {"),
+);
+check(
+	"…judgeCitationSupport is gated the same way",
+	!RUN_SRC5.includes("const support = await judgeCitationSupport") &&
+		RUN_SRC5.includes(": await judgeCitationSupport(deps, {"),
+);
+check(
+	"run.ts gates relevancy on relevancyExclusionReason, keyed on `answer.sources === null` " +
+		"(the CRITICAL fix — issue 1)",
+	RUN_SRC5.includes("relevancyExcludedReason = relevancyExclusionReason({") &&
+		RUN_SRC5.includes("sourcesIsNull: answer.sources === null"),
+);
+check(
+	"…judgeRelevancyQuestions is called ONLY inside the exclusion gate, never unconditionally " +
+		"(the original bug: `const rq = await judgeRelevancyQuestions(...)` with no guard)",
+	!RUN_SRC5.includes("const rq = await judgeRelevancyQuestions") &&
+		RUN_SRC5.includes("rq = await judgeRelevancyQuestions"),
+);
+
+// Full-denominator companions make every exclusion visible in the report,
+// the same shape as the existing citation/claim coverage rows.
+check(
+	"run.ts logs a relevancy_measurable companion (full denominator, issue 1)",
+	RUN_SRC5.includes("relevancy_measurable: relevancyModelInvoked ? 1 : 0"),
+);
+const REPORT_SRC = readSrc("scripts/rag-eval/report.ts");
+check(
+	"report.ts carries the 'Answer relevancy coverage' companion row",
+	REPORT_SRC.includes("relevancy_measurable") &&
+		REPORT_SRC.includes("Answer relevancy coverage"),
+);
+check(
+	"report.ts also carries the 'Hard errors' counted category (issue 2)",
+	REPORT_SRC.includes("Hard errors (guard-rejected / malformed"),
+);
+
+// rowsFor: a synthetic baseline run where one item is a genuine oos_or_guard
+// refusal (relevancy excluded, coverage=0) and one is a normal answer
+// (relevancy scored, coverage=1) — the companion row must show n=2, 50%,
+// never silently agreeing with the "Answer relevancy" row's smaller n.
+const relevancyRun = {
+	dir: "fixture",
+	manifest: {
+		experiment: "baseline",
+		aborted: false,
+		items: 2,
+		prompt_version: "test",
+		models: {},
+		judge_errors: {},
+		cost: { capUsd: 2, totalUsd: 0, byKind: {} },
+		golden_set: { sha256: "x", records: 2 },
+	},
+	items: [
+		{ fallback_taken: null, metrics: { answer_relevancy: 0.9, relevancy_measurable: 1 } },
+		// oos_or_guard: no LLM call, relevancy excluded — NOT scored 0.
+		{ fallback_taken: "oos_or_guard", metrics: { answer_relevancy: null, relevancy_measurable: 0 } },
+	],
+} as unknown as Parameters<typeof rowsFor>[0];
+const relevancyRows = rowsFor(relevancyRun);
+const relevancyRow = (c: string): Row =>
+	relevancyRows.find((r) => r.category.startsWith(c)) as Row;
+check(
+	"Answer relevancy = 90% over n=1 — the oos_or_guard item is EXCLUDED, not scored 0",
+	relevancyRow("Answer relevancy").measured === "90.0%" && relevancyRow("Answer relevancy").n === "1",
+	relevancyRow("Answer relevancy"),
+);
+check(
+	"…and the coverage companion (n=2, 50%) is what makes that exclusion visible",
+	relevancyRow("Answer relevancy coverage").measured === "50.0%" &&
+		relevancyRow("Answer relevancy coverage").n === "2",
+	relevancyRow("Answer relevancy coverage"),
+);
+
+// ---------------------------------------------------------------------------
+section(
+	"23. Issue 3 (round 3) — every extractCitations call site reads STRIPPED " +
+		"text (consistency nit + symmetry test)",
+);
+
+// THE BUG. runNegative logged `citations: extractCitations(a.text)` on the RAW
+// text while baseline used `extractCitations(judged)` — inconsistent with
+// round 2's "every citation extractor reads stripped text". Force the
+// limited-context branch on a negative-probe-shaped answer and assert the
+// negative experiment's citation extraction now reads the SAME
+// stripped/judged text baseline does.
+
+const NEG_MODEL_ANSWER = "The NRC (a US body) is out of scope [REGDOC-2.3.4 §3.2].";
+const NEG_WITH_DISCLAIMER = `${KNOWLEDGE_HUB_LIMITED_CONTEXT}${NEG_MODEL_ANSWER}`;
+
+check(
+	"a limited-context-prefixed probe answer strips to the model's own citation-bearing text",
+	stripLimitedContextPrefix(NEG_WITH_DISCLAIMER) === NEG_MODEL_ANSWER,
+);
+check(
+	"extractCitations over the STRIPPED text finds exactly the model's citation",
+	extractCitations(stripLimitedContextPrefix(NEG_WITH_DISCLAIMER)).length === 1,
+);
+
+// The property that actually matters: run.ts's negative-experiment citation
+// LOG must read the JUDGED (stripped) text, matching baseline's own pattern —
+// not the raw text.
+check(
+	"run.ts's negative-experiment citation log reads the JUDGED (stripped) text, matching baseline",
+	RUN_SRC5.includes("const negJudged = judgedText(a)") &&
+		RUN_SRC5.includes("citations: extractCitations(negJudged)"),
+);
+check(
+	"…and no longer reads the RAW text for this field (the round-3 inconsistency, fixed)",
+	!RUN_SRC5.includes("citations: extractCitations(a.text)"),
+);
+// scoreRejection is the ONE documented exception — it exists to detect the
+// route's own disclaimer/refusal lines and must keep seeing RAW text. Already
+// pinned in §19; re-asserted here for locality to this fix.
+check(
+	"…while scoreRejection (which must see the route's own lines) still reads RAW text",
+	RUN_SRC5.includes('const verdict = scoreRejection({\n\t\t\t\tstatus: a.status,\n\t\t\t\ttext: a.text,'),
+);
+// Baseline's own call site is unchanged by this fix — pin it here too so a
+// future edit cannot regress baseline while "fixing" negative.
+check(
+	"baseline's citation log is unaffected — it already read the judged text",
+	RUN_SRC5.includes("citations: extractCitations(judged),"),
 );
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);

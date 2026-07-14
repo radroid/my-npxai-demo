@@ -47,6 +47,9 @@ interface Manifest {
 		byKind: Record<string, { usd: number; tokens: number }>;
 	};
 	golden_set: { sha256: string; records: number };
+	/** Fix round 3, issue 2 — guard-rejected / malformed responses, counted
+	 *  separately from judge_errors and from any refusal-branch count. */
+	hard_errors?: number;
 	daily_cap_headroom_at_start?: {
 		available: boolean;
 		remaining: number;
@@ -96,6 +99,16 @@ const EXPECTED: Record<string, { range: string; source: string }> = {
 	"Answer relevancy": {
 		range: "high-0.8s+ when retrieval works",
 		source: "RAGAS docs; qaskills",
+	},
+	"Answer relevancy coverage (model was invoked — excludes oos_or_guard / hard-error route constants)":
+		{
+			range:
+				"companion to relevancy — undefined when the route made no LLM call at all, never a pass or a fail",
+			source: "custom metric; deterministic",
+		},
+	"Hard errors (guard-rejected / malformed — never scored as model behaviour)": {
+		range: "0 expected — any non-zero count means the server broke or rejected a curated question",
+		source: "custom metric; deterministic (fix round 3, issue 2)",
 	},
 	"Citation correctness (claim support)": {
 		range: "no published standard — read against the faithfulness gate (0.95+)",
@@ -284,7 +297,19 @@ export function rowsFor(run: Run): Row[] {
 				"Claim coverage (answers making ≥ 1 verifiable claim)",
 				meanDefined(it.map((i) => metric(i, "faithfulness_claim_coverage"))),
 			);
-			add("Answer relevancy", meanDefined(it.map((i) => metric(i, "answer_relevancy"))), "judge error");
+			add(
+				"Answer relevancy",
+				meanDefined(it.map((i) => metric(i, "answer_relevancy"))),
+				"judge error, or the route made NO LLM call at all (oos_or_guard / hard error) — the scored text would not be model output",
+			);
+			// Full-denominator companion (fix round 3, issue 1): makes visible how
+			// many items were structurally excluded because the route never called
+			// the model — as opposed to a GENUINE model refusal (llm_refusal /
+			// low_confidence), which IS scored above, RAGAS-style, low by design.
+			add(
+				"Answer relevancy coverage (model was invoked — excludes oos_or_guard / hard-error route constants)",
+				meanDefined(it.map((i) => metric(i, "relevancy_measurable"))),
+			);
 			add(
 				"Citation correctness (claim support)",
 				meanDefined(it.map((i) => metric(i, "citation_support"))),
@@ -309,20 +334,37 @@ export function rowsFor(run: Run): Row[] {
 			// False-rejection rate: golden (answerable) questions the pipeline
 			// REFUSED. The route's limited-context disclaimer is NOT a refusal (the
 			// model still answers), so it does not count here — issue 2.
-			const refusedItems = it.filter((i) =>
+			//
+			// Fix round 3, issue 2: a HARD ERROR (guard-rejected / malformed) is
+			// EXCLUDED from both the numerator and the denominator — the server
+			// failed, so this item is neither "answered" nor "refused"; counting
+			// it in the denominator would silently dilute the rate with a
+			// question that was never actually put to the model.
+			const rejectionEligible = it.filter((i) => !i.hard_error_reason);
+			const refusedItems = rejectionEligible.filter((i) =>
 				REFUSAL_BRANCHES.has(String(i.fallback_taken ?? "")),
 			).length;
+			const hardErrorCount = it.length - rejectionEligible.length;
 			rows.push({
 				category: "False-rejection rate (answerable golden questions refused)",
-				measured: pct(it.length === 0 ? null : refusedItems / it.length),
-				n: String(it.length),
-				excluded: "0",
+				measured: pct(
+					rejectionEligible.length === 0 ? null : refusedItems / rejectionEligible.length,
+				),
+				n: String(rejectionEligible.length),
+				excluded:
+					hardErrorCount > 0
+						? `${hardErrorCount} — hard error (guard-rejected / malformed): neither answered nor refused`
+						: "0",
 			});
 			// Branch census — every item lands in exactly one bucket, so a reader can
-			// reconcile the exclusions above against the run.
+			// reconcile the exclusions above against the run. A hard error gets its
+			// OWN bucket, never "normal_answer" (fallback_taken is null for both, and
+			// they must not be conflated — issue 2).
 			const branches = new Map<string, number>();
 			for (const i of it) {
-				const b = String(i.fallback_taken ?? "normal_answer");
+				const b = i.hard_error_reason
+					? "hard_error"
+					: String(i.fallback_taken ?? "normal_answer");
 				branches.set(b, (branches.get(b) ?? 0) + 1);
 			}
 			addCount(
@@ -330,6 +372,14 @@ export function rowsFor(run: Run): Row[] {
 				Array.from(branches.entries())
 					.map(([b, n]) => `${b}: ${n}`)
 					.join(", ") || "—",
+				it.length,
+			);
+			// Fix round 3, issue 2: hard errors, counted and reported SEPARATELY —
+			// never as a refusal, never silently folded into any other row's
+			// exclusion reason.
+			addCount(
+				"Hard errors (guard-rejected / malformed — never scored as model behaviour)",
+				String(hardErrorCount),
 				it.length,
 			);
 			break;
@@ -587,8 +637,8 @@ function main(): void {
 	lines.push("");
 	lines.push("## Cost appendix");
 	lines.push("");
-	lines.push("| Run | Total $ | Answerer (est.) | Judge | Embeddings | Judge errors | Aborted |");
-	lines.push("|---|---|---|---|---|---|---|");
+	lines.push("| Run | Total $ | Answerer (est.) | Judge | Embeddings | Judge errors | Hard errors | Aborted |");
+	lines.push("|---|---|---|---|---|---|---|---|");
 	let grand = 0;
 	for (const run of runs) {
 		const c = run.manifest.cost;
@@ -601,10 +651,19 @@ function main(): void {
 			`| ${run.manifest.experiment} | $${c.totalUsd.toFixed(4)} | ` +
 				`$${(c.byKind.answerer_estimated?.usd ?? 0).toFixed(4)} | ` +
 				`$${(c.byKind.judge?.usd ?? 0).toFixed(4)} | ` +
-				`$${(c.byKind.embeddings?.usd ?? 0).toFixed(4)} | ${errs || "none"} | ${run.manifest.aborted} |`,
+				`$${(c.byKind.embeddings?.usd ?? 0).toFixed(4)} | ${errs || "none"} | ` +
+				`${run.manifest.hard_errors ?? 0} | ${run.manifest.aborted} |`,
 		);
 	}
-	lines.push(`| **TOTAL** | **$${grand.toFixed(4)}** | | | | | |`);
+	lines.push(`| **TOTAL** | **$${grand.toFixed(4)}** | | | | | | |`);
+	lines.push("");
+	lines.push(
+		"**Hard errors** (fix round 3, issue 2) are guard-rejected (4xx) or malformed (empty-body/" +
+			"unparseable-stream) responses — counted here SEPARATELY from judge errors and NEVER folded " +
+			"into a refusal branch or a silent exclusion. `askServer` throws and aborts the run outright " +
+			"on any 5xx (a transport/server failure), so an outage cannot appear in this table at all — " +
+			"it stops the run before any item reaches it.",
+	);
 	lines.push("");
 	lines.push(
 		"Answerer + server-embedding costs are ESTIMATED with tiktoken (the SSE stream carries " +

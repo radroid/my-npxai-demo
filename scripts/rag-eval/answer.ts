@@ -23,11 +23,39 @@ import { ANSWERER_MODEL, EMBEDDING_MODEL, baseUrl } from "./config";
 import type { CostAccountant } from "./cost";
 import { type ParsedStream, parseStream } from "./sse";
 
+/**
+ * Which of three mutually-exclusive shapes the route's HTTP response took
+ * (PR #8 fix round 3, issue 2):
+ *
+ *   "ok"             — a 2xx with genuine content: a normal answer, an
+ *                       LLM-level refusal, the low-confidence line, the
+ *                       limited-context disclaimer, OR the oos_or_guard
+ *                       canonical constant. Every one of those emits
+ *                       NON-EMPTY text — callers distinguish WHICH one via
+ *                       classifyBranch on `text`/`sources`, not via `kind`.
+ *   "guard_rejected" — a 4xx (never 429, which throws below) with a JSON
+ *                       error body: the route refused at the REQUEST
+ *                       BOUNDARY (validation) before retrieval or the model
+ *                       ever ran. Deliberately modelled for the negative
+ *                       experiment (Edge case 4 / R7 metric 7 already score
+ *                       any 4xx as a rejection success) but it is NOT a
+ *                       model refusal and must never be read as one.
+ *   "malformed"      — a 2xx with NO text and NO data-sources frame. Every
+ *                       genuine route behaviour emits non-empty text (the
+ *                       canonical constants are not empty strings), so this
+ *                       is a stream that produced nothing — an upstream
+ *                       stall, a truncated proxy response — not an "empty
+ *                       answer" to be scored.
+ */
+export type ResponseKind = "ok" | "guard_rejected" | "malformed";
+
 export interface AnswerResult extends ParsedStream {
 	status: number;
 	latencyMs: number;
 	/** Raw response body — kept for the item log when parsing surprises us. */
 	raw: string;
+	/** Which of the three response shapes above this was (issue 2). */
+	kind: ResponseKind;
 }
 
 export class RateLimitedError extends Error {
@@ -40,6 +68,61 @@ export class RateLimitedError extends Error {
 		);
 		this.name = "RateLimitedError";
 	}
+}
+
+/**
+ * PR #8 fix round 3, issue 2 (BLOCKING). `askServer` used to throw ONLY on
+ * 429 — every other non-2xx (500, 502, an empty body, malformed SSE, a guard
+ * error JSON) fell through to `parseStream()` and was scored as MODEL
+ * BEHAVIOUR: an empty body parses to `{text:"", sources:null}`, which is
+ * indistinguishable downstream from the oos_or_guard branch's canonical
+ * refusal, so a genuine server outage got LAUNDERED into a "rejection
+ * success" or a "retrieval not measurable" exclusion — a plausible-looking
+ * number instead of the error it actually was. This framework had NEVER made
+ * a live HTTP request before slice 2.2, so this was the single highest-risk
+ * residual. A 5xx is a transport/server failure, not a deliberately-modelled
+ * outcome (unlike 429 and a 4xx guard rejection) — abort the run LOUDLY
+ * rather than risk scoring an outage as a refusal.
+ */
+export class ServerFailureError extends Error {
+	readonly status: number;
+	readonly body: string;
+	constructor(status: number, body: string) {
+		super(
+			`Dev server returned HTTP ${status} — a transport/server failure, not ` +
+				"model behaviour (fix round 3, issue 2). The run is aborted rather " +
+				"than risk scoring an outage as a refusal or a silent exclusion. " +
+				`Response body (first 500 chars): ${body.slice(0, 500)}`,
+		);
+		this.name = "ServerFailureError";
+		this.status = status;
+		this.body = body;
+	}
+}
+
+/**
+ * The HARD-ERROR label for a non-"ok" response — never a refusal, never a
+ * silently-excluded item, always its own counted category (fix round 3,
+ * issue 2). `null` for "ok" (nothing to flag) and for the 5xx case, which
+ * never reaches here at all (askServer throws before returning).
+ */
+export function hardErrorReasonFor(a: {
+	kind: ResponseKind;
+	status: number;
+}): string | null {
+	if (a.kind === "guard_rejected") {
+		return (
+			`hard_error:guard_rejected_http_${a.status}:request_boundary_rejection` +
+			"_not_a_model_refusal_or_route_constant"
+		);
+	}
+	if (a.kind === "malformed") {
+		return (
+			"hard_error:malformed_response:empty_body_or_unparseable_stream_" +
+			"not_an_empty_answer"
+		);
+	}
+	return null;
 }
 
 export function endpoint(): string {
@@ -62,7 +145,17 @@ export function buildBody(question: string): Record<string, unknown> {
 	};
 }
 
-/** One sequential request against the production route. Throws on 429. */
+/**
+ * One sequential request against the production route.
+ *
+ * Throws on 429 (RateLimitedError, unchanged) and on any 5xx
+ * (ServerFailureError — fix round 3, issue 2: a transport/server failure
+ * must abort the run, never be scored). A 4xx is tagged "guard_rejected" and
+ * a 2xx with no text and no sources frame is tagged "malformed" — both are
+ * returned (not thrown) because they are per-item outcomes callers must
+ * count SEPARATELY from model behaviour, never launder into a refusal or a
+ * silent exclusion. See `ResponseKind` for the full classification.
+ */
 export async function askServer(question: string): Promise<AnswerResult> {
 	const headers: Record<string, string> = {
 		"content-type": "application/json",
@@ -79,8 +172,31 @@ export async function askServer(question: string): Promise<AnswerResult> {
 	const raw = await res.text();
 	const latencyMs = Date.now() - start;
 	if (res.status === 429) throw new RateLimitedError();
+	// Issue 2: a 5xx is the server itself breaking (retrieval failure, an
+	// unhandled exception, the process down) — not a deliberately-modelled
+	// outcome like 429 or a 4xx guard rejection. Fail loudly.
+	if (res.status >= 500) throw new ServerFailureError(res.status, raw);
 	const parsed = parseStream(raw);
-	return { ...parsed, status: res.status, latencyMs, raw };
+	if (res.status >= 400) {
+		// A validation/guard rejection at the request boundary — the route
+		// returns a plain JSON error body, never an SSE stream, so `parsed` is
+		// always empty here. Tagged distinctly so no caller mistakes it for the
+		// oos_or_guard branch's canonical-text-no-sources shape.
+		return { ...parsed, status: res.status, latencyMs, raw, kind: "guard_rejected" };
+	}
+	// 2xx. Every genuine route behaviour (a normal answer, an LLM refusal, the
+	// low-confidence line, the limited-context disclaimer, and the
+	// oos_or_guard canonical constant) emits NON-EMPTY text. Empty text with
+	// no sources frame is therefore never a legitimate "the model said
+	// nothing" — it is a stream that produced nothing.
+	const malformed = parsed.text.trim() === "" && parsed.sources === null;
+	return {
+		...parsed,
+		status: res.status,
+		latencyMs,
+		raw,
+		kind: malformed ? "malformed" : "ok",
+	};
 }
 
 /** Cheap liveness probe used by preflight — GET, no OpenAI spend. */
