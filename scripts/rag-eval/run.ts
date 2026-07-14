@@ -34,7 +34,11 @@ import {
 	postFilterRankedIdsFromTrace,
 	retrieveChunks,
 } from "../../lib/retrieval";
-import { KNOWLEDGE_HUB_SYSTEM, PROMPT_VERSION } from "../../lib/prompts";
+import {
+	KNOWLEDGE_HUB_SYSTEM,
+	PROMPT_VERSION,
+	stripLimitedContextPrefix,
+} from "../../lib/prompts";
 import {
 	ANSWERER_MODEL,
 	CONSISTENCY_REPEATS,
@@ -240,7 +244,30 @@ function toContextChunks(
  * lowercased-substring markers in lib/prompts.ts.
  */
 function fallbackTaken(a: AnswerResult): RouteBranch {
+	// RAW text on purpose — branch detection exists to find the route's own
+	// disclaimer/refusal lines, so it is the ONE consumer that must not strip them
+	// (issue 4).
 	return classifyBranch({ text: a.text, hasSourcesFrame: a.sources !== null });
+}
+
+/**
+ * The MODEL's output, with the route's boilerplate removed (PR #8 fix round 2,
+ * issue 4). This — not `answer.text` — is what any judge, claim decomposer, or
+ * citation extractor must see.
+ *
+ * The low-avg-similarity branch PREPENDS KNOWLEDGE_HUB_LIMITED_CONTEXT ("Limited
+ * matches in the indexed corpus…") to an otherwise normal answer. The eval used
+ * to feed that raw text straight to judgeFaithfulness, judgeCitationSupport,
+ * judgeRelevancyQuestions, scoreCitationValidity and normalizeText. A
+ * claim-decomposition judge reads the disclaimer as one more claim — unsupported
+ * by any chunk, carrying no citation — so faithfulness and citation support were
+ * systematically DEFLATED, and only on the weak-retrieval questions, i.e. the
+ * hardest ones. Our own boilerplate was being scored as if the model had written
+ * it. A metric deflated by our own plumbing is exactly as dishonest as one
+ * inflated by a vacuous pass; this PR exists to stamp out both directions.
+ */
+function judgedText(a: AnswerResult): string {
+	return stripLimitedContextPrefix(a.text);
 }
 
 function sourcesOf(a: AnswerResult): Array<{
@@ -691,26 +718,37 @@ async function main(): Promise<void> {
 			const corpus = await fetchChunksByIds(supabase, envelopeIds);
 			const ctx = toContextChunks(envelopeIds, corpus);
 
+			// ISSUE 4: judges see the MODEL's output, never the route's boilerplate.
+			// The low-similarity branch prepends KNOWLEDGE_HUB_LIMITED_CONTEXT, and a
+			// claim-decomposition judge scores that sentence as an unsupported, uncited
+			// claim — deflating faithfulness and citation support on exactly the
+			// weak-retrieval questions where the disclaimer fires.
+			const judged = judgedText(answer);
+			const boilerplateStripped = judged !== answer.text;
+
 			const faith = await judgeFaithfulness(deps, {
 				question: rec.question,
-				answer: answer.text,
+				answer: judged,
 				chunks: ctx,
 			});
 			if (!faith.ok) judgeErrors.faithfulness++;
 
 			const support = await judgeCitationSupport(deps, {
 				question: rec.question,
-				answer: answer.text,
+				answer: judged,
 				chunks: ctx,
 			});
 			if (!support.ok) judgeErrors.citation_support++;
 
 			// RAGAS Response Relevancy: judge writes 3 questions from the answer,
-			// we embed them and score mean cosine vs the original question.
+			// we embed them and score mean cosine vs the original question. Fed the
+			// raw text, the judge reverse-engineers a question ABOUT THE DISCLAIMER —
+			// which is orthogonal to the user's question, so the cosine (and the score)
+			// drops for a reason that has nothing to do with the model.
 			let relevancyRaw: number | null = null;
 			const rq = await judgeRelevancyQuestions(deps, {
 				question: rec.question,
-				answer: answer.text,
+				answer: judged,
 			});
 			if (!rq.ok || !rq.value) {
 				judgeErrors.relevancy++;
@@ -726,7 +764,7 @@ async function main(): Promise<void> {
 				);
 			}
 
-			const validity = scoreCitationValidity(answer.text, sources);
+			const validity = scoreCitationValidity(judged, sources);
 
 			runLog.append({
 				experiment: "baseline",
@@ -763,8 +801,13 @@ async function main(): Promise<void> {
 				// not, the pool-stage metric is describing a different retrieval than
 				// the one that produced this answer — and the report must say so.
 				trace_envelope_agrees: traceEnvelopeAgrees,
+				// RAW answer (what the user would see) is logged verbatim; every judged
+				// metric above scored `judged_answer` — the same text with the route's
+				// disclaimer boilerplate removed (issue 4).
 				answer: answer.text,
-				citations: extractCitations(answer.text),
+				judged_answer: judged,
+				boilerplate_stripped: boilerplateStripped,
+				citations: extractCitations(judged),
 				metrics: {
 					// null (EXCLUDED, not 0) when the stage this metric scores does not
 					// exist for the item — round 1 issue 7b, round 2 issue 2.
@@ -931,8 +974,13 @@ async function main(): Promise<void> {
 				await chargeAnswer(supabase, cost, a, rec.question, label);
 				runs.push(a);
 			}
-			const citationKeys = runs.map((a) => citationSetKey(a.text));
-			const textKeys = runs.map((a) => normalizeText(a.text));
+			// ISSUE 4: compare the MODEL's output, not the route's boilerplate. The
+			// low-similarity disclaimer is deterministic route text; letting it into
+			// TARr means a repeat that flipped across the LOW_SIM_DISCLAIMER threshold
+			// scores as model disagreement when the model may have said the same thing.
+			const judgedRuns = runs.map((a) => judgedText(a));
+			const citationKeys = judgedRuns.map((t) => citationSetKey(t));
+			const textKeys = judgedRuns.map((t) => normalizeText(t));
 			const citationAgreement = totalAgreement(citationKeys);
 			const tarr = totalAgreement(textKeys);
 
@@ -949,8 +997,8 @@ async function main(): Promise<void> {
 					if (citationKeys[a] === citationKeys[b]) continue;
 					const eq = await judgeAnswerEquivalence(deps, {
 						question: rec.question,
-						answerA: runs[a].text,
-						answerB: runs[b].text,
+						answerA: judgedRuns[a],
+						answerB: judgedRuns[b],
 					});
 					if (!eq.ok) judgeErrors.answer_equivalence++;
 					equivalences.push({
@@ -976,6 +1024,7 @@ async function main(): Promise<void> {
 					http_status: a.status,
 					latency_ms: a.latencyMs,
 					answer: a.text,
+					judged_answer: judgedRuns[idx],
 					citation_set: citationKeys[idx],
 					retrieved: sourcesOf(a),
 					fallback_taken: fallbackTaken(a),
@@ -1017,7 +1066,10 @@ async function main(): Promise<void> {
 			const canonical = await askServer(rec.question);
 			await chargeAnswer(supabase, cost, canonical, rec.question, canonLabel);
 			const canonicalIds = new Set(sourcesOf(canonical).map((s) => s.id));
-			const canonicalCitations = citationSetKey(canonical.text);
+			// ISSUE 4: the route's disclaimer is boilerplate, not model output — strip
+			// it before any comparison or judgement.
+			const canonicalJudged = judgedText(canonical);
+			const canonicalCitations = citationSetKey(canonicalJudged);
 
 			const results: unknown[] = [];
 			for (const p of byParent.get(rec.question_id) ?? []) {
@@ -1025,10 +1077,11 @@ async function main(): Promise<void> {
 				const a = await askServer(p.question);
 				await chargeAnswer(supabase, cost, a, p.question, `paraphrase:${p.paraphrase_id}`);
 				const ids = new Set(sourcesOf(a).map((s) => s.id));
+				const pJudged = judgedText(a);
 				const eq = await judgeAnswerEquivalence(deps, {
 					question: rec.question,
-					answerA: canonical.text,
-					answerB: a.text,
+					answerA: canonicalJudged,
+					answerB: pJudged,
 				});
 				if (!eq.ok) judgeErrors.answer_equivalence++;
 				results.push({
@@ -1036,11 +1089,13 @@ async function main(): Promise<void> {
 					question: p.question,
 					http_status: a.status,
 					answer: a.text,
+					judged_answer: pJudged,
 					retrieved: sourcesOf(a),
 					fallback_taken: fallbackTaken(a),
 					metrics: {
 						retrieval_jaccard: jaccard(canonicalIds, ids),
-						citation_set_stable: citationSetKey(a.text) === canonicalCitations ? 1 : 0,
+						citation_set_stable:
+							citationSetKey(pJudged) === canonicalCitations ? 1 : 0,
 						answer_equivalent: eq.value?.equivalent ?? null,
 					},
 					judge: { answer_equivalence: { ok: eq.ok, cached: eq.cached, reasons: eq.reasons, error: eq.error } },
@@ -1055,6 +1110,7 @@ async function main(): Promise<void> {
 				models: { answerer: ANSWERER_MODEL, judge: judgeModel() },
 				canonical: {
 					answer: canonical.text,
+					judged_answer: canonicalJudged,
 					retrieved: sourcesOf(canonical),
 					citation_set: canonicalCitations,
 					fallback_taken: fallbackTaken(canonical),

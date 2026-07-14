@@ -259,6 +259,31 @@ export function isLimitedContextText(text: string): boolean {
 	return text.toLowerCase().includes(LIMITED_CONTEXT_MARKER);
 }
 
+/**
+ * Strip a leading KNOWLEDGE_HUB_LIMITED_CONTEXT disclaimer, returning the MODEL's
+ * own output (PR #8 fix round 2, issue 4).
+ *
+ * The disclaimer is ROUTE BOILERPLATE — the low-avg-similarity branch prepends it
+ * to an otherwise normal answer (route.ts). It is not something the model wrote.
+ * Feed the raw text to a claim-decomposition judge and the judge dutifully
+ * extracts "Limited matches in the indexed corpus for this question" as one more
+ * claim: unsupported by any chunk, and carrying no citation. So faithfulness and
+ * citation-support get DEFLATED — and precisely on the weak-retrieval questions,
+ * the hardest ones, where the disclaimer fires. That is the exact mirror image of
+ * the vacuous-pass bug this PR is named for: a metric made to read WORSE than the
+ * pipeline deserves is no more honest than one made to read better.
+ *
+ * Use this for anything that judges or decomposes MODEL OUTPUT. Do NOT use it for
+ * branch classification (classifyBranch) or refusal scoring (scoreRejection) —
+ * those exist to detect this very prefix and must see the RAW text.
+ */
+export function stripLimitedContextPrefix(text: string): string {
+	const disclaimer = KNOWLEDGE_HUB_LIMITED_CONTEXT.trimEnd();
+	const lead = text.trimStart();
+	if (!lead.toLowerCase().startsWith(disclaimer.toLowerCase())) return text;
+	return lead.slice(disclaimer.length).trimStart();
+}
+
 export const GENERATOR_SYSTEM = `You are generating a CANDU shift turnover report per CNSC REGDOC-2.3.4.
 Input data for the requested unit is provided as a JSON object with keys:
 - plant_status: list of parameter readings (unit_id, parameter, value,

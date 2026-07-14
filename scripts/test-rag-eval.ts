@@ -41,6 +41,7 @@ import {
 	isLimitedContextText,
 	isLowConfidenceText,
 	isRefusalText,
+	stripLimitedContextPrefix,
 } from "../lib/prompts";
 import {
 	ANSWERER_MODEL,
@@ -1335,6 +1336,101 @@ check(
 	RETRIEVAL_METRIC_STAGE.reciprocal_rank === "post_filter_pool" &&
 		RETRIEVAL_METRIC_STAGE.hit_rate_at_k === "envelope" &&
 		RETRIEVAL_METRIC_STAGE.context_precision_at_k === "envelope",
+);
+
+// ---------------------------------------------------------------------------
+section("19. Issue 4 — our own boilerplate must not be judged as model output");
+
+// The bug, in the OTHER direction from the one this PR is named for. The
+// low-similarity branch PREPENDS KNOWLEDGE_HUB_LIMITED_CONTEXT to an otherwise
+// normal answer. run.ts fed that raw text to judgeFaithfulness,
+// judgeCitationSupport, judgeRelevancyQuestions, scoreCitationValidity and
+// normalizeText. A claim-decomposition judge extracts the disclaimer as one more
+// claim — unsupported by any chunk, carrying no citation — so faithfulness and
+// citation support were systematically DEFLATED, and only on the weak-retrieval
+// questions, i.e. the hardest ones. A metric deflated by our own plumbing is
+// exactly as dishonest as one inflated by a vacuous pass.
+const MODEL_ANSWER = "Licensees shall conduct a panel walkdown [REGDOC-2.3.4 §3.2.3].";
+const WITH_DISCLAIMER = `${KNOWLEDGE_HUB_LIMITED_CONTEXT}${MODEL_ANSWER}`;
+
+check(
+	"stripLimitedContextPrefix removes the route's prefix, leaving the model's own text",
+	stripLimitedContextPrefix(WITH_DISCLAIMER) === MODEL_ANSWER,
+	stripLimitedContextPrefix(WITH_DISCLAIMER),
+);
+check(
+	"…and is a no-op on an answer that never carried it",
+	stripLimitedContextPrefix(MODEL_ANSWER) === MODEL_ANSWER,
+);
+check(
+	"…and does NOT strip the disclaimer's words from the MIDDLE of a real answer",
+	stripLimitedContextPrefix(`The corpus has limited matches in the indexed corpus. ${MODEL_ANSWER}`).startsWith(
+		"The corpus has limited",
+	),
+);
+check(
+	"…and does not touch the model's own low-confidence line (that IS model output)",
+	stripLimitedContextPrefix(KNOWLEDGE_HUB_LOW_CONFIDENCE) === KNOWLEDGE_HUB_LOW_CONFIDENCE,
+);
+
+// The judged text is what a claim decomposer sees. Pin the property that matters:
+// the disclaimer sentence is NOT in it, so it cannot become an unsupported claim.
+check(
+	"the judged text carries NO disclaimer sentence for a claim decomposer to score",
+	!isLimitedContextText(stripLimitedContextPrefix(WITH_DISCLAIMER)) &&
+		isLimitedContextText(WITH_DISCLAIMER),
+);
+// Branch detection is the ONE consumer that must still see the raw text.
+check(
+	"branch detection still sees the RAW text (it exists to find this very prefix)",
+	classifyBranch({ text: WITH_DISCLAIMER, hasSourcesFrame: true }) === "limited_context",
+);
+check(
+	"…and the disclaimer is still NOT a refusal — the model answered",
+	!REFUSAL_BRANCHES.has("limited_context"),
+);
+
+// Citation extraction over the raw vs judged text: the disclaimer carries no
+// citation, so a validity score computed over the raw text silently mixes route
+// boilerplate into the answer under judgement.
+check(
+	"citation extraction over the judged text finds the model's citation",
+	extractCitations(stripLimitedContextPrefix(WITH_DISCLAIMER)).length === 1,
+);
+
+// The call sites. run.ts must judge `judged`, never `answer.text`.
+const RUN_SRC4 = readSrc("scripts/rag-eval/run.ts");
+check(
+	"run.ts derives a judged text by stripping the route's boilerplate",
+	RUN_SRC4.includes("stripLimitedContextPrefix(a.text)") &&
+		RUN_SRC4.includes("const judged = judgedText(answer)"),
+);
+check(
+	"run.ts feeds the JUDGED text to faithfulness / citation-support / relevancy",
+	RUN_SRC4.split("answer: judged,").length - 1 >= 3,
+);
+check(
+	"run.ts no longer feeds RAW answer text to any judge",
+	!RUN_SRC4.includes("answer: answer.text,\n\t\t\t\tchunks: ctx") &&
+		!RUN_SRC4.includes("answerA: runs[a].text") &&
+		!RUN_SRC4.includes("answerA: canonical.text"),
+);
+check(
+	"citation validity scores the judged text, not the boilerplate-prefixed one",
+	RUN_SRC4.includes("scoreCitationValidity(judged, sources)"),
+);
+check(
+	"consistency compares MODEL output (TARr + citation sets over the judged text)",
+	RUN_SRC4.includes("const judgedRuns = runs.map((a) => judgedText(a))") &&
+		RUN_SRC4.includes("normalizeText(t)"),
+);
+check(
+	"…and branch classification is the ONE consumer still given the raw text",
+	RUN_SRC4.includes("classifyBranch({ text: a.text, hasSourcesFrame: a.sources !== null })"),
+);
+check(
+	"negative rejection still scores the RAW text (it must see the route's own lines)",
+	RUN_SRC4.includes("const verdict = scoreRejection({\n\t\t\t\tstatus: a.status,\n\t\t\t\ttext: a.text,"),
 );
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);
