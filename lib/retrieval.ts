@@ -416,10 +416,32 @@ export async function retrieveChunks(
 		if (embeddings.length !== embedInputs.length) {
 			throw new Error("embedding count mismatch");
 		}
-		await (deps.recordUsage ?? recordOpenAICall)(0);
 	} catch (err) {
 		console.error("embedding_error", err);
 		throw new RetrievalError("embedding", err);
+	}
+
+	// Accounting, deliberately OUTSIDE the try above. It used to sit inside it,
+	// which meant a dead Redis threw and was re-labelled `RetrievalError
+	// ("embedding")` — the user saw "Embedding failed." while the embedding had
+	// in fact succeeded and been paid for. This placement makes that mislabel
+	// structurally impossible: nothing that happens AFTER a successful embedding
+	// can be reported AS an embedding failure.
+	//
+	// The catch is belt-and-braces. `recordOpenAICall` no longer throws (see
+	// lib/guard.ts), but callers may INJECT their own `recordUsage` — and an
+	// injected accountant that dies must not take a paid-for retrieval down with
+	// it either.
+	//
+	// ONE EXCEPTION, and it is load-bearing: a CostCapError means the eval
+	// harness hit its spend ceiling and is deliberately aborting the run. That
+	// must propagate — swallowing it would silently defeat the wallet guard.
+	// Matched by name, not by import: lib/ must not depend on scripts/.
+	try {
+		await (deps.recordUsage ?? recordOpenAICall)(0);
+	} catch (err) {
+		if ((err as Error)?.name === "CostCapError") throw err;
+		console.error("retrieval_accounting_unavailable", err);
 	}
 
 	// Primary retrieval: 20 chunks by open cosine sim.

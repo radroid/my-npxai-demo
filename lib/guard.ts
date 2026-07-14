@@ -301,16 +301,40 @@ export function withGuard(
 }
 
 // Call this after a successful OpenAI request to feed the B.4 counter.
+//
+// NEVER THROWS. This is accounting, not a precondition — it runs AFTER the
+// OpenAI call has already succeeded and already cost money. Letting a Redis
+// outage throw here fails the user's request for spend that was already
+// incurred: we pay, and they still see an error.
+//
+// It is also the same fail-open posture the two Redis reads above already
+// take (`ratelimit_unavailable`, `circuit_breaker_unavailable`); this writer
+// was simply never given it. That inconsistency had teeth: `retrieveChunks`
+// calls this INSIDE its embedding try-block, so a dead Redis surfaced to the
+// user as "Embedding failed." — sending an operator to debug OpenAI while the
+// actual fault was Upstash. (Observed in production 2026-07-14: the Upstash
+// database's host stopped resolving; embeddings were provably fine.)
+//
+// The trade-off is stated plainly: when Redis is unreachable, the global daily
+// circuit breaker CANNOT COUNT and therefore cannot trip. Cost protection is
+// degraded until Redis returns. We log it loudly rather than deny service —
+// but a persistent `openai_accounting_unavailable` in the logs means the spend
+// cap is not being enforced and Redis must be restored.
 export async function recordOpenAICall(costUsd = 0): Promise<void> {
-	const today = new Date().toISOString().slice(0, 10);
-	const redis = getRedis();
-	// Increment + set TTL on first write (48h — generous headroom over daily reset).
-	const calls = await redis.incr(`openai:calls:${today}`);
-	if (calls === 1) await redis.expire(`openai:calls:${today}`, 60 * 60 * 48);
-	if (costUsd > 0) {
-		const cents = Math.round(costUsd * 100);
-		const costKey = `openai:cost_cents:${today}`;
-		const total = await redis.incrby(costKey, cents);
-		if (total === cents) await redis.expire(costKey, 60 * 60 * 48);
+	try {
+		const today = new Date().toISOString().slice(0, 10);
+		const redis = getRedis();
+		// Increment + set TTL on first write (48h — generous headroom over daily reset).
+		const calls = await redis.incr(`openai:calls:${today}`);
+		if (calls === 1) await redis.expire(`openai:calls:${today}`, 60 * 60 * 48);
+		if (costUsd > 0) {
+			const cents = Math.round(costUsd * 100);
+			const costKey = `openai:cost_cents:${today}`;
+			const total = await redis.incrby(costKey, cents);
+			if (total === cents) await redis.expire(costKey, 60 * 60 * 48);
+		}
+	} catch (err) {
+		// Loud in logs, invisible to the user — their request already succeeded.
+		console.error("openai_accounting_unavailable", err);
 	}
 }

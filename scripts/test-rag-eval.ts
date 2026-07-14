@@ -468,6 +468,129 @@ check("trace is emitted only when withTrace is set", !!result?.trace);
 
 const trace = result?.trace as RetrievalTrace;
 check("trace pool carries pre/post-boost ranks + similarities", trace.pool.length === 20 && trace.pool[0].rankPostBoost === 1);
+
+// ── PRODUCTION INCIDENT 2026-07-14 — a dead Redis reported itself as "Embedding failed." ──
+// Upstash's host stopped resolving. Embeddings were provably fine (200, 1536 dims), but
+// `recordOpenAICall` threw from INSIDE retrieveChunks' embedding try-block, so the throw was
+// re-labelled RetrievalError("embedding") and the user was told the embedding failed. An
+// operator would debug OpenAI while the actual fault was Redis.
+//
+// Two structural fixes, one test each. Revert either and one of these goes RED.
+{
+	// (1) Accounting that throws must NOT fail a request whose embedding already succeeded
+	//     and was already paid for. retrieveChunks must survive a throwing recordUsage.
+	let deadRedisError: string | null = null;
+	let survived: Awaited<ReturnType<typeof retrieveChunks>> | null = null;
+	try {
+		survived = await retrieveChunks(
+			"What is required at shift turnover?",
+			{
+				supabase: fakeSupabase,
+				openai: meteredOpenAI(fakeOpenAI, new CostAccountant(10), "dead-redis"),
+				// Exactly what a vanished Upstash host does: the REST call rejects.
+				recordUsage: async () => {
+					throw new Error("fetch failed: getaddrinfo ENOTFOUND charming-lioness.upstash.io");
+				},
+			},
+			{ envelopeChunks: 8 },
+		);
+	} catch (err) {
+		deadRedisError = (err as Error).message;
+	}
+	check(
+		"a throwing accounting call NEVER fails retrieval (the embedding already succeeded and was paid for)",
+		deadRedisError === null,
+		deadRedisError,
+	);
+	check("…and retrieval still returns a full envelope with Redis dead", survived?.envelope.length === 8);
+	check(
+		"…and the failure is NEVER mislabelled as an embedding error",
+		deadRedisError === null || !deadRedisError.toLowerCase().includes("embedding"),
+		deadRedisError,
+	);
+
+	// (2) A REAL embedding failure must still be reported as one — the fix above must not
+	//     have made retrieval swallow genuine OpenAI errors.
+	let realEmbedFailure: unknown = null;
+	try {
+		await retrieveChunks(
+			"What is required at shift turnover?",
+			{
+				supabase: fakeSupabase,
+				openai: {
+					embeddings: {
+						create: async () => {
+							throw new Error("401 Incorrect API key provided");
+						},
+					},
+				} as unknown as OpenAI,
+				recordUsage: async () => {},
+			},
+			{ envelopeChunks: 8 },
+		);
+	} catch (err) {
+		realEmbedFailure = err;
+	}
+	check(
+		"a genuine embedding failure IS still raised as RetrievalError('embedding')",
+		realEmbedFailure instanceof RetrievalError && (realEmbedFailure as RetrievalError).stage === "embedding",
+		realEmbedFailure,
+	);
+
+	// (3) The wallet guard must survive the fix above. Tolerating a dead accountant
+	//     must NOT also swallow a CostCapError — that is the eval deliberately
+	//     aborting an over-budget run, and it has to propagate.
+	class FakeCostCapError extends Error {
+		constructor() {
+			super("cost cap reached");
+			this.name = "CostCapError";
+		}
+	}
+	let capPropagated = false;
+	try {
+		await retrieveChunks(
+			"What is required at shift turnover?",
+			{
+				supabase: fakeSupabase,
+				openai: meteredOpenAI(fakeOpenAI, new CostAccountant(10), "cap-test"),
+				recordUsage: async () => {
+					throw new FakeCostCapError();
+				},
+			},
+			{ envelopeChunks: 8 },
+		);
+	} catch (err) {
+		capPropagated = (err as Error).name === "CostCapError";
+	}
+	check(
+		"a CostCapError from the accountant STILL aborts — tolerating dead Redis must not defeat the wallet guard",
+		capPropagated,
+	);
+
+	// (4) The guard's own writer must be non-throwing. This is the function that
+	//     actually died in production. With Upstash pointed at a host that cannot
+	//     resolve, recordOpenAICall must log and return — never throw.
+	const savedUrl = process.env.UPSTASH_REDIS_REST_URL;
+	const savedToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+	process.env.UPSTASH_REDIS_REST_URL = "https://this-host-does-not-resolve.invalid";
+	process.env.UPSTASH_REDIS_REST_TOKEN = "irrelevant";
+	const { recordOpenAICall: liveRecorder } = await import("../lib/guard");
+	let recorderThrew: string | null = null;
+	try {
+		await liveRecorder(0);
+	} catch (err) {
+		recorderThrew = (err as Error).message;
+	}
+	if (savedUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+	else process.env.UPSTASH_REDIS_REST_URL = savedUrl;
+	if (savedToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+	else process.env.UPSTASH_REDIS_REST_TOKEN = savedToken;
+	check(
+		"recordOpenAICall NEVER throws when Redis is unreachable (the production incident itself)",
+		recorderThrew === null,
+		recorderThrew,
+	);
+}
 check("trace decision is 'normal' for a strong pool", trace.decision === "normal", { topSim: trace.topSim, LOW_SIM_OOS });
 
 // The k-sweep derives every k from ONE retrieval — it must agree exactly with
