@@ -145,7 +145,7 @@ Discovered during planning:
 - Do not commit raw per-item result logs or the judge cache — only the datasets, the report, and the summary JSON.
 - Do not start/restart/kill the dev server; do not clear `.next/`.
 
-## Execution notes (PR #7)
+## Execution notes (PR #8)
 
 Slice 2.1 only. Written by the third executor on this slice — the first two died on
 infra errors (usage limits / stream stalls) after pushing a checkpoint commit
