@@ -94,15 +94,14 @@ import {
 	clamp01,
 	classifyBranch,
 	cosineSimilarity,
-	jaccard,
 	kSweepExclusion,
 	mean,
-	normalizeText,
 	reciprocalRank,
+	scoreConsistency,
 	scoreEnvelopeAtK,
+	scoreParaphrasePair,
 	scoreRejection,
 	scoreRetrievalStages,
-	totalAgreement,
 } from "./metrics";
 import { embedTexts, getEvalOpenAI, meteredOpenAI } from "./openai";
 import {
@@ -980,9 +979,21 @@ async function main(): Promise<void> {
 			// scores as model disagreement when the model may have said the same thing.
 			const judgedRuns = runs.map((a) => judgedText(a));
 			const citationKeys = judgedRuns.map((t) => citationSetKey(t));
-			const textKeys = judgedRuns.map((t) => normalizeText(t));
-			const citationAgreement = totalAgreement(citationKeys);
-			const tarr = totalAgreement(textKeys);
+
+			// ISSUE 1a: the vacuous-pass bug, still alive here after round 1.
+			// citationSetKey used to return "" for a zero-citation answer, and
+			// totalAgreement(["","","","",""]) = 1 — so the headline citation-stability
+			// KPI reported PERFECT consistency precisely when the model cited nothing
+			// at all, five times over. Two answers that both cited nothing are not
+			// consistent; they are both uncitable. scoreConsistency EXCLUDES those
+			// (with a counted reason) and surfaces them through a full-denominator
+			// citation-coverage companion. It also excludes TARr when every repeat took
+			// the guard/OOS branch, where the route emits a CONSTANT string and never
+			// calls the model — agreement 1 by construction, measuring nothing.
+			const consistency = scoreConsistency({
+				judgedTexts: judgedRuns,
+				noEnvelope: runs.map((a) => a.sources === null),
+			});
 
 			// Judge ONLY the citation-disagreeing pairs.
 			const equivalences: Array<{
@@ -1010,7 +1021,7 @@ async function main(): Promise<void> {
 					});
 				}
 			}
-			const judged = equivalences.filter((e) => e.equivalent !== null);
+			const judgedPairs = equivalences.filter((e) => e.equivalent !== null);
 			runLog.append({
 				experiment: "consistency",
 				question_id: rec.question_id,
@@ -1030,22 +1041,40 @@ async function main(): Promise<void> {
 					fallback_taken: fallbackTaken(a),
 				})),
 				metrics: {
-					citation_set_agreement: citationAgreement,
-					tarr_exact_text_agreement: tarr,
+					// null = EXCLUDED (with a reason below), never a vacuous 1.
+					citation_set_agreement: consistency.citation_set_agreement,
+					tarr_exact_text_agreement: consistency.tarr_exact_text_agreement,
+					// FULL denominator — this is what makes an exclusion visible.
+					citation_coverage_across_repeats: consistency.citation_coverage,
+					citation_agreement_excluded_reason:
+						consistency.citation_agreement_excluded_reason,
+					tarr_excluded_reason: consistency.tarr_excluded_reason,
 					// Of the pairs that DID disagree on citations, how many are still
 					// substantively the same answer?
 					disagreeing_pairs: equivalences.length,
-					equivalent_pairs: judged.filter((e) => e.equivalent).length,
+					equivalent_pairs: judgedPairs.filter((e) => e.equivalent).length,
 					equivalence_rate:
-						judged.length === 0 ? null : judged.filter((e) => e.equivalent).length / judged.length,
+						judgedPairs.length === 0
+							? null
+							: judgedPairs.filter((e) => e.equivalent).length /
+								judgedPairs.length,
 				},
 				judge: { answer_equivalence: equivalences },
 				timestamp: new Date().toISOString(),
 				cost_so_far_usd: cost.totalUsd(),
 			});
 			console.log(
-				`[${i + 1}/${golden.length}] ${rec.question_id} citation-agree=${citationAgreement} ` +
-					`TARr=${tarr} disagreeing-pairs=${equivalences.length} $${cost.totalUsd().toFixed(4)}`,
+				`[${i + 1}/${golden.length}] ${rec.question_id} ` +
+					`citation-agree=${
+						consistency.citation_set_agreement ??
+						`excluded(${consistency.citation_agreement_excluded_reason})`
+					} ` +
+					`TARr=${
+						consistency.tarr_exact_text_agreement ??
+						`excluded(${consistency.tarr_excluded_reason})`
+					} ` +
+					`cite-coverage=${consistency.citation_coverage?.toFixed(2) ?? "n/a"} ` +
+					`disagreeing-pairs=${equivalences.length} $${cost.totalUsd().toFixed(4)}`,
 			);
 		}
 	}
@@ -1071,6 +1100,7 @@ async function main(): Promise<void> {
 			const canonicalJudged = judgedText(canonical);
 			const canonicalCitations = citationSetKey(canonicalJudged);
 
+			const canonicalBranch = fallbackTaken(canonical);
 			const results: unknown[] = [];
 			for (const p of byParent.get(rec.question_id) ?? []) {
 				reserveAnswer(cost, p.question, `paraphrase:${p.paraphrase_id}`);
@@ -1078,12 +1108,48 @@ async function main(): Promise<void> {
 				await chargeAnswer(supabase, cost, a, p.question, `paraphrase:${p.paraphrase_id}`);
 				const ids = new Set(sourcesOf(a).map((s) => s.id));
 				const pJudged = judgedText(a);
-				const eq = await judgeAnswerEquivalence(deps, {
-					question: rec.question,
-					answerA: canonicalJudged,
-					answerB: pJudged,
+
+				// ISSUE 1b: this experiment had NONE of round 1's exclude-with-reason
+				// discipline. jaccard(∅, ∅) === 1, so a canonical AND paraphrase that
+				// both refused scored PERFECT retrieval stability for a pair where
+				// nothing was retrieved either time; citationSetKey's "" === "" gave a
+				// free citation-stability 1 whenever both cited nothing; and the
+				// equivalence rubric literally says "Both being refusals of the same
+				// kind is equivalent", so two refusals scored as perfect paraphrase
+				// robustness. scoreParaphrasePair excludes all three with counted
+				// reasons and surfaces them through full-denominator coverage rows.
+				const pair = scoreParaphrasePair({
+					canonicalEnvelopeIds: canonicalIds,
+					paraphraseEnvelopeIds: ids,
+					canonicalJudgedText: canonicalJudged,
+					paraphraseJudgedText: pJudged,
+					canonicalBranch,
+					paraphraseBranch: fallbackTaken(a),
 				});
-				if (!eq.ok) judgeErrors.answer_equivalence++;
+
+				// Skipping the judge on a refusal pair is not just honesty — it is the
+				// cheaper path too: no judge call is made for a verdict that could only
+				// ever have been vacuous.
+				let equivalent: boolean | null = null;
+				let eqJudge: Record<string, unknown> = {
+					skipped: pair.equivalence_excluded_reason,
+				};
+				if (!pair.skipEquivalenceJudge) {
+					const eq = await judgeAnswerEquivalence(deps, {
+						question: rec.question,
+						answerA: canonicalJudged,
+						answerB: pJudged,
+					});
+					if (!eq.ok) judgeErrors.answer_equivalence++;
+					equivalent = eq.value?.equivalent ?? null;
+					eqJudge = {
+						ok: eq.ok,
+						cached: eq.cached,
+						reasons: eq.reasons,
+						error: eq.error,
+					};
+				}
+
 				results.push({
 					paraphrase_id: p.paraphrase_id,
 					question: p.question,
@@ -1093,12 +1159,20 @@ async function main(): Promise<void> {
 					retrieved: sourcesOf(a),
 					fallback_taken: fallbackTaken(a),
 					metrics: {
-						retrieval_jaccard: jaccard(canonicalIds, ids),
-						citation_set_stable:
-							citationSetKey(pJudged) === canonicalCitations ? 1 : 0,
-						answer_equivalent: eq.value?.equivalent ?? null,
+						// null = EXCLUDED (reason alongside), never a vacuous 1.
+						retrieval_jaccard: pair.retrieval_jaccard,
+						citation_set_stable: pair.citation_set_stable,
+						answer_equivalent: equivalent,
+						// FULL-denominator companions — the exclusions are visible here.
+						both_sides_have_envelope: pair.both_sides_have_envelope,
+						both_sides_cited: pair.both_sides_cited,
+						both_sides_answered: pair.both_sides_answered,
+						jaccard_excluded_reason: pair.jaccard_excluded_reason,
+						citation_stability_excluded_reason:
+							pair.citation_stability_excluded_reason,
+						equivalence_excluded_reason: pair.equivalence_excluded_reason,
 					},
-					judge: { answer_equivalence: { ok: eq.ok, cached: eq.cached, reasons: eq.reasons, error: eq.error } },
+					judge: { answer_equivalence: eqJudge },
 				});
 			}
 			runLog.append({
@@ -1157,7 +1231,11 @@ async function main(): Promise<void> {
 				retrieved: sourcesOf(a),
 				citations: extractCitations(a.text),
 				metrics: {
-					rejection_success: verdict.success ? 1 : 0,
+					// null = EXCLUDED (a 200 that streamed no text is not a refusal and
+					// not an answer — scoring it 0 would be a false FAILURE that drags the
+					// row down for a reason that is not the pipeline's refusal behaviour).
+					rejection_success:
+						verdict.success === null ? null : verdict.success ? 1 : 0,
 					layer: verdict.layer,
 					fabricated_citations: verdict.fabricatedCitations,
 					reason: verdict.reason,
@@ -1166,8 +1244,13 @@ async function main(): Promise<void> {
 				cost_so_far_usd: cost.totalUsd(),
 			});
 			console.log(
-				`[${i + 1}/${probes.length}] ${probe.probe_id} reject=${verdict.success ? "PASS" : "FAIL"} ` +
-					`layer=${verdict.layer} $${cost.totalUsd().toFixed(4)}`,
+				`[${i + 1}/${probes.length}] ${probe.probe_id} reject=${
+					verdict.success === null
+						? `EXCLUDED(${verdict.reason})`
+						: verdict.success
+							? "PASS"
+							: "FAIL"
+				} layer=${verdict.layer} $${cost.totalUsd().toFixed(4)}`,
 			);
 		}
 	}

@@ -107,11 +107,29 @@ export function scoreCitationValidity(
 	};
 }
 
-// Canonical citation-set key for consistency comparisons (R7 metric 6):
-// sorted, deduped "REGDOC-X.X§Y" strings.
-export function citationSetKey(text: string): string {
-	const set = new Set(
-		extractCitations(text).map((c) => `${c.regdoc}§${c.section ?? ""}`),
-	);
+/**
+ * Canonical citation-set key for consistency comparisons (R7 metric 6): sorted,
+ * deduped "REGDOC-X.X§Y" strings — or NULL when the answer cites NOTHING.
+ *
+ * PR #8 fix round 2 (issue 1a) — THE SAME VACUOUS-PASS BUG round 1 fixed for
+ * baseline's citation validity, still alive here.
+ *
+ * This used to return "" for a zero-citation answer. `totalAgreement(["", "",
+ * "", "", ""])` over N repeats that ALL produced zero citations returns PERFECT
+ * agreement — so the citation-stability KPI, the headline consistency number,
+ * reported 100% precisely when the model cited nothing at all, five times over.
+ * The same "" collapsed the paraphrase experiment's `citation_set_stable` into a
+ * free 1 whenever the canonical AND the paraphrase both cited nothing.
+ *
+ * Two answers that both cited nothing are not "consistent". They are both
+ * UNCITABLE: there is no citation SET, so there is nothing to agree about. The
+ * key is NULL, the item is EXCLUDED from the mean with a counted reason, and the
+ * companion coverage row (over the FULL denominator) is what makes the
+ * zero-citation-ness visible. Never a silent pass.
+ */
+export function citationSetKey(text: string): string | null {
+	const cites = extractCitations(text);
+	if (cites.length === 0) return null;
+	const set = new Set(cites.map((c) => `${c.regdoc}§${c.section ?? ""}`));
 	return Array.from(set).sort().join("|");
 }

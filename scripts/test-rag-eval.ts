@@ -100,7 +100,9 @@ import {
 	mean,
 	normalizeText,
 	reciprocalRank,
+	scoreConsistency,
 	scoreEnvelopeAtK,
+	scoreParaphrasePair,
 	scoreRejection,
 	scoreRetrievalStages,
 	similarityRankedIdsFromTrace,
@@ -213,13 +215,13 @@ const rej = (over: Partial<Parameters<typeof scoreRejection>[0]>) =>
 		hasSourcesFrame: false,
 		...over,
 	});
-check("guard/sim-gate refusal (no data-sources frame) = SUCCESS", rej({}).success && rej({}).layer === "deterministic_or_sim_gate");
+check("guard/sim-gate refusal (no data-sources frame) = SUCCESS", rej({}).success === true && rej({}).layer === "deterministic_or_sim_gate");
 check("LLM-level refusal (with sources frame) = SUCCESS", rej({ hasSourcesFrame: true }).layer === "llm_refusal");
-check("low-confidence line also counts as a rejection", rej({ text: lowConfText }).success);
-check("HTTP 4xx block = SUCCESS at the request boundary", rej({ status: 400 }).success && rej({ status: 400 }).layer === "guard_http");
-check("answering an OOC probe = FAILURE", !rej({ text: "The NRC requires 40 hours." }).success);
+check("low-confidence line also counts as a rejection", rej({ text: lowConfText }).success === true);
+check("HTTP 4xx block = SUCCESS at the request boundary", rej({ status: 400 }).success === true && rej({ status: 400 }).layer === "guard_http");
+check("answering an OOC probe = FAILURE", rej({ text: "The NRC requires 40 hours." }).success === false);
 const fab = rej({ text: `${oosText} But see [REGDOC-2.3.4 §3.2].` });
-check("fabricated citation inside a rejection = FAILURE", !fab.success && fab.fabricatedCitations === 1, fab);
+check("fabricated citation inside a rejection = FAILURE", fab.success === false && fab.fabricatedCitations === 1, fab);
 let threw = false;
 try {
 	rej({ status: 429 });
@@ -554,11 +556,11 @@ check("LIMITED-CONTEXT marker matches the route's disclaimer constant", isLimite
 const RECASED = "This Assistant ONLY ANSWERS QUESTIONS ABOUT THE INDEXED CNSC regulatory documents.";
 check(
 	"a re-cased model refusal is still a rejection SUCCESS (lowercased-substring match)",
-	rej({ text: RECASED }).success,
+	rej({ text: RECASED }).success === true,
 	rej({ text: RECASED }),
 );
 const WRAPPED = `I'm sorry — this assistant only answers questions about the indexed CNSC regulatory documents, so I can't help with that.`;
-check("a refusal wrapped in prose is still detected", rej({ text: WRAPPED }).success);
+check("a refusal wrapped in prose is still detected", rej({ text: WRAPPED }).success === true);
 check(
 	"eval-security.ts imports the shared markers instead of re-deriving them",
 	readSrc("scripts/eval-security.ts").includes('from "../lib/prompts"'),
@@ -1420,9 +1422,11 @@ check(
 	RUN_SRC4.includes("scoreCitationValidity(judged, sources)"),
 );
 check(
-	"consistency compares MODEL output (TARr + citation sets over the judged text)",
+	"consistency + paraphrase compare MODEL output (the judged text feeds the scorers and the judge)",
 	RUN_SRC4.includes("const judgedRuns = runs.map((a) => judgedText(a))") &&
-		RUN_SRC4.includes("normalizeText(t)"),
+		RUN_SRC4.includes("judgedTexts: judgedRuns") &&
+		RUN_SRC4.includes("const canonicalJudged = judgedText(canonical)") &&
+		RUN_SRC4.includes("const pJudged = judgedText(a)"),
 );
 check(
 	"…and branch classification is the ONE consumer still given the raw text",
@@ -1431,6 +1435,311 @@ check(
 check(
 	"negative rejection still scores the RAW text (it must see the route's own lines)",
 	RUN_SRC4.includes("const verdict = scoreRejection({\n\t\t\t\tstatus: a.status,\n\t\t\t\ttext: a.text,"),
+);
+
+// ---------------------------------------------------------------------------
+section("20. Issue 1 — the vacuous pass, hunted out of EVERY experiment");
+
+// Round 1 fixed this for baseline's citation validity and stopped there. The
+// IDENTICAL failure mode was still live in consistency and paraphrase.
+
+// (a) CONSISTENCY. citationSetKey returned "" for a zero-citation answer, and
+// totalAgreement(["","","","",""]) === 1 — so the headline citation-stability KPI
+// reported PERFECT consistency precisely when the model cited nothing at all,
+// five times over.
+const REFUSAL = KNOWLEDGE_HUB_OUT_OF_SCOPE;
+const CITING_A = "Licensees shall X [REGDOC-2.3.4 §3.2].";
+const CITING_B = "Licensees must X [REGDOC-2.2.5 §3.1].";
+
+check(
+	"citationSetKey is NULL for a zero-citation answer (it used to be the empty string)",
+	citationSetKey(REFUSAL) === null && citationSetKey("no citations here") === null,
+);
+check(
+	"…and still a real, order-insensitive key when the answer DOES cite",
+	citationSetKey(CITING_A) !== null,
+);
+// THE BUG, made executable.
+check(
+	"the OLD key would have scored 5 uncitable repeats as PERFECT agreement (the bug)",
+	totalAgreement(["", "", "", "", ""]) === 1,
+);
+const allVacuousConsistency = scoreConsistency({
+	judgedTexts: [REFUSAL, REFUSAL, REFUSAL, REFUSAL, REFUSAL],
+	noEnvelope: [true, true, true, true, true],
+});
+check(
+	"scoreConsistency: 5 zero-citation repeats are EXCLUDED, not scored 1",
+	allVacuousConsistency.citation_set_agreement === null &&
+		allVacuousConsistency.citation_agreement_excluded_reason !== null,
+	allVacuousConsistency,
+);
+check(
+	"…and TARr is EXCLUDED too — the guard/OOS branch emits a CONSTANT and never calls the model",
+	allVacuousConsistency.tarr_exact_text_agreement === null &&
+		allVacuousConsistency.tarr_excluded_reason?.includes("no_llm_call") === true,
+	allVacuousConsistency,
+);
+check(
+	"…and the citation-coverage companion records the zero over the FULL denominator",
+	allVacuousConsistency.citation_coverage === 0,
+);
+// A MIXED case is a genuine disagreement — measured, not hidden.
+const mixedConsistency = scoreConsistency({
+	judgedTexts: [CITING_A, REFUSAL, CITING_A, CITING_A, CITING_A],
+	noEnvelope: [false, false, false, false, false],
+});
+check(
+	"one repeat citing nothing while others cite IS a disagreement (0), not an exclusion",
+	mixedConsistency.citation_set_agreement === 0 &&
+		mixedConsistency.citation_agreement_excluded_reason === null,
+	mixedConsistency,
+);
+check(
+	"…and coverage shows 4 of 5 repeats cited",
+	Math.abs((mixedConsistency.citation_coverage ?? 0) - 0.8) < 1e-9,
+);
+const stableConsistency = scoreConsistency({
+	judgedTexts: [CITING_A, CITING_A, CITING_A, CITING_A, CITING_A],
+	noEnvelope: [false, false, false, false, false],
+});
+check(
+	"5 repeats that genuinely agree still score 1 (the fix does not deflate the real case)",
+	stableConsistency.citation_set_agreement === 1 &&
+		stableConsistency.tarr_exact_text_agreement === 1 &&
+		stableConsistency.citation_coverage === 1,
+);
+const disagreeConsistency = scoreConsistency({
+	judgedTexts: [CITING_A, CITING_B, CITING_A, CITING_A, CITING_A],
+	noEnvelope: [false, false, false, false, false],
+});
+check(
+	"…and a real citation disagreement still scores 0",
+	disagreeConsistency.citation_set_agreement === 0,
+);
+// An LLM-level refusal (the model DID run) is still measurable for TARr.
+const llmRefusedConsistency = scoreConsistency({
+	judgedTexts: [REFUSAL, REFUSAL, REFUSAL],
+	noEnvelope: [false, false, false], // envelope WAS built; the model refused
+});
+check(
+	"an LLM-level refusal x3 keeps TARr measurable (the model ran) but EXCLUDES citation agreement",
+	llmRefusedConsistency.tarr_exact_text_agreement === 1 &&
+		llmRefusedConsistency.citation_set_agreement === null,
+	llmRefusedConsistency,
+);
+
+// (b) PARAPHRASE. Three vacuous passes at once.
+const ENV_A = new Set([1, 2, 3]);
+const ENV_B = new Set([2, 3, 4]);
+const EMPTY = new Set<number>();
+
+check(
+	"jaccard(∅, ∅) === 1 — two empty envelopes scored PERFECT retrieval stability (the bug)",
+	jaccard(EMPTY, EMPTY) === 1,
+);
+const bothRefused = scoreParaphrasePair({
+	canonicalEnvelopeIds: EMPTY,
+	paraphraseEnvelopeIds: EMPTY,
+	canonicalJudgedText: REFUSAL,
+	paraphraseJudgedText: REFUSAL,
+	canonicalBranch: "oos_or_guard",
+	paraphraseBranch: "oos_or_guard",
+});
+check(
+	"scoreParaphrasePair: two refusals EXCLUDE retrieval Jaccard, not score it 1.0",
+	bothRefused.retrieval_jaccard === null &&
+		bothRefused.jaccard_excluded_reason?.startsWith("no_envelope:both") === true,
+	bothRefused,
+);
+check(
+	"…EXCLUDE citation stability, not score it 1.0 (two uncitable answers share no set)",
+	bothRefused.citation_set_stable === null &&
+		bothRefused.citation_stability_excluded_reason?.startsWith("zero_citations:both") === true,
+);
+check(
+	"…and EXCLUDE answer-equivalence — the judge's own rubric calls two refusals 'equivalent'",
+	bothRefused.skipEquivalenceJudge &&
+		bothRefused.equivalence_excluded_reason?.startsWith("refusal:both") === true,
+);
+check(
+	"…with all three FULL-denominator coverage companions recording the zero",
+	bothRefused.both_sides_have_envelope === 0 &&
+		bothRefused.both_sides_cited === 0 &&
+		bothRefused.both_sides_answered === 0,
+);
+// One-sided failures are excluded too — but the coverage rows make them visible,
+// so nothing is swept under the rug in either direction.
+const oneSided = scoreParaphrasePair({
+	canonicalEnvelopeIds: ENV_A,
+	paraphraseEnvelopeIds: EMPTY,
+	canonicalJudgedText: CITING_A,
+	paraphraseJudgedText: REFUSAL,
+	canonicalBranch: null,
+	paraphraseBranch: "oos_or_guard",
+});
+check(
+	"a paraphrase that broke retrieval is EXCLUDED but NAMED (canonical vs paraphrase)",
+	oneSided.retrieval_jaccard === null &&
+		oneSided.jaccard_excluded_reason?.includes("paraphrase") === true &&
+		oneSided.both_sides_have_envelope === 0,
+	oneSided,
+);
+check(
+	"…and its coverage companions are what surface it (0 of 1 answered / cited)",
+	oneSided.both_sides_answered === 0 && oneSided.both_sides_cited === 0,
+);
+// The real case still measures.
+const realPair = scoreParaphrasePair({
+	canonicalEnvelopeIds: ENV_A,
+	paraphraseEnvelopeIds: ENV_B,
+	canonicalJudgedText: CITING_A,
+	paraphraseJudgedText: CITING_A,
+	canonicalBranch: null,
+	paraphraseBranch: null,
+});
+check(
+	"a genuine paraphrase pair still scores Jaccard = 1/2 and stability = 1",
+	Math.abs((realPair.retrieval_jaccard ?? 0) - 0.5) < 1e-9 &&
+		realPair.citation_set_stable === 1 &&
+		!realPair.skipEquivalenceJudge,
+	realPair,
+);
+const unstablePair = scoreParaphrasePair({
+	canonicalEnvelopeIds: ENV_A,
+	paraphraseEnvelopeIds: ENV_B,
+	canonicalJudgedText: CITING_A,
+	paraphraseJudgedText: CITING_B,
+	canonicalBranch: null,
+	paraphraseBranch: null,
+});
+check(
+	"…and a genuinely unstable citation set still scores 0",
+	unstablePair.citation_set_stable === 0,
+);
+
+// (c) NEGATIVE. A 200 that streamed no text is neither a refusal nor an answer.
+// The old code ran isRefusalText("") → false → "answered_instead_of_rejecting",
+// a FALSE FAILURE dragging the row down for a reason that is not the pipeline's
+// refusal behaviour.
+const emptyBody = rej({ text: "" });
+check(
+	"an empty 200 response is NOT MEASURABLE (excluded), not a false rejection FAILURE",
+	emptyBody.success === null && emptyBody.reason.includes("empty_response_body"),
+	emptyBody,
+);
+check(
+	"…while a real answer to an OOC probe is still an honest FAILURE",
+	rej({ text: "The NRC requires 40 hours of training." }).success === false,
+);
+
+// (d) THE REPORT. No aggregated row may print a percentage whose denominator
+// silently swallowed the vacuous cases — in EITHER direction.
+const consistencyRun = {
+	dir: "fixture",
+	manifest: {
+		experiment: "consistency",
+		aborted: false,
+		items: 2,
+		prompt_version: "test",
+		models: {},
+		judge_errors: {},
+		cost: { capUsd: 2, totalUsd: 0, byKind: {} },
+		golden_set: { sha256: "x", records: 2 },
+	},
+	items: [
+		{ metrics: { citation_set_agreement: 1, tarr_exact_text_agreement: 1, citation_coverage_across_repeats: 1 } },
+		// all 5 repeats refused, citing nothing: EXCLUDED from both agreements.
+		{ metrics: { citation_set_agreement: null, tarr_exact_text_agreement: null, citation_coverage_across_repeats: 0 } },
+	],
+} as unknown as Parameters<typeof rowsFor>[0];
+const cRows = rowsFor(consistencyRun);
+const cRow = (c: string): Row => cRows.find((r) => r.category.startsWith(c)) as Row;
+const citeAgree = cRow("Consistency (citation-set agreement");
+check(
+	"consistency: citation-set agreement = 100% over n=1 — the uncitable item is EXCLUDED, not a free 1",
+	citeAgree.measured === "100.0%" && citeAgree.n === "1" && citeAgree.excluded.startsWith("1 —"),
+	citeAgree,
+);
+check(
+	"…and the exclusion says WHY, in the table itself",
+	citeAgree.excluded.toLowerCase().includes("cited nothing") ||
+		citeAgree.excluded.toLowerCase().includes("uncitable"),
+	citeAgree.excluded,
+);
+const covRepeats = cRow("Citation coverage across repeats");
+check(
+	"…and a FULL-denominator coverage row (n=2) makes the zero-citation item visible",
+	covRepeats.measured === "50.0%" && covRepeats.n === "2",
+	covRepeats,
+);
+
+const paraphraseRun = {
+	...consistencyRun,
+	manifest: { ...consistencyRun.manifest, experiment: "paraphrase" },
+	items: [
+		{
+			paraphrases: [
+				{ metrics: { retrieval_jaccard: 0.5, citation_set_stable: 1, answer_equivalent: true, both_sides_have_envelope: 1, both_sides_cited: 1, both_sides_answered: 1 } },
+				// both sides refused: every metric EXCLUDED, all three coverages 0.
+				{ metrics: { retrieval_jaccard: null, citation_set_stable: null, answer_equivalent: null, both_sides_have_envelope: 0, both_sides_cited: 0, both_sides_answered: 0 } },
+			],
+		},
+	],
+} as unknown as Parameters<typeof rowsFor>[0];
+const pRows = rowsFor(paraphraseRun);
+const pRow = (c: string): Row => pRows.find((r) => r.category.startsWith(c)) as Row;
+const jacRow = pRow("Paraphrase retrieval Jaccard");
+check(
+	"paraphrase: Jaccard = 50% over n=1 — the both-refused pair is EXCLUDED, not scored 1.0",
+	jacRow.measured === "50.0%" && jacRow.n === "1" && jacRow.excluded.startsWith("1 —"),
+	jacRow,
+);
+const stabRow = pRow("Paraphrase citation-set stability");
+check(
+	"paraphrase: citation stability excludes the uncitable pair rather than passing it",
+	stabRow.n === "1" && stabRow.excluded.startsWith("1 —"),
+	stabRow,
+);
+const eqRow = pRow("Paraphrase answer-equivalence rate");
+check(
+	"paraphrase: equivalence excludes the refusal pair (the rubric would have called it 'equivalent')",
+	eqRow.n === "1" && eqRow.excluded.startsWith("1 —"),
+	eqRow,
+);
+check(
+	"paraphrase: three FULL-denominator coverage rows keep the exclusions honest",
+	["Paraphrase envelope coverage", "Paraphrase citation coverage", "Paraphrase answer coverage"].every(
+		(c) => pRow(c) !== undefined && pRow(c).n === "2" && pRow(c).measured === "50.0%",
+	),
+	pRows.map((r) => `${r.category}=${r.measured}/n=${r.n}`),
+);
+
+// A run in which NOTHING is measurable must print n/a — never a flattering number.
+const allVacuousParaphrase = rowsFor({
+	...paraphraseRun,
+	items: [
+		{
+			paraphrases: [
+				{ metrics: { retrieval_jaccard: null, citation_set_stable: null, answer_equivalent: null, both_sides_have_envelope: 0, both_sides_cited: 0, both_sides_answered: 0 } },
+			],
+		},
+	],
+} as unknown as Parameters<typeof rowsFor>[0]);
+check(
+	"a paraphrase run where everything refused prints n/a over n=0 — NOT 100% stability",
+	(allVacuousParaphrase.find((r) => r.category.startsWith("Paraphrase retrieval Jaccard")) as Row).measured === "n/a" &&
+		(allVacuousParaphrase.find((r) => r.category.startsWith("Paraphrase citation-set stability")) as Row).measured === "n/a",
+	allVacuousParaphrase.map((r) => `${r.category}=${r.measured}`),
+);
+const allVacuousConsistencyRows = rowsFor({
+	...consistencyRun,
+	items: [consistencyRun.items[1], consistencyRun.items[1]],
+} as unknown as Parameters<typeof rowsFor>[0]);
+check(
+	"a consistency run where every repeat cited nothing prints n/a — NOT 100% agreement",
+	(allVacuousConsistencyRows.find((r) => r.category.startsWith("Consistency (citation-set agreement")) as Row).measured === "n/a" &&
+		(allVacuousConsistencyRows.find((r) => r.category.startsWith("Consistency (TARr")) as Row).measured === "n/a",
 );
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);

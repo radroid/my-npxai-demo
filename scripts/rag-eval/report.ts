@@ -118,9 +118,29 @@ const EXPECTED: Record<string, { range: string; source: string }> = {
 		range: "~76% expected (i.e. ~24% of repeats differ verbatim)",
 		source: "arXiv 2408.04667",
 	},
+	"Citation coverage across repeats (repeats carrying ≥ 1 citation)": {
+		range:
+			"companion to citation-set agreement — agreement is UNDEFINED when no repeat cited, never a pass",
+		source: "custom metric; deterministic",
+	},
 	"Paraphrase retrieval Jaccard": {
 		range: "no canonical threshold — track deltas over time",
 		source: "arXiv 2604.10745; REAL-MM-RAG",
+	},
+	"Paraphrase envelope coverage (both sides retrieved something)": {
+		range:
+			"companion to Jaccard — an empty-vs-empty overlap is undefined, never 1.0",
+		source: "custom metric; deterministic",
+	},
+	"Paraphrase citation coverage (both sides cited ≥ 1)": {
+		range:
+			"companion to citation-set stability — undefined when either side cited nothing",
+		source: "custom metric; deterministic",
+	},
+	"Paraphrase answer coverage (neither side refused)": {
+		range:
+			"companion to answer-equivalence — two refusals are not a robust answer",
+		source: "custom metric; deterministic",
 	},
 	"Negative rejection": {
 		range: "~24.7% exact-match for vanilla ChatGPT — refusal prompting should beat it decisively",
@@ -331,8 +351,25 @@ export function rowsFor(run: Run): Row[] {
 			break;
 		}
 		case "consistency": {
-			add("Consistency (citation-set agreement ×5)", meanDefined(it.map((i) => metric(i, "citation_set_agreement"))), "not measurable");
-			add("Consistency (TARr exact text ×5)", meanDefined(it.map((i) => metric(i, "tarr_exact_text_agreement"))), "not measurable");
+			// Issue 1a. citationSetKey used to return "" for a zero-citation answer, so
+			// totalAgreement over N repeats that ALL cited nothing returned a PERFECT 1
+			// — the headline stability KPI read 100% precisely when the model cited
+			// nothing at all, N times. Those items are EXCLUDED now, and the coverage
+			// row below is what makes them visible. Read the two together.
+			add(
+				"Consistency (citation-set agreement ×5)",
+				meanDefined(it.map((i) => metric(i, "citation_set_agreement"))),
+				"every repeat cited nothing — there is no citation SET to agree about, so agreement is undefined, NOT a pass (see the coverage row)",
+			);
+			add(
+				"Consistency (TARr exact text ×5)",
+				meanDefined(it.map((i) => metric(i, "tarr_exact_text_agreement"))),
+				"every repeat took the guard/OOS branch, where the route emits a CONSTANT string and never calls the model — agreement would be 1 by construction, measuring nothing",
+			);
+			add(
+				"Citation coverage across repeats (repeats carrying ≥ 1 citation)",
+				meanDefined(it.map((i) => metric(i, "citation_coverage_across_repeats"))),
+			);
 			add(
 				"Answer equivalence among citation-disagreeing pairs",
 				meanDefined(it.map((i) => metric(i, "equivalence_rate"))),
@@ -341,24 +378,63 @@ export function rowsFor(run: Run): Row[] {
 			break;
 		}
 		case "paraphrase": {
-			const jaccards: number[] = [];
+			// Issue 1b. This experiment had NONE of the exclude-with-reason discipline:
+			// jaccard(∅,∅) === 1 scored two refusals as PERFECT retrieval stability;
+			// "" === "" gave a free citation-stability 1 when both sides cited nothing;
+			// and the equivalence rubric literally calls two refusals "equivalent". All
+			// three are excluded now, and the three coverage rows over the FULL
+			// denominator are what keep the exclusions honest.
+			const jaccards: Array<number | null> = [];
 			const equivalents: Array<number | null> = [];
-			const stable: number[] = [];
+			const stable: Array<number | null> = [];
+			const envCoverage: Array<number | null> = [];
+			const citeCoverage: Array<number | null> = [];
+			const answerCoverage: Array<number | null> = [];
+			const num = (v: unknown): number | null =>
+				typeof v === "number" ? v : null;
 			for (const i of it) {
 				for (const p of (i.paraphrases ?? []) as Array<{ metrics: Record<string, unknown> }>) {
 					const m = p.metrics;
-					if (typeof m.retrieval_jaccard === "number") jaccards.push(m.retrieval_jaccard);
-					if (typeof m.citation_set_stable === "number") stable.push(m.citation_set_stable);
-					equivalents.push(typeof m.answer_equivalent === "boolean" ? (m.answer_equivalent ? 1 : 0) : null);
+					jaccards.push(num(m.retrieval_jaccard));
+					stable.push(num(m.citation_set_stable));
+					equivalents.push(
+						typeof m.answer_equivalent === "boolean"
+							? m.answer_equivalent
+								? 1
+								: 0
+							: null,
+					);
+					envCoverage.push(num(m.both_sides_have_envelope));
+					citeCoverage.push(num(m.both_sides_cited));
+					answerCoverage.push(num(m.both_sides_answered));
 				}
 			}
-			add("Paraphrase retrieval Jaccard", meanDefined(jaccards), "not measurable");
-			add("Paraphrase answer-equivalence rate", meanDefined(equivalents), "judge error");
-			add("Paraphrase citation-set stability", meanDefined(stable), "not measurable");
+			add(
+				"Paraphrase retrieval Jaccard",
+				meanDefined(jaccards),
+				"one or both sides retrieved NOTHING — an empty-vs-empty overlap is not 1.0, it is undefined (see envelope coverage)",
+			);
+			add(
+				"Paraphrase answer-equivalence rate",
+				meanDefined(equivalents),
+				"one or both sides REFUSED — two refusals are not a robust answer (the judge's rubric would call them 'equivalent'); or judge error",
+			);
+			add(
+				"Paraphrase citation-set stability",
+				meanDefined(stable),
+				"one or both sides cited NOTHING — there is no citation set to compare, so stability is undefined, NOT a pass",
+			);
+			add("Paraphrase envelope coverage (both sides retrieved something)", meanDefined(envCoverage));
+			add("Paraphrase citation coverage (both sides cited ≥ 1)", meanDefined(citeCoverage));
+			add("Paraphrase answer coverage (neither side refused)", meanDefined(answerCoverage));
 			break;
 		}
 		case "negative": {
-			add("Negative rejection", meanDefined(it.map((i) => metric(i, "rejection_success"))), "not measurable");
+			add(
+				"Negative rejection",
+				meanDefined(it.map((i) => metric(i, "rejection_success"))),
+				"a 200 that streamed NO text — neither a refusal nor an answer, so not measurable (scoring it 0 would be a false FAILURE)",
+			);
 			const fabricated = it.filter((i) => (metric(i, "fabricated_citations") ?? 0) > 0).length;
 			addCount("Fabricated citations inside a rejection (must be 0)", String(fabricated), it.length);
 			const layers = new Map<string, number>();

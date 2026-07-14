@@ -20,7 +20,7 @@ import {
 	envelopeIdsAtK,
 	postFilterRankedIdsFromTrace,
 } from "../../lib/retrieval";
-import { extractCitations } from "./citations";
+import { citationSetKey, extractCitations } from "./citations";
 
 // ---------------------------------------------------------------------------
 // 1. Retrieval quality (ID-based, zero judge cost)
@@ -305,7 +305,9 @@ export function normalizeText(raw: string): string {
  * Index pairs (i, j) of runs whose citation sets differ — the ONLY pairs the
  * answer-equivalence judge is invoked for (cost control, R7 metric 6).
  */
-export function disagreeingPairs(keys: string[]): Array<[number, number]> {
+export function disagreeingPairs(
+	keys: Array<string | null>,
+): Array<[number, number]> {
 	const out: Array<[number, number]> = [];
 	for (let i = 0; i < keys.length; i++) {
 		for (let j = i + 1; j < keys.length; j++) {
@@ -313,6 +315,181 @@ export function disagreeingPairs(keys: string[]): Array<[number, number]> {
 		}
 	}
 	return out;
+}
+
+/**
+ * Total agreement across N repeats, WITH vacuity discipline (issue 1a).
+ *
+ *   every key NULL      → NOT MEASURABLE (null). N answers that all cited
+ *                         nothing are not "consistent"; they are all uncitable,
+ *                         and there is no set to agree about. EXCLUDED + counted.
+ *   some null, some not → a genuine DISAGREEMENT (0). One repeat cited and
+ *                         another did not — that IS instability, and it is real,
+ *                         so it is measured rather than hidden.
+ *   all equal, non-null → 1.
+ */
+export function totalAgreementOrNull(
+	keys: Array<string | null>,
+): 0 | 1 | null {
+	if (keys.length === 0) return null;
+	if (keys.every((k) => k === null)) return null;
+	return keys.every((k) => k === keys[0]) ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// 6b. CONSISTENCY scorer — the same exclude-with-reason discipline round 1 gave
+// baseline, applied uniformly (PR #8 fix round 2, issue 1a).
+
+export interface ConsistencyScores {
+	citation_set_agreement: 0 | 1 | null;
+	tarr_exact_text_agreement: 0 | 1 | null;
+	/** FULL denominator: fraction of repeats that cited at least once. This is
+	 *  the companion that makes an excluded citation-agreement visible. */
+	citation_coverage: number | null;
+	citation_agreement_excluded_reason: string | null;
+	tarr_excluded_reason: string | null;
+}
+
+export function scoreConsistency(args: {
+	/** Per repeat: the MODEL's text, route boilerplate already stripped (issue 4). */
+	judgedTexts: string[];
+	/** Per repeat: true when the route emitted NO data-sources frame — the
+	 *  deterministic jailbreak guard or the similarity OOS gate fired, which means
+	 *  NO LLM CALL WAS MADE and the emitted string is a route constant. */
+	noEnvelope: boolean[];
+}): ConsistencyScores {
+	const n = args.judgedTexts.length;
+	const keys = args.judgedTexts.map((t) => citationSetKey(t));
+	const cited = keys.filter((k) => k !== null).length;
+	const allNoLlm = n > 0 && args.noEnvelope.every(Boolean);
+	const allEmpty =
+		n > 0 && args.judgedTexts.every((t) => normalizeText(t) === "");
+
+	// TARr measures the MODEL's run-to-run text stability. On the guard/OOS branch
+	// the route emits a CONSTANT string and never calls the model — so agreement
+	// is 1 BY CONSTRUCTION and says nothing whatsoever about the answerer. A
+	// vacuous 1 is a flattering number for the wrong reason, so it is excluded.
+	const tarrExcluded =
+		n === 0
+			? "no_repeats"
+			: allNoLlm
+				? "no_llm_call_in_any_repeat:guard_or_oos_gate_emits_a_constant"
+				: allEmpty
+					? "all_repeats_empty_answer"
+					: null;
+
+	// Citation-set agreement. EXCLUDED when NOT ONE repeat cited: there is no
+	// citation set to agree about. A MIXED case (some cited, some did not) is a
+	// genuine DISAGREEMENT → 0, measured, not hidden.
+	const citationExcluded =
+		n === 0
+			? "no_repeats"
+			: cited === 0
+				? allNoLlm
+					? "no_llm_call_in_any_repeat:guard_or_oos_gate_cites_nothing"
+					: "zero_citations_in_every_repeat:no_citation_set_to_agree_about"
+				: null;
+
+	return {
+		citation_set_agreement:
+			citationExcluded === null ? totalAgreementOrNull(keys) : null,
+		tarr_exact_text_agreement:
+			tarrExcluded === null
+				? totalAgreement(args.judgedTexts.map(normalizeText))
+				: null,
+		citation_coverage: n === 0 ? null : cited / n,
+		citation_agreement_excluded_reason: citationExcluded,
+		tarr_excluded_reason: tarrExcluded,
+	};
+}
+
+// ---------------------------------------------------------------------------
+// 6c. PARAPHRASE scorer — same discipline (PR #8 fix round 2, issue 1b).
+//
+// runParaphrase computed retrieval_jaccard and citation_set_stable with NONE of
+// the exclude-with-reason discipline round 1 gave baseline:
+//
+//   - `jaccard(∅, ∅) === 1`. Canonical refused, paraphrase refused → both
+//     envelopes empty → PERFECT retrieval stability reported for a pair where
+//     NOTHING was retrieved either time.
+//   - `citationSetKey(a) === citationSetKey(b)` was `"" === ""` → a free 1
+//     whenever both sides cited nothing.
+//   - the equivalence judge's own rubric says "Both being refusals of the same
+//     kind is equivalent" — so two refusals scored as perfect paraphrase
+//     robustness. (Skipping that judge call also saves real money.)
+//
+// Every one of those is EXCLUDED with a counted reason now. The three
+// FULL-denominator coverage companions below are what keep the exclusions
+// honest: a reader who sees "equivalence 95%, n=6, excluded 54 — one side
+// refused" alongside "answer coverage 10%" cannot be misled into thinking the
+// pipeline is robust.
+
+export interface ParaphrasePairScores {
+	retrieval_jaccard: number | null;
+	citation_set_stable: 0 | 1 | null;
+	/** Full-denominator companions — the exclusions above are visible through these. */
+	both_sides_have_envelope: 0 | 1;
+	both_sides_cited: 0 | 1;
+	both_sides_answered: 0 | 1;
+	jaccard_excluded_reason: string | null;
+	citation_stability_excluded_reason: string | null;
+	equivalence_excluded_reason: string | null;
+	/** True → do NOT call the equivalence judge (vacuous, and it costs money). */
+	skipEquivalenceJudge: boolean;
+}
+
+function whichSides(canonical: boolean, paraphrase: boolean): string {
+	if (canonical && paraphrase) return "both";
+	return canonical ? "canonical" : "paraphrase";
+}
+
+export function scoreParaphrasePair(args: {
+	canonicalEnvelopeIds: Set<number>;
+	paraphraseEnvelopeIds: Set<number>;
+	/** MODEL text, route boilerplate already stripped (issue 4). */
+	canonicalJudgedText: string;
+	paraphraseJudgedText: string;
+	canonicalBranch: RouteBranch;
+	paraphraseBranch: RouteBranch;
+}): ParaphrasePairScores {
+	const cEmpty = args.canonicalEnvelopeIds.size === 0;
+	const pEmpty = args.paraphraseEnvelopeIds.size === 0;
+	const jaccardExcluded =
+		cEmpty || pEmpty
+			? `no_envelope:${whichSides(cEmpty, pEmpty)}:nothing_retrieved_to_overlap`
+			: null;
+
+	const cKey = citationSetKey(args.canonicalJudgedText);
+	const pKey = citationSetKey(args.paraphraseJudgedText);
+	const cNoCite = cKey === null;
+	const pNoCite = pKey === null;
+	const stabilityExcluded =
+		cNoCite || pNoCite
+			? `zero_citations:${whichSides(cNoCite, pNoCite)}:no_citation_set_to_compare`
+			: null;
+
+	const cRefused = REFUSAL_BRANCHES.has(String(args.canonicalBranch ?? ""));
+	const pRefused = REFUSAL_BRANCHES.has(String(args.paraphraseBranch ?? ""));
+	const equivalenceExcluded =
+		cRefused || pRefused
+			? `refusal:${whichSides(cRefused, pRefused)}:two_refusals_are_not_a_robust_answer`
+			: null;
+
+	return {
+		retrieval_jaccard:
+			jaccardExcluded === null
+				? jaccard(args.canonicalEnvelopeIds, args.paraphraseEnvelopeIds)
+				: null,
+		citation_set_stable:
+			stabilityExcluded === null ? (cKey === pKey ? 1 : 0) : null,
+		both_sides_have_envelope: cEmpty || pEmpty ? 0 : 1,
+		both_sides_cited: cNoCite || pNoCite ? 0 : 1,
+		both_sides_answered: cRefused || pRefused ? 0 : 1,
+		jaccard_excluded_reason: jaccardExcluded,
+		citation_stability_excluded_reason: stabilityExcluded,
+		equivalence_excluded_reason: equivalenceExcluded,
+		skipEquivalenceJudge: equivalenceExcluded !== null,
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +521,8 @@ export function disagreeingPairs(keys: string[]): Array<[number, number]> {
 // LLM-level refusal.
 
 export interface RejectionVerdict {
-	success: boolean;
+	/** null = NOT MEASURABLE (excluded + counted), never a silent 0 or 1. */
+	success: boolean | null;
 	layer: "guard_http" | "deterministic_or_sim_gate" | "llm_refusal" | "none";
 	fabricatedCitations: number;
 	reason: string;
@@ -368,6 +546,20 @@ export function scoreRejection(args: {
 			layer: "guard_http",
 			fabricatedCitations: 0,
 			reason: `blocked_http_${status}`,
+		};
+	}
+	// PR #8 fix round 2 (issue 1, negative audit). A 200 that streamed NO text is
+	// not a refusal — it is a stream that produced nothing (an upstream stall, an
+	// aborted fetch). The old code ran isRefusalText("") → false → scored it
+	// "answered_instead_of_rejecting", i.e. a FALSE FAILURE that would drag the
+	// negative-rejection row DOWN for a reason that is not the pipeline's refusal
+	// behaviour at all. Not measurable: excluded and counted, never a silent 0.
+	if (text.trim() === "") {
+		return {
+			success: null,
+			layer: "none",
+			fabricatedCitations: 0,
+			reason: "empty_response_body:no_text_streamed:not_measurable",
 		};
 	}
 	const refused = isRefusalText(text) || isLowConfidenceText(text);
