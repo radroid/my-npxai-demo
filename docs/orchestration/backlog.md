@@ -2,7 +2,7 @@
 
 Sprint brief (Raj, 2026-07-13): (1) Knowledge Hub "Artifact" mode — a search-time toggle that, instead of the chat interface, generates a high-quality self-contained HTML explainer ("artifact", as the AI labs call it) for a complex topic; success criteria: HTML files that explain boring nuclear regulations well, aligned with the NPX theme, containing diagrams and visuals that aid the text. (2) A RAG-pipeline evaluation framework: experiments comparing what is in the ingested files vs what the agent answers, using established metrics (web-researched), with heavy logging, delivering realistic percentages across multiple rating categories. Timelapse-file cleanup was a pre-item (done inline by the orchestrator).
 
-**Progress:** item-1 slice 1.1 built (PR #6, gates green) — adversarial review in flight. Both specs written (docs/orchestration/specs/). Shipped: PR #5 (scaffolding). Next: PR #6 review → fix → merge, then slice 1.2 + item-2 slice 2.1 in parallel.
+**Progress:** PR #6 MERGED (item-1 slice 1.1: artifact backend + lib/retrieval.ts + test harness; 31-agent review APPROVE, smell-probe defect fixed in round 1). In flight: slice 1.2 (frontend, feat/artifact-frontend) + item-2 slice 2.1 (eval framework, feat/rag-eval-framework, isolated worktree) in parallel. Live smoke deferred to manual queue (dev server down). Shipped: PR #5, PR #6.
 
 ## Items
 
