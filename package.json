@@ -17,6 +17,10 @@
 		"evals:security": "bun run scripts/eval-security.ts",
 		"test:tiers": "bun run scripts/tier-tests.ts",
 		"test:artifact": "bun run scripts/test-artifact.ts",
+		"test:rag-eval": "bun run scripts/test-rag-eval.ts",
+		"eval:rag": "bun run scripts/rag-eval/run.ts",
+		"eval:rag:golden": "bun run scripts/rag-eval/generate-golden.ts",
+		"eval:rag:report": "bun run scripts/rag-eval/report.ts",
 		"build:cloudflare": "bunx opennextjs-cloudflare build",
 		"preview:cloudflare": "bunx opennextjs-cloudflare preview",
 		"deploy:cloudflare": "bunx opennextjs-cloudflare deploy"

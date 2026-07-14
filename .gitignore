@@ -57,3 +57,8 @@ scraped_regdocs/
 
 # ui-test scratch (screenshots, reports)
 .context/
+
+# rag-eval artifacts — per-run logs and cached judge verdicts are NOT committed
+# (item-2: only the datasets evals/*.jsonl, the report, and the summary JSON are)
+evals/results/
+evals/.judge-cache/
