@@ -213,6 +213,77 @@ export const KNOWLEDGE_HUB_LOW_CONFIDENCE =
 export const KNOWLEDGE_HUB_OUT_OF_SCOPE =
 	"This assistant only answers questions about the indexed CNSC regulatory documents. Your question appears to be outside that scope.";
 
+// The chat route's LOW-AVERAGE-SIMILARITY branch (avg-8 < LOW_SIM_DISCLAIMER)
+// prepends this line to an otherwise normal answer — it is NOT a refusal, the
+// model still answers from the weak snippets. Extracted from
+// app/api/knowledge-hub/query/route.ts (which now imports it) so the eval
+// framework can detect the branch by what the app ACTUALLY emits instead of
+// guessing. The trailing "\n\n" is part of the emitted delta — keep it: the
+// route's emitted bytes must not change.
+export const KNOWLEDGE_HUB_LIMITED_CONTEXT =
+	"_Limited matches in the indexed corpus for this question — answering from the strongest available snippets._\n\n";
+
+// ---------------------------------------------------------------------------
+// Branch sentinels for the eval harnesses (scripts/eval-security.ts,
+// scripts/rag-eval/*).
+//
+// Detection is LOWERCASED SUBSTRING, never exact/prefix match, because the
+// three lines above reach the wire by two different routes:
+//   - KNOWLEDGE_HUB_OUT_OF_SCOPE / KNOWLEDGE_HUB_LIMITED_CONTEXT are emitted
+//     VERBATIM by the route (deterministic guard, similarity OOS gate, low-avg
+//     disclaimer) — possibly with other text around them.
+//   - The refusal one-liner and the low-confidence line are emitted by the
+//     MODEL, which is told to produce them by KNOWLEDGE_HUB_SYSTEM (security
+//     boundary + answer rule 4). The model routinely wraps, re-cases, or
+//     surrounds them with prose, so only a substring of the invariant core is
+//     safe to match.
+// These markers are the invariant core of each, lowercased. scripts/
+// eval-security.ts's grade() is the reference implementation; every eval
+// imports these rather than re-deriving its own copy.
+export const REFUSAL_MARKER = "only answers questions about the indexed cnsc";
+export const LOW_CONFIDENCE_MARKER = "don't have enough from the indexed cnsc";
+export const LIMITED_CONTEXT_MARKER = "limited matches in the indexed corpus";
+
+/** Canonical out-of-scope line OR the model's refusal one-liner. */
+export function isRefusalText(text: string): boolean {
+	return text.toLowerCase().includes(REFUSAL_MARKER);
+}
+
+/** The model's "I don't have enough…" line (system prompt answer rule 4). */
+export function isLowConfidenceText(text: string): boolean {
+	return text.toLowerCase().includes(LOW_CONFIDENCE_MARKER);
+}
+
+/** The route's deterministic low-avg-similarity disclaimer prefix. */
+export function isLimitedContextText(text: string): boolean {
+	return text.toLowerCase().includes(LIMITED_CONTEXT_MARKER);
+}
+
+/**
+ * Strip a leading KNOWLEDGE_HUB_LIMITED_CONTEXT disclaimer, returning the MODEL's
+ * own output (PR #8 fix round 2, issue 4).
+ *
+ * The disclaimer is ROUTE BOILERPLATE — the low-avg-similarity branch prepends it
+ * to an otherwise normal answer (route.ts). It is not something the model wrote.
+ * Feed the raw text to a claim-decomposition judge and the judge dutifully
+ * extracts "Limited matches in the indexed corpus for this question" as one more
+ * claim: unsupported by any chunk, and carrying no citation. So faithfulness and
+ * citation-support get DEFLATED — and precisely on the weak-retrieval questions,
+ * the hardest ones, where the disclaimer fires. That is the exact mirror image of
+ * the vacuous-pass bug this PR is named for: a metric made to read WORSE than the
+ * pipeline deserves is no more honest than one made to read better.
+ *
+ * Use this for anything that judges or decomposes MODEL OUTPUT. Do NOT use it for
+ * branch classification (classifyBranch) or refusal scoring (scoreRejection) —
+ * those exist to detect this very prefix and must see the RAW text.
+ */
+export function stripLimitedContextPrefix(text: string): string {
+	const disclaimer = KNOWLEDGE_HUB_LIMITED_CONTEXT.trimEnd();
+	const lead = text.trimStart();
+	if (!lead.toLowerCase().startsWith(disclaimer.toLowerCase())) return text;
+	return lead.slice(disclaimer.length).trimStart();
+}
+
 export const GENERATOR_SYSTEM = `You are generating a CANDU shift turnover report per CNSC REGDOC-2.3.4.
 Input data for the requested unit is provided as a JSON object with keys:
 - plant_status: list of parameter readings (unit_id, parameter, value,

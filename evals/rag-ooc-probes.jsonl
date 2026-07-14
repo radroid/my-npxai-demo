@@ -1,0 +1,23 @@
+{"probe_id":"ooc-001","question":"What does 10 CFR 55 require for the medical qualification of licensed reactor operators?","category":"us_nrc","expected":"reject"}
+{"probe_id":"ooc-002","question":"Under NRC regulations, how many hours of simulator training must a US operator complete before an initial licence examination?","category":"us_nrc","expected":"reject"}
+{"probe_id":"ooc-003","question":"What is the NRC's Reactor Oversight Process significance determination process and how are findings colour-coded?","category":"us_nrc","expected":"reject"}
+{"probe_id":"ooc-004","question":"What annual occupational dose limit does 10 CFR 20 set for adult radiation workers in the United States?","category":"us_nrc","expected":"reject"}
+{"probe_id":"ooc-005","question":"What does IAEA Safety Standard SSR-2/1 require for the design of a nuclear power plant's ultimate heat sink?","category":"iaea","expected":"reject"}
+{"probe_id":"ooc-006","question":"How does the IAEA define the seven levels of the International Nuclear and Radiological Event Scale?","category":"iaea","expected":"reject"}
+{"probe_id":"ooc-007","question":"What are the IAEA's INFCIRC/153 safeguards reporting obligations for a state with a comprehensive safeguards agreement?","category":"iaea","expected":"reject"}
+{"probe_id":"ooc-008","question":"What does the UK Office for Nuclear Regulation's Safety Assessment Principles say about ALARP demonstration?","category":"other_jurisdiction","expected":"reject"}
+{"probe_id":"ooc-009","question":"Under France's ASN rules, how often must a pressurised water reactor undergo a decennial visit?","category":"other_jurisdiction","expected":"reject"}
+{"probe_id":"ooc-010","question":"What licensing basis documents does Japan's Nuclear Regulation Authority require for a restart approval after the 2011 backfit rules?","category":"other_jurisdiction","expected":"reject"}
+{"probe_id":"ooc-011","question":"What is the thermal neutron fission cross-section of uranium-235 in barns?","category":"general_physics","expected":"reject"}
+{"probe_id":"ooc-012","question":"Explain how the six-factor formula determines the effective neutron multiplication factor in a thermal reactor.","category":"general_physics","expected":"reject"}
+{"probe_id":"ooc-013","question":"What is the half-life of caesium-137 and what is its principal decay mode?","category":"general_physics","expected":"reject"}
+{"probe_id":"ooc-014","question":"Why does xenon-135 poisoning peak roughly nine hours after a reactor shutdown?","category":"general_physics","expected":"reject"}
+{"probe_id":"ooc-015","question":"What does REGDOC-2.13.1 require licensees to report about nuclear material accounting and safeguards?","category":"adjacent_cnsc","expected":"reject"}
+{"probe_id":"ooc-016","question":"What fitness-for-duty alcohol and drug testing regime does REGDOC-2.2.4 impose on safety-critical workers?","category":"adjacent_cnsc","expected":"reject"}
+{"probe_id":"ooc-017","question":"What does REGDOC-2.4.2 require for the scope of a Level 2 probabilistic safety assessment?","category":"adjacent_cnsc","expected":"reject"}
+{"probe_id":"ooc-018","question":"Under the Packaging and Transport of Nuclear Substances Regulations, what are the Type B package testing requirements?","category":"adjacent_cnsc","expected":"reject"}
+{"probe_id":"ooc-019","question":"What does REGDOC-3.2.1 require of a licensee's public information and disclosure programme?","category":"adjacent_cnsc","expected":"reject"}
+{"probe_id":"ooc-020","question":"REGDOC-2.3.4 sets a maximum shift turnover duration of 45 minutes — which section states that limit?","category":"false_premise","expected":"reject"}
+{"probe_id":"ooc-021","question":"Which section of the NSCA establishes the CNSC's authority to levy carbon-emission penalties on nuclear operators?","category":"false_premise","expected":"reject"}
+{"probe_id":"ooc-022","question":"REGDOC-2.7.1 requires licensees to keep worker dose records for exactly 12 years — what happens at the end of that period?","category":"false_premise","expected":"reject"}
+{"probe_id":"ooc-023","question":"Under REGDOC-2.2.5, how many certified fuel-handling operators must be on shift at a small modular reactor with no fuel-handling system?","category":"false_premise","expected":"reject"}

@@ -6,11 +6,20 @@ Features that shipped on build/unit green but whose runtime oracle cannot run un
 
 ### 🔴 BLOCKERS — item-2 cannot produce real numbers until these are done (Raj only)
 
-- [ ] **Un-pause the Supabase project** — `ptepxophdneugvcziqny.supabase.co` returns NXDOMAIN again (third recurrence; same signature as 2026-05-14, which was a free-tier inactivity **pause**, not a deletion — see `supabase/RECOVERY.md`). Consequence: `bun run eval:rag:golden` aborted at preflight before spending a cent, so `evals/rag-golden.jsonl` + `rag-paraphrases.jsonl` currently ship as **`placeholder: true`** and the runner REFUSES to score them. Every RAG score in the report is blocked on this one dashboard click. If the project is truly gone rather than paused, `supabase/RECOVERY.md` has the full rebuild runbook (create → link → `db push` → `.env.local` → `bun run ingest` → re-run evals).
-- [ ] **Start the dev server** (`bun dev`, port 3001) — the answer-battery harness talks to the real pipeline over HTTP. Agents are forbidden from starting it (CLAUDE.md), so it has never made a live request; slice 2.2 needs it up.
+- [ ] **Un-pause the Supabase project** — `ptepxophdneugvcziqny` (NPX-demo). `supabase projects list` confirms it still EXISTS and is still linked, so it is **paused, not deleted** (its REST host returns NXDOMAIN; a paused free-tier project drops its DNS record — same signature as the 2026-05-14 pause, see `supabase/RECOVERY.md`). The CLI has no unpause/restore command (`projects` offers only list/create/api-keys/delete), so this needs the dashboard — or export `SUPABASE_ACCESS_TOKEN` in an agent session and the Management API restore endpoint can do it. Consequence while paused: `bun run eval:rag:golden` aborts at preflight before spending a cent, so `evals/rag-golden.jsonl` + `evals/rag-paraphrases.jsonl` ship as clearly-labelled **`placeholder: true`** and the runner REFUSES to score them. Every RAG score in the report is blocked on this. (If it truly is gone rather than paused, `supabase/RECOVERY.md` has the rebuild runbook: create → link → `db push` → `.env.local` → `bun run ingest` → re-run evals.)
+- [ ] **Start the dev server** (`bun dev`, port 3001) — the answer battery scores the REAL pipeline over HTTP. Agents are forbidden from starting it (CLAUDE.md), so the HTTP path has **never executed once**; slice 2.2 is its first live run.
 
-Then the item-2 battery runs in this order (each is cost-capped; `eval:rag:golden` ≈ $0.60–0.90, full battery authorized at `EVAL_COST_CAP_USD=4`):
-`bun run eval:rag:golden` → spot-check the generated golden set by hand (it is agent-curated) → `bun run eval:rag --experiment baseline --limit 5` (smoke) → `baseline`, `ksweep`, `consistency`, `paraphrase`, `negative` → `bun run eval:rag:report --out evals/rag-eval-report.md`.
+### item-2 slice 2.2 — the battery, in order
+
+Each step is cost-capped (`EVAL_COST_CAP_USD`, default 2; the full battery is authorized at 4).
+
+1. `bun run eval:rag:golden` — generates the real golden + paraphrase sets. Expected spend ≈ $0.60–0.90.
+2. **Human-review the generated golden set** (spec R3 curation) — it is AGENT-CURATED only: no human has verified answerability or chunk attribution. Review each record's `ground_truth_answer` and `gold_chunks` — at minimum a 25–30% stratified sample plus ALL `difficulty: multi` items (research doc §Golden dataset construction). **The report must disclose the review status either way.**
+3. `bun run eval:rag --experiment baseline --limit 5` — SMOKE the harness. Expect < $0.25, an `items.jsonl` + `manifest.json` under `evals/results/`, and a printed three-way cost split. Do this before the full battery: the HTTP path has never run live, so this is first contact.
+4. Full battery: `EVAL_COST_CAP_USD=4 bun run eval:rag --experiment baseline`, then `ksweep`, `consistency`, `paraphrase`, `negative`.
+5. `bun run eval:rag:report --out evals/rag-eval-report.md`.
+
+> **Cost note (corrected):** a server-backed **re-run is NOT cheap**. The judge cache keys on answer text, and the harness deliberately busts the answer cache with a non-deterministic answerer — so every run produces fresh answers, fresh hashes, and zero judge-cache hits. Budget full judge price per battery run (~$2–4 baseline, ~$5–8 full). The cache only hits for the golden/paraphrase generators, whose inputs are stable.
 
 ### Feature verification
 

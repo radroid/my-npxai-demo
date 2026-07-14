@@ -159,6 +159,30 @@ function buildExpansions(
 	return out;
 }
 
+// ADDITIVE (item-2 PR #8 fix round 2, issue 3 — WALLET): the EXACT list of
+// strings retrieveChunks will send to `embeddings.create` for a query — the
+// primary query plus every expansion. Pure, offline, network-free, free.
+//
+// Why this exists. The eval cost accountant cannot observe the dev server's
+// internal embedding call, so it used to charge `countTokens(question) *
+// EMBED_INPUT_MULTIPLIER` with EMBED_INPUT_MULTIPLIER = 5, documented as
+// "1 primary + 4 expansions, above the practical ceiling". It is NOT a ceiling.
+// buildExpansions() emits, PER mentioned doc, one NARROW expansion per mentioned
+// section + one CONCEPT expansion per matched seed + one BROAD `${doc} ${query}`.
+// extractMentionedDocs() can return an unbounded number of docs (every REGDOC the
+// query names, plus up to 4 CONCEPT_DOC_HINTS), and each BROAD expansion carries
+// the WHOLE query — so a multi-doc question sends far more than 5x the query's
+// tokens and the "err-high" factor silently erred LOW on the one spending path
+// the eval cannot see. Counting exactly is free, so we count exactly.
+//
+// retrieveChunks builds its own inputs through this same function, so the eval's
+// count and production's call can never drift.
+export function embeddingInputsFor(query: string): string[] {
+	const docs = extractMentionedDocs(query);
+	const sections = extractMentionedSections(query);
+	return [query, ...buildExpansions(query, docs, sections)];
+}
+
 // Doc-diversity pass: when multiple docs are mentioned, seed the envelope
 // with the TOP chunk from each mentioned doc before filling by overall
 // score. Without this, a single doc's chunks can sweep the top 8 and the
@@ -207,6 +231,12 @@ export class RetrievalError extends Error {
 export interface RetrievalDeps {
 	supabase: GuardedHandlerArgs["supabase"];
 	openai: OpenAI;
+	// ADDITIVE (item-2 DELTA D2): OpenAI-call accounting hook. Defaults to
+	// recordOpenAICall — the global daily circuit-breaker increment — so both
+	// production routes keep byte-identical behavior without passing anything.
+	// The RAG eval harness passes an explicit no-op so direct (non-HTTP)
+	// retrieval calls never consume the production GLOBAL_DAILY_CAP budget.
+	recordUsage?: (costUsd?: number) => Promise<void>;
 }
 
 export interface RetrievalOptions {
@@ -214,12 +244,134 @@ export interface RetrievalOptions {
 	// calibrated 8 (ENVELOPE_CHUNKS above); the artifact route passes 12
 	// because explainers span more sections than chat answers.
 	envelopeChunks: number;
+	// ADDITIVE (item-2 DELTA D1): when true, the result carries a
+	// RetrievalTrace for eval instrumentation. Neither production route sets
+	// this, so their behavior and result shape are unchanged.
+	withTrace?: boolean;
+}
+
+// ADDITIVE (item-2 DELTA D1): one entry per candidate chunk in the merged
+// pool, in POST-boost rank order. `similarity` is the raw cosine sim the
+// pool was merged on; `score` is what the reranker actually sorted by.
+export interface TracePoolEntry {
+	chunk: RetrievedChunk;
+	similarity: number;
+	boosted: boolean;
+	score: number;
+	rankPreBoost: number;
+	rankPostBoost: number;
+}
+
+// ADDITIVE (item-2 DELTA D1): everything the eval framework needs to score
+// retrieval offline — expansion queries used, the full ranked pool with
+// pre/post-boost ranks, and the fallback decision the chat route would take.
+// `decision` mirrors the CHAT route's branch order: OOS gate on raw-pool
+// top-1, then the disclaimer check on the post-filter envelope average
+// (which is structurally >= MIN_CHUNK_SIM in the non-OOS branch — kept for
+// fidelity, see poolAvgSim above for the live limited-coverage signal).
+export interface RetrievalTrace {
+	query: string;
+	expansions: string[];
+	mentionedDocs: string[];
+	mentionedSections: string[];
+	topSim: number;
+	decision: "oos" | "disclaimer" | "normal";
+	pool: TracePoolEntry[];
+	// ADDITIVE (item-2 PR #8 fix round 2, issue 2).
+	stages: RetrievalStages;
+}
+
+// ADDITIVE (item-2 PR #8 fix round 2, issue 2): the pipeline's three DISTINCT
+// stages, exposed separately so every retrieval metric reads the list its
+// DEFINITION requires — and NAMES it — instead of all of them sharing whichever
+// list is most convenient.
+//
+// Fix round 1 correctly moved the rank-sensitive metrics off the `data-sources`
+// frame (whose order is the diversity-reordered envelope, not a ranking) and
+// onto this trace. But it then scored them over `pool`, which is the UNFILTERED
+// merged candidate list straight out of `match_regdoc_chunks` — a SUPERSET that
+// production never surfaces to the model. A metric computed over a pool the
+// pipeline never showed anyone does not describe the shipped pipeline.
+//
+//   rawRankedIds         The merged candidate pool in raw cosine-similarity
+//                        order, BEFORE the MIN_CHUNK_SIM filter and BEFORE the
+//                        named-doc boost. This is the retriever's unfiltered
+//                        candidate set; production NEVER shows it to the model.
+//                        Diagnostic only — no reported metric scores it.
+//
+//   postFilterRankedIds  The same list with MIN_CHUNK_SIM applied, still in
+//                        cosine order: the chunks that are ELIGIBLE to reach the
+//                        model. This is the honest denominator for a rank metric
+//                        (MRR): a chunk below the filter can never be surfaced,
+//                        so ranking it credits the retriever with a rank
+//                        production discards. EMPTY on the OOS branch — nothing
+//                        is eligible there, the route refuses without an
+//                        envelope.
+//
+//   envelopeIds          What the route ACTUALLY feeds the LLM, in prompt order:
+//                        post-boost, post-filter, doc-diversity selected, trimmed
+//                        to `opts.envelopeChunks`. This is RAGAS's
+//                        `retrieved_contexts` — the window whose noise causes the
+//                        generation errors context precision exists to measure.
+//                        EMPTY on the OOS branch (see envelopeIdsAtK).
+export interface RetrievalStages {
+	rawRankedIds: number[];
+	postFilterRankedIds: number[];
+	envelopeIds: number[];
+}
+
+// ADDITIVE (fix round 2, issue 2): the ids the ROUTE would feed the LLM at
+// envelope size k. EMPTY on the OOS branch, where the route short-circuits with
+// the canonical out-of-scope line and builds NO envelope at all.
+//
+// Deliberately DISTINCT from deriveEnvelopeAtK, which mirrors retrieveChunks'
+// RETURN value — and that value is the full ranked pool on the OOS branch, which
+// the route then discards. Scoring "what the model saw" against that list would
+// credit the pipeline for chunks it refused to show. Use this for any
+// envelope-stage metric; use deriveEnvelopeAtK only to reproduce retrieveChunks.
+export function envelopeIdsAtK(trace: RetrievalTrace, k: number): number[] {
+	if (trace.decision === "oos") return [];
+	return deriveEnvelopeAtK(trace, k)
+		.slice(0, k)
+		.map((c) => c.id);
+}
+
+// ADDITIVE (fix round 2, issue 2): the similarity-ranked, MIN_CHUNK_SIM-eligible
+// pool — the honest denominator for MRR. The trace's `pool` arrives in POST-boost
+// order, so restore cosine order via rankPreBoost before filtering.
+export function postFilterRankedIdsFromTrace(trace: RetrievalTrace): number[] {
+	if (trace.decision === "oos") return [];
+	return trace.pool
+		.slice()
+		.sort((a, b) => a.rankPreBoost - b.rankPreBoost)
+		.filter((e) => e.similarity >= MIN_CHUNK_SIM)
+		.map((e) => e.chunk.id);
+}
+
+// ADDITIVE (item-2 DELTA D1): replay the route's envelope selection at any k
+// from a captured trace — same MIN_CHUNK_SIM filter, same doc-diversity pass,
+// same OOS branch (full ranked pool). Lets the eval k-sweep derive envelopes
+// for k ∈ {3,5,8,10} from ONE retrieval (one embedding spend), guaranteed
+// identical to what retrieveChunks would select at that envelopeChunks.
+export function deriveEnvelopeAtK(
+	trace: RetrievalTrace,
+	k: number,
+): RetrievedChunk[] {
+	const ranked = trace.pool.map((e) => e.chunk);
+	if (trace.topSim < LOW_SIM_OOS) return ranked;
+	return selectDiverseEnvelope(
+		ranked.filter((c) => c.similarity >= MIN_CHUNK_SIM),
+		new Set(trace.mentionedDocs),
+		k,
+	);
 }
 
 export interface RetrievalResult {
 	envelope: RetrievedChunk[];
 	topSim: number;
 	avgSim: number;
+	// ADDITIVE (item-2 DELTA D1): present ONLY when opts.withTrace is true.
+	trace?: RetrievalTrace;
 	// ADDITIVE (PR #6 fix round 1): mean similarity over the FULL ranked
 	// candidate pool BEFORE the MIN_CHUNK_SIM filter. In the non-OOS branch
 	// the envelope only contains chunks >= MIN_CHUNK_SIM (0.35), so the
@@ -247,8 +399,12 @@ export async function retrieveChunks(
 	// each mentioned doc so that chunks in heavy-legal or glossary docs
 	// (NSCA §48, REGDOC-3.5.3 §5.4) can surface even when they embed
 	// weakly against the verbose natural-language question.
-	const expansions = buildExpansions(query, mentionedDocs, mentionedSections);
-	const embedInputs = [query, ...expansions];
+	//
+	// Routed through embeddingInputsFor() (fix round 2, issue 3) so the eval
+	// cost accountant charges the SAME list this call actually sends — one
+	// source of truth, no drift, no guessed multiplier.
+	const embedInputs = embeddingInputsFor(query);
+	const expansions = embedInputs.slice(1);
 
 	let embeddings: number[][];
 	try {
@@ -260,7 +416,7 @@ export async function retrieveChunks(
 		if (embeddings.length !== embedInputs.length) {
 			throw new Error("embedding count mismatch");
 		}
-		await recordOpenAICall(0);
+		await (deps.recordUsage ?? recordOpenAICall)(0);
 	} catch (err) {
 		console.error("embedding_error", err);
 		throw new RetrievalError("embedding", err);
@@ -350,10 +506,58 @@ export async function retrieveChunks(
 			? ranked.reduce((acc, c) => acc + c.similarity, 0) / ranked.length
 			: 0;
 
+	// ADDITIVE (item-2 DELTA D1): trace is built AFTER every production value
+	// above so it can never influence them; gated on withTrace so the routes
+	// (which never set it) pay nothing.
+	let trace: RetrievalTrace | undefined;
+	if (opts.withTrace) {
+		const preBoostRank = new Map<number, number>(
+			rawPool.map((c, i) => [c.id, i + 1]),
+		);
+		const oos = topSim < LOW_SIM_OOS;
+		trace = {
+			query,
+			expansions,
+			mentionedDocs: Array.from(mentionedDocs),
+			mentionedSections,
+			topSim,
+			decision: oos
+				? "oos"
+				: avgSim < LOW_SIM_DISCLAIMER
+					? "disclaimer"
+					: "normal",
+			pool: ranked.map((c, i) => ({
+				chunk: c,
+				similarity: c.similarity,
+				boosted: mentionedDocs.has(c.regdoc_id),
+				score:
+					c.similarity + (mentionedDocs.has(c.regdoc_id) ? NAMED_DOC_BOOST : 0),
+				rankPreBoost: preBoostRank.get(c.id) ?? 0,
+				rankPostBoost: i + 1,
+			})),
+			// The three stages, each named so a metric can say which one it scores
+			// (fix round 2, issue 2). On the OOS branch the route refuses WITHOUT
+			// building an envelope, so the eligible pool and the envelope are both
+			// EMPTY — even though `chunks` (this function's return value) carries the
+			// full ranked pool there. Reporting that pool as "what was retrieved"
+			// would score a list the pipeline explicitly declined to show anyone.
+			stages: {
+				rawRankedIds: rawPool.map((c) => c.id),
+				postFilterRankedIds: oos
+					? []
+					: rawPool
+							.filter((c) => c.similarity >= MIN_CHUNK_SIM)
+							.map((c) => c.id),
+				envelopeIds: oos ? [] : chunks.map((c) => c.id),
+			},
+		};
+	}
+
 	return {
 		envelope: chunks,
 		topSim,
 		avgSim,
+		trace,
 		poolAvgSim,
 		mentionedDocs: Array.from(mentionedDocs),
 	};

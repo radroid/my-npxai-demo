@@ -1,0 +1,1 @@
+{"parent_question_id":"PLACEHOLDER-000","paraphrase_id":"PLACEHOLDER-000-p1","question":"PLACEHOLDER — paraphrases are derived from the golden set, which could not be generated (Supabase paused). Regenerate both with `bun run eval:rag:golden`.","placeholder":true}
