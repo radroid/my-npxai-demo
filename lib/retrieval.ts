@@ -237,21 +237,42 @@ export class RetrievalError extends Error {
 // Error("accounting failed", { cause: costCapError })`, an AggregateError from
 // a Promise.all, a re-throw that adds context) would present a non-CostCapError
 // on top, the check would miss it, retrieval would swallow it, and the eval
-// would keep spending past its cap. So walk the `cause` chain.
+// would keep spending past its cap.
 //
-// Bounded depth: a cyclic or adversarially deep chain must not hang the route.
-// 8 is far past any real wrapping depth; a CostCapError buried deeper than that
-// is not a shape we produce.
+// So walk BOTH edges an error can hide behind (PR #11 round 2, B7). The round-1
+// version claimed to handle an AggregateError and did not: AggregateError puts
+// its sub-errors in `.errors`, and its `.cause` is undefined, so a `cause`-only
+// walk terminated on the first hop and returned false. `isCostCapError(new
+// AggregateError([capErr]))` was a silent miss — i.e. the wallet guard the
+// comment advertised did not exist for the exact shape it named. Breadth-first
+// over `cause` AND `errors` closes it.
+//
+// Bounded: a cyclic, adversarially deep, or adversarially WIDE chain must not
+// hang the route. Depth 8 is far past any real wrapping depth; the node budget
+// stops a 100k-element AggregateError from turning a fail-open catch into a
+// stall. A CostCapError buried past either bound is not a shape we produce.
 const CAUSE_CHAIN_MAX_DEPTH = 8;
+const CAUSE_CHAIN_MAX_NODES = 64;
 function isCostCapError(err: unknown): boolean {
 	const seen = new Set<unknown>();
-	let current: unknown = err;
+	let frontier: unknown[] = [err];
 	for (let depth = 0; depth < CAUSE_CHAIN_MAX_DEPTH; depth++) {
-		if (current === null || current === undefined) return false;
-		if (seen.has(current)) return false; // cycle
-		seen.add(current);
-		if ((current as Error)?.name === "CostCapError") return true;
-		current = (current as { cause?: unknown })?.cause;
+		if (frontier.length === 0) return false;
+		const next: unknown[] = [];
+		for (const current of frontier) {
+			if (current === null || current === undefined) continue;
+			if (seen.has(current)) continue; // cycle
+			if (seen.size >= CAUSE_CHAIN_MAX_NODES) return false;
+			seen.add(current);
+			if ((current as Error)?.name === "CostCapError") return true;
+			const cause = (current as { cause?: unknown })?.cause;
+			if (cause !== null && cause !== undefined) next.push(cause);
+			// AggregateError (Promise.all / Promise.any rejections) — and anything
+			// else that collects sub-errors under `.errors`.
+			const nested = (current as { errors?: unknown })?.errors;
+			if (Array.isArray(nested)) next.push(...nested);
+		}
+		frontier = next;
 	}
 	return false;
 }
@@ -464,8 +485,8 @@ export async function retrieveChunks(
 	// ONE EXCEPTION, and it is load-bearing: a CostCapError means the eval
 	// harness hit its spend ceiling and is deliberately aborting the run. That
 	// must propagate — swallowing it would silently defeat the wallet guard.
-	// isCostCapError walks the `cause` chain, so a WRAPPED cost-cap error still
-	// aborts (see its definition above).
+	// isCostCapError walks the `cause` chain AND `AggregateError.errors`, so a
+	// WRAPPED cost-cap error still aborts (see its definition above).
 	try {
 		await (deps.recordUsage ?? recordOpenAICall)(0);
 	} catch (err) {

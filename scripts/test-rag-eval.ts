@@ -20,6 +20,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import type { Redis } from "@upstash/redis";
+import type { NextRequest } from "next/server";
 import type OpenAI from "openai";
 import {
 	type CacheClient,
@@ -28,7 +30,17 @@ import {
 	cacheWrite,
 } from "../lib/cache";
 import { type RetrievedChunk, buildContextEnvelope } from "../lib/context-envelope";
-import { type AccountingRedis, getRedis, recordOpenAICall } from "../lib/guard";
+import {
+	type AccountingRedis,
+	type GuardDeps,
+	createRedisClient,
+	degradedBackstop,
+	getRedis,
+	isRedisDegraded,
+	markRedisHealthy,
+	recordOpenAICall,
+	withGuard,
+} from "../lib/guard";
 import {
 	LOW_SIM_OOS,
 	MIN_CHUNK_SIM,
@@ -579,7 +591,9 @@ check("trace pool carries pre/post-boost ranks + similarities", trace.pool.lengt
 	//      IMMEDIATELY caught error only. Any wrapper — a re-throw that adds context,
 	//      an AggregateError — would present a non-CostCapError on top, the check
 	//      would miss it, retrieval would swallow it, and the eval would keep
-	//      spending past its ceiling. The matcher now walks the `cause` chain.
+	//      spending past its ceiling. The matcher now walks the `cause` chain and
+	//      `AggregateError.errors` (round 2, B7 — the AggregateError half of that
+	//      claim was false when it was first written; §25 pins it).
 	let wrappedCapPropagated = false;
 	let wrappedCapName: string | null = null;
 	try {
@@ -2637,6 +2651,358 @@ check(
 		'void cacheDelete(cKey, "kh_cache_invalidate_error")',
 	),
 );
+
+// ---------------------------------------------------------------------------
+section("25. PR #11 B5/B6/B7 — a dead Redis must not become an open bar");
+
+// §24 made every Redis touch fail OPEN. That fixed the outage and opened a
+// WALLET hole: with Upstash unreachable, the rate limiter enforces nothing
+// (`remaining` stays +Infinity), the circuit breaker cannot count so
+// GLOBAL_DAILY_CAP can never trip, the answer cache is a permanent MISS so the
+// same question re-pays every time, and recordOpenAICall records none of it.
+// Before §24 that request 500'd having spent $0. After §24 it reaches OpenAI —
+// unlimited, unrate-limited, uncached, uncounted, at a volume the caller picks.
+//
+// The three checks below pin the three fixes. Each is written so that reverting
+// its fix turns it RED.
+
+// A helper: the guard logs a JSON line per request (stdout) — keep the harness
+// output readable without hiding failures.
+async function silenced<T>(run: () => Promise<T>): Promise<T> {
+	const realLog = console.log;
+	const realError = console.error;
+	console.log = () => {};
+	console.error = () => {};
+	try {
+		return await run();
+	} finally {
+		console.log = realLog;
+		console.error = realError;
+	}
+}
+
+// ── B6. A dead Redis is a FAST failure, not a 20-second hang. ───────────────
+// @upstash/redis defaults to 5 retries with `Math.exp(i) * 50` ms backoff —
+// 6 fetch attempts and ≈4.3 s of sleeping PER COMMAND. A request touches Redis
+// several times, so "fail open" meant ~20 s of backoff before the first token.
+// createRedisClient bounds it: 1 retry, zero backoff, 1 s per-command abort.
+{
+	const realFetch = globalThis.fetch;
+
+	// (a) The host is gone: fetch rejects immediately. Count the attempts.
+	let attempts = 0;
+	globalThis.fetch = (async () => {
+		attempts++;
+		throw new TypeError("fetch failed");
+	}) as typeof fetch;
+
+	let deadThrew = false;
+	const t0 = Date.now();
+	try {
+		await createRedisClient("https://dead-host.upstash.io", "tok").get("k");
+	} catch {
+		deadThrew = true;
+	}
+	const deadMs = Date.now() - t0;
+	globalThis.fetch = realFetch;
+
+	check(
+		"a dead Upstash host fails FAST — ≤2 fetch attempts and no exponential backoff (default: 6 attempts, ~4.3s)",
+		deadThrew && attempts <= 2 && deadMs < 500,
+		{ attempts, deadMs },
+	);
+
+	// (b) The host BLACKHOLES the connection: fetch never settles. Only an abort
+	//     signal can end this. Without one the client hangs forever — so the
+	//     watchdog below is what turns "no signal configured" into a FAILURE
+	//     rather than a hung test run.
+	globalThis.fetch = ((_url: unknown, init?: { signal?: AbortSignal }) =>
+		new Promise((_resolve, reject) => {
+			const signal = init?.signal;
+			// No signal → nothing ever settles. That is precisely the bug.
+			if (!signal) return;
+			signal.addEventListener("abort", () =>
+				reject(new Error("The operation was aborted.")),
+			);
+		})) as unknown as typeof fetch;
+
+	const WATCHDOG_MS = 6000;
+	let watchdog: ReturnType<typeof setTimeout> | undefined;
+	const t1 = Date.now();
+	// The race RETURNS the outcome rather than assigning a closed-over variable:
+	// "hung" can only win if the client really never settles.
+	const outcome = await Promise.race([
+		createRedisClient("https://blackhole.upstash.io", "tok")
+			.get("k")
+			.then(
+				() => "resolved" as const,
+				() => "rejected" as const,
+			),
+		new Promise<"hung">((resolve) => {
+			watchdog = setTimeout(() => resolve("hung"), WATCHDOG_MS);
+		}),
+	]);
+	if (watchdog) clearTimeout(watchdog);
+	const hangMs = Date.now() - t1;
+	globalThis.fetch = realFetch;
+
+	check(
+		"a BLACKHOLED Upstash is aborted by the per-command timeout — the request never hangs",
+		outcome === "rejected" && hangMs < WATCHDOG_MS,
+		{ outcome, hangMs },
+	);
+}
+
+// ── B7. isCostCapError's contract must match its code. ─────────────────────
+// The round-1 comment claimed the matcher handled "an AggregateError from a
+// Promise.all". It did not: AggregateError carries its sub-errors in `.errors`,
+// and its `.cause` is undefined, so a cause-only walk terminated on the first
+// hop. The wallet guard the comment advertised did not exist for the exact
+// shape it named. Revert to a cause-only walk and this goes RED.
+{
+	let aggCapPropagated = false;
+	try {
+		await retrieveChunks(
+			"What is required at shift turnover?",
+			{
+				supabase: fakeSupabase,
+				openai: meteredOpenAI(fakeOpenAI, new CostAccountant(10), "agg-cap"),
+				recordUsage: async () => {
+					const cap = new Error("cost cap reached");
+					cap.name = "CostCapError";
+					// The literal shape a Promise.all rejection produces.
+					throw new AggregateError(
+						[new Error("some other failure"), cap],
+						"accounting",
+					);
+				},
+			},
+			{ envelopeChunks: 8 },
+		);
+	} catch {
+		aggCapPropagated = true;
+	}
+	check(
+		"a CostCapError inside an AggregateError STILL aborts retrieval (B7 — the claim the comment made)",
+		aggCapPropagated,
+	);
+
+	// …and the tolerance survives: an AggregateError with NO cost-cap in it is
+	// still swallowed, so "fixing" B7 cannot re-break the original incident.
+	let aggOrdinary: string | null = null;
+	try {
+		await retrieveChunks(
+			"What is required at shift turnover?",
+			{
+				supabase: fakeSupabase,
+				openai: meteredOpenAI(fakeOpenAI, new CostAccountant(10), "agg-ord"),
+				recordUsage: async () => {
+					throw new AggregateError(
+						[new Error("ENOTFOUND charming-lioness.upstash.io")],
+						"accounting",
+					);
+				},
+			},
+			{ envelopeChunks: 8 },
+		);
+	} catch (err) {
+		aggOrdinary = (err as Error).message;
+	}
+	check(
+		"…while an AggregateError of ordinary Redis errors is still swallowed (tolerance intact)",
+		aggOrdinary === null,
+		aggOrdinary,
+	);
+}
+
+// ── B5. THE WALLET REGRESSION. ─────────────────────────────────────────────
+// Drives the REAL withGuard. Redis is injected at the CLIENT boundary, so the
+// real @upstash/ratelimit sliding-window code runs on top of it: "down" is a
+// client that rejects exactly the way a vanished host does; "healthy" is one
+// that answers. The handler stands in for everything that costs money — every
+// time it runs, a request reached OpenAI.
+{
+	const guardReq = (ip: string): NextRequest =>
+		new Request("https://demo.test/api/knowledge-hub/query", {
+			method: "POST",
+			headers: { "cf-connecting-ip": ip },
+		}) as unknown as NextRequest;
+
+	type SupabaseFactory = NonNullable<GuardDeps["createSupabase"]>;
+	// Anon caller: no session. withGuard's ONLY use of the client is getUser().
+	const fakeSupabaseAuth: SupabaseFactory = async () =>
+		({
+			auth: { getUser: async () => ({ data: { user: null } }) },
+		}) as unknown as Awaited<ReturnType<SupabaseFactory>>;
+
+	let handlerCalls = 0;
+	const payingHandler = async (): Promise<Response> => {
+		handlerCalls++;
+		return new Response("ok", { status: 200 });
+	};
+
+	// A vanished Upstash: every command rejects.
+	const deadRedis = new Proxy({} as Redis, {
+		get: (_target, prop) => {
+			if (prop === "then") return undefined;
+			return async () => {
+				throw new Error(UPSTASH_DEAD);
+			};
+		},
+	});
+
+	// A healthy Upstash. @upstash/ratelimit's slidingWindow reaches Redis through
+	// exactly one call — `evalsha(hash, keys, args)` returning
+	// [remainingTokens, effectiveLimit] — so counting per key here reproduces a
+	// working limiter without a network or a Lua interpreter. `get` is the
+	// circuit breaker's daily-calls read.
+	const healthyRedis = (() => {
+		const used = new Map<string, number>();
+		return {
+			evalsha: async (_hash: string, keys: string[], args: unknown[]) => {
+				const tokens = Number(args[0]);
+				const key = keys[0];
+				const n = (used.get(key) ?? 0) + 1;
+				used.set(key, n);
+				return [tokens - n, tokens];
+			},
+			get: async () => 0,
+		} as unknown as Redis;
+	})();
+
+	// ---- Redis DOWN: the backstop engages and 429s past its cap.
+	degradedBackstop.reset();
+	markRedisHealthy();
+	handlerCalls = 0;
+
+	const downGuard = withGuard(
+		{ route: "knowledge-hub/query" },
+		payingHandler,
+		{ redis: deadRedis, createSupabase: fakeSupabaseAuth },
+	);
+
+	const downStatuses: number[] = [];
+	let deniedBody: { error?: string; message?: string } = {};
+	let deniedHeaders: Record<string, string | null> = {};
+	await silenced(async () => {
+		for (let i = 0; i < 5; i++) {
+			const res = await downGuard(guardReq("203.0.113.7"));
+			downStatuses.push(res.status);
+			if (res.status === 429 && !deniedBody.error) {
+				deniedBody = (await res.clone().json()) as typeof deniedBody;
+				deniedHeaders = {
+					retryAfter: res.headers.get("Retry-After"),
+					cacheControl: res.headers.get("Cache-Control"),
+				};
+			}
+		}
+	});
+
+	// DEGRADED_IDENTIFIER_CAP = 3.
+	check(
+		"Redis DOWN: the first 3 requests still work (a casual visitor keeps a working demo)",
+		downStatuses.slice(0, 3).every((s) => s === 200),
+		downStatuses,
+	);
+	check(
+		"Redis DOWN: past the cap the in-isolate backstop DENIES — before this, every request reached OpenAI unbounded",
+		downStatuses[3] === 429 && downStatuses[4] === 429,
+		downStatuses,
+	);
+	check(
+		"…and the denial NEVER costs money: the handler ran exactly 3 times, not 5",
+		handlerCalls === 3,
+		{ handlerCalls },
+	);
+	check(
+		"…and it is never a 5xx — a spent budget is not a server fault (Arc/CDNs render 5xx as a dead page)",
+		downStatuses.every((s) => s < 500),
+		downStatuses,
+	);
+	check(
+		"…and it reuses the guard's friendly 429 shape: demo_rate_limit + Retry-After + no-store",
+		deniedBody.error === "demo_rate_limit" &&
+			Number(deniedHeaders.retryAfter) > 0 &&
+			deniedHeaders.cacheControl === "no-store",
+		{ deniedBody, deniedHeaders },
+	);
+
+	// ---- Redis DOWN, many identifiers: the per-ISOLATE cap bounds the total,
+	// so rotating IPs cannot buy unlimited OpenAI calls out of one isolate.
+	degradedBackstop.reset();
+	handlerCalls = 0;
+	const rotated: number[] = [];
+	await silenced(async () => {
+		// 30 distinct IPs × 1 request each. Per-identifier cap (3) can never bind;
+		// only the isolate cap (25) can.
+		for (let i = 0; i < 30; i++) {
+			const res = await downGuard(guardReq(`198.51.100.${i}`));
+			rotated.push(res.status);
+		}
+	});
+	check(
+		"Redis DOWN: rotating the IP does NOT buy unlimited calls — the per-isolate cap (25) binds",
+		rotated.filter((s) => s === 200).length === 25 &&
+			rotated.filter((s) => s === 429).length === 5,
+		{
+			ok: rotated.filter((s) => s === 200).length,
+			denied: rotated.filter((s) => s === 429).length,
+		},
+	);
+	check(
+		"…and the isolate budget is what the handler actually spent (25 paid calls, not 30)",
+		handlerCalls === 25,
+		{ handlerCalls },
+	);
+
+	// ---- Redis HEALTHY: the backstop must be INERT. If it engaged here it would
+	// be a second, much tighter limiter silently strangling the live demo.
+	degradedBackstop.reset();
+	markRedisHealthy();
+	handlerCalls = 0;
+
+	const upGuard = withGuard(
+		{ route: "knowledge-hub/query" },
+		payingHandler,
+		{ redis: healthyRedis, createSupabase: fakeSupabaseAuth },
+	);
+
+	const upStatuses: number[] = [];
+	await silenced(async () => {
+		// anon LIMITS for knowledge-hub/query are minute:3 — stay inside them.
+		for (let i = 0; i < 3; i++) {
+			upStatuses.push((await upGuard(guardReq("192.0.2.5"))).status);
+		}
+	});
+	check(
+		"Redis HEALTHY: requests pass through normally",
+		upStatuses.every((s) => s === 200) && handlerCalls === 3,
+		{ upStatuses, handlerCalls },
+	);
+	check(
+		"Redis HEALTHY: the backstop does NOT engage — it charged NOTHING against its budget",
+		degradedBackstop.admitted() === 0 && !isRedisDegraded(),
+		{ admitted: degradedBackstop.admitted(), degraded: isRedisDegraded() },
+	);
+
+	// …and the REAL limiter is still the one doing the work: a 4th request in the
+	// same minute is refused by Upstash's sliding window (`rate_limited`), not by
+	// the backstop (`demo_rate_limit`).
+	let fourthBody: { error?: string } = {};
+	let fourthStatus = 0;
+	await silenced(async () => {
+		const res = await upGuard(guardReq("192.0.2.5"));
+		fourthStatus = res.status;
+		fourthBody = (await res.json()) as typeof fourthBody;
+	});
+	check(
+		"Redis HEALTHY: the real Upstash limiter still enforces the tier cap (rate_limited, not demo_rate_limit)",
+		fourthStatus === 429 &&
+			fourthBody.error === "rate_limited" &&
+			degradedBackstop.admitted() === 0,
+		{ fourthStatus, fourthBody, admitted: degradedBackstop.admitted() },
+	);
+}
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

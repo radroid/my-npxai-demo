@@ -20,14 +20,25 @@
 // Every call site passes its own log key, so the logs still name which cache
 // broke, and the two routes can no longer drift apart.
 //
+// "DEGRADES TO A MISS" IS ONLY TRUE IF IT DEGRADES FAST. An earlier version of
+// this comment claimed a dead cache is just a miss while the Upstash client was
+// still on its default retry policy — 5 retries with exponential backoff, ≈4.3 s
+// of sleeping per command. Across the request's several Redis touches that was
+// ~20 s of backoff, most of it before the first token: a hang, not a miss. The
+// client is now built with a bounded failure budget (lib/guard.ts
+// createRedisClient — 1 retry, no backoff, a 1 s per-command abort), so the
+// claim above is now literally true.
+//
 // TRADE-OFF, stated plainly: with Redis down the answer cache is inert. Every
 // request re-embeds, re-retrieves and re-generates, so OpenAI spend per request
 // goes UP exactly when the spend counter (lib/guard.ts recordOpenAICall) can no
-// longer increment. That is a deliberate availability-over-thrift choice for a
-// demo; see the PR body's residual-risk note.
+// longer increment. That is why every failure below reports to markRedisFailure()
+// — it arms the in-isolate degraded backstop in lib/guard.ts, which caps how
+// many of those uncached, uncounted requests can reach OpenAI. Best-effort and
+// per-isolate; read DegradedBackstop's contract before trusting it.
 
 import type { Redis } from "@upstash/redis";
-import { getRedis } from "./guard";
+import { getRedis, markRedisFailure, markRedisHealthy } from "./guard";
 
 // The slice of the Upstash client these helpers use — and the TEST SEAM.
 // Injecting a rejecting client is how the fail-open property is proven with no
@@ -45,9 +56,12 @@ export async function cacheRead<T>(
 ): Promise<T | null> {
 	try {
 		const redis = client ?? getRedis();
-		return (await redis.get<T>(key)) ?? null;
+		const hit = (await redis.get<T>(key)) ?? null;
+		markRedisHealthy();
+		return hit;
 	} catch (err) {
 		console.error(logKey, err);
+		markRedisFailure();
 		return null;
 	}
 }
@@ -64,8 +78,10 @@ export async function cacheWrite(
 	try {
 		const redis = client ?? getRedis();
 		await redis.set(key, value, { ex: ttlSeconds });
+		markRedisHealthy();
 	} catch (err) {
 		console.error(logKey, err);
+		markRedisFailure();
 	}
 }
 
@@ -79,7 +95,9 @@ export async function cacheDelete(
 	try {
 		const redis = client ?? getRedis();
 		await redis.del(key);
+		markRedisHealthy();
 	} catch (err) {
 		console.error(logKey, err);
+		markRedisFailure();
 	}
 }
