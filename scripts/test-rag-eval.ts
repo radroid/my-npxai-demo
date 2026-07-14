@@ -1742,5 +1742,48 @@ check(
 		(allVacuousConsistencyRows.find((r) => r.category.startsWith("Consistency (TARr")) as Row).measured === "n/a",
 );
 
+// (e) FINAL AUDIT — the same vacuous-pass shape in baseline's JUDGED metrics.
+// Faithfulness is EXCLUDED for an answer that makes no verifiable claim (RAGAS's
+// no-claims case), and a refusal makes none. Without a full-denominator
+// companion, faithfulness could print 100% over a handful of items while every
+// refusal quietly left the denominator — exactly the citation-validity bug,
+// wearing a judge's hat.
+const claimRun = {
+	...consistencyRun,
+	manifest: { ...consistencyRun.manifest, experiment: "baseline" },
+	items: [
+		{ fallback_taken: null, metrics: { faithfulness: 1, faithfulness_claim_coverage: 1, citation_support: 1, citation_support_claim_coverage: 1 } },
+		// A refusal: claims nothing, cites nothing → EXCLUDED from both judged means.
+		{ fallback_taken: "oos_or_guard", metrics: { faithfulness: null, faithfulness_claim_coverage: 0, citation_support: null, citation_support_claim_coverage: 0 } },
+	],
+} as unknown as Parameters<typeof rowsFor>[0];
+const claimRows = rowsFor(claimRun);
+// Missing-row lookups must fail as a clean CHECK, not a TypeError — a deleted
+// coverage row is exactly the regression these assertions exist to catch, so the
+// failure has to be legible.
+const claimRow = (c: string): Row =>
+	claimRows.find((r) => r.category.startsWith(c)) ?? {
+		category: `<MISSING ROW: ${c}>`,
+		measured: "<missing>",
+		n: "<missing>",
+		excluded: "<missing>",
+	};
+check(
+	"faithfulness = 100% over n=1 — the no-claims refusal is EXCLUDED, not scored",
+	claimRow("Faithfulness").measured === "100.0%" && claimRow("Faithfulness").n === "1",
+	claimRow("Faithfulness"),
+);
+check(
+	"…and a FULL-denominator claim-coverage row (n=2, 50%) is what makes that exclusion visible",
+	claimRow("Claim coverage").measured === "50.0%" && claimRow("Claim coverage").n === "2",
+	claimRow("Claim coverage"),
+);
+check(
+	"…same for cited-claim coverage alongside citation support",
+	claimRow("Cited-claim coverage").measured === "50.0%" &&
+		claimRow("Cited-claim coverage").n === "2",
+	claimRow("Cited-claim coverage"),
+);
+
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

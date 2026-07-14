@@ -395,4 +395,138 @@ aggregation itself is unit-tested: §13 asserts that a run in which nothing is m
 
 **Still open / for slice 2.2.** `docs/orchestration/backlog.md`'s Resolved DELTAs line still says
 "judge cache makes re-runs cents" — same false claim as issue 6, in a file this item does not own.
-The steward should strike it.
+The steward should strike it. *(Struck by the steward in `0caaebc`.)*
+
+> **CORRECTIONS TO FIX ROUND 1 (made by round 2 — read these with the list above).**
+> 1. **The honesty guarantees were applied to BASELINE ONLY.** Round 1's issue-1 fix
+>    (zero-citation answers excluded, never a free 1.0) fixed `scoreCitationValidity` and
+>    stopped. The **identical** vacuous-pass bug was still live in `consistency` and
+>    `paraphrase` — and in consistency it sat under the **headline KPI**. Round 2, issue 1.
+> 2. **"Rank-sensitive metrics now come from the true similarity-ranked pool" was half a
+>    fix.** The `withTrace` seam was the right move, but `trace.pool` is the UNFILTERED
+>    `match_regdoc_chunks` merge — a superset production never surfaces. Round 2, issue 2.
+> 3. **"Every component it cannot observe is charged with a documented factor that errs
+>    high" was FALSE** for the embedding line: `EMBED_INPUT_MULTIPLIER = 5` errs LOW on any
+>    multi-doc query. Round 2, issue 3.
+> 4. **Round 1's own regression test for issue 2 was partly vacuous** — a `.slice(0, 30)`
+>    truncated the assertion so the half it appeared to check was never checked. Round 2,
+>    issue 5.
+> 5. **Edge case 9 ("if a golden question OOS-gates … retrieval metrics score it honestly —
+>    hit rate 0")** is superseded. An OOS item is EXCLUDED, not scored 0: the route showed the
+>    model nothing, so retrieval quality is not *measurable*, and a silent 0 is as dishonest
+>    as a silent 1. The spec text above is left as written (it is dispatch text); this is the
+>    governing rule.
+
+### Fix round 2
+
+Applied against a second adversarial review. Round 1's finding was right and its principle —
+*a metric that reports a good number for the wrong reason is worse than no metric* — was
+right. Its **execution was scoped to the baseline experiment**, and a review of the other
+four found the same bugs still breathing. Round 2 also adds the mirror principle, which
+round 1 never stated: **a metric systematically DEFLATED by our own boilerplate is exactly as
+dishonest as one inflated by a vacuous pass.** Each fix carries a regression test in
+`scripts/test-rag-eval.ts` (§§14b, 18-20) that was **mutation-tested**: the fix was reverted,
+the suite was confirmed RED, the fix restored. 12/12 mutations caught.
+
+1. **The vacuous pass survived round 1 in consistency + paraphrase (CRITICAL).**
+   `citationSetKey()` returned `""` for a zero-citation answer, so
+   `totalAgreement(["","","","",""])` over 5 repeats that ALL cited nothing returned a
+   **perfect 1** — the citation-stability KPI, the *headline consistency number*, read 100%
+   precisely when the model cited nothing at all, five times over. `runParaphrase` was worse:
+   three vacuous passes at once — `jaccard(∅, ∅) === 1` scored two refusals as PERFECT
+   retrieval stability for a pair where nothing was retrieved either time; `"" === ""` gave a
+   free citation-stability 1; and the equivalence rubric *literally says* "Both being refusals
+   of the same kind is equivalent", so two refusals scored as perfect paraphrase robustness.
+   Now: `citationSetKey` returns `null`, and every experiment excludes zero-citation /
+   refused / no-envelope items **with a counted reason**, never a silent pass and never a
+   silent 0. Mixed cases (one repeat cited, another did not) remain a genuine **disagreement**
+   (0) — the exclusion never hides a real failure. Full-denominator **coverage companions**
+   (citation coverage across repeats; paraphrase envelope / citation / answer coverage; claim
+   and cited-claim coverage) make every exclusion visible in the report itself. Skipping the
+   equivalence judge on refusal pairs also saves real money.
+   *Audit of the remaining experiments:* **TARr** was excluded when every repeat took the
+   guard/OOS branch (the route emits a CONSTANT string and never calls the model — agreement
+   is 1 by construction and measures nothing). **negative**: a 200 that streamed no text ran
+   `isRefusalText("")` → false → `answered_instead_of_rejecting`, a **false FAILURE** that
+   deflated the rejection row; now excluded. **ksweep**: see issue 2.
+
+2. **The trace-based retrieval metrics read a pool production never showed the model.**
+   Round 1 correctly moved the rank-sensitive metrics onto the `withTrace` seam, then scored
+   them over `trace.pool` — the **unfiltered** merged candidate list, which still holds chunks
+   below `MIN_CHUNK_SIM` that the route filters out and the model never sees. The trace now
+   exposes **three stages distinctly** and each metric reads the one its DEFINITION requires,
+   and NAMES it in the report row label:
+   | Stage | What it is | Scored by |
+   |---|---|---|
+   | raw candidate pool | pre-filter, pre-boost, cosine order | **nothing** — production never shows it; diagnostic log only |
+   | post-filter ranked pool | `MIN_CHUNK_SIM` applied, cosine order: what production could surface | **MRR** (ranking the raw pool credits ranks the pipeline discards) |
+   | envelope | what the route feeds the LLM, in prompt order — RAGAS `retrieved_contexts` | **hit rate, context recall, context precision** |
+   **ksweep re-verified**: the OOS gate fires on the raw pool's top-1 and is **k-independent**,
+   so the route builds no envelope at *any* k — yet `deriveEnvelopeAtK` still returns the full
+   ranked pool there (it mirrors `retrieveChunks`' return value, which the route discards). The
+   old sweep sliced that to k and could report **hit@k = 1 for a question production REFUSED**.
+   Those items are excluded with a reason, which also keeps the denominator **constant across
+   k** — without which comparing k values is not even well-formed. **MRR moved out of the per-k
+   block**: it ranks the pool, which envelope size does not touch, so printing it per k implied
+   a k-sensitivity it does not have. A new **Trace/server envelope agreement** row is the
+   integrity check that the offline trace reproduces the served envelope; below 1.00 the MRR
+   row is describing a different retrieval than the one that produced the answers.
+   *Structural note:* the stage choice now lives inside pure, unit-tested functions
+   (`scoreRetrievalStages` / `scoreEnvelopeAtK` / `kSweepExclusion`), so a call site **cannot**
+   wire a metric to the wrong pool. This was not cosmetic — round 1's fix was pinned only by a
+   source-level string match, and the first mutation run (swap the pool, keep the call shape)
+   **sailed straight through it**. Making the wrong thing impossible beats asserting it did not
+   happen.
+
+3. **The "err-high" cost factor erred LOW (WALLET).** `EMBED_INPUT_MULTIPLIER = 5` was
+   documented as "1 primary + 4 expansions, above the practical ceiling". **It is not a
+   ceiling.** `buildExpansions()` emits, PER mentioned doc, one narrow expansion per mentioned
+   section + one per matched concept seed + one BROAD `${doc} ${query}` carrying the *whole*
+   query; `extractMentionedDocs()` returns an **unbounded** number of docs (every REGDOC named,
+   plus up to 4 concept hints). Real input runs to ~`(1 + docs) × tokens(query)`, so a
+   multi-doc question — which the golden set is *built* to contain — walks straight past 5×,
+   and the estimate under-charged the one spending path the eval cannot observe (the dev
+   server's internal `embeddings.create`). The expansion list is a **pure function of the
+   query**, so guessing was never necessary: `lib/retrieval.ts` now exports
+   `embeddingInputsFor()`, `retrieveChunks` builds its own inputs through it (one source of
+   truth — they cannot drift), and the accountant counts the **real strings**. Exact, not
+   bounded; free, no network. The multiplier is deleted. The one remaining unobservable (a
+   chunk whose full text cannot be re-fetched) keeps its err-high factor. Wallet protection
+   fails safe: over-estimate, never under.
+
+4. **Our own boilerplate was deflating the hardest questions.** The low-similarity branch
+   PREPENDS `KNOWLEDGE_HUB_LIMITED_CONTEXT` to an otherwise normal answer — route boilerplate,
+   not model output — and `run.ts` fed `answer.text` **raw** to `judgeFaithfulness`,
+   `judgeCitationSupport`, `judgeRelevancyQuestions`, `scoreCitationValidity` and
+   `normalizeText`. A claim-decomposition judge does exactly what it is told: it extracts that
+   sentence as one more claim — unsupported by any chunk, carrying no citation. So faithfulness
+   and citation-support were systematically **DEFLATED**, and only on the weak-retrieval
+   questions, i.e. the hardest ones, where the disclaimer fires. The relevancy judge is worse:
+   it reverse-engineers a question *about the disclaimer*, orthogonal to the user's, dragging
+   the cosine down for a reason that has nothing to do with the model. This is the exact mirror
+   of the bug this PR is named for, and it made the pipeline look **worse** than it is.
+   `lib/prompts.ts` gains `stripLimitedContextPrefix()`; every judge, claim decomposer and
+   citation extractor now reads the stripped text. Swept the other experiments — consistency
+   (TARr + citation sets + equivalence judge) and paraphrase likewise. The RAW text is kept,
+   and **must** be kept, for `classifyBranch` and `scoreRejection`, which exist to detect these
+   very lines. Both raw and judged text are logged per item.
+
+5. **A round-1 regression test was itself partly vacuous.** `scripts/test-rag-eval.ts:516`
+   asserted `ROUTE_SRC.includes('KNOWLEDGE_HUB_LIMITED_CONTEXT,\n} from "@/lib/prompts"'.slice(0, 30))`
+   — the `.slice(0, 30)` truncated the needle to the bare identifier, so the import-SOURCE half
+   it appeared to check was **never checked**. Asserted as two separate substrings now,
+   unsliced. (Mutation-proof: pointing the route's import at a different module now goes RED;
+   under the sliced assertion it passed.)
+
+**Report honesty (round 2 additions).** Every experiment's section — not just baseline — now
+prints `n`, its exclusions, and **why**, plus full-denominator coverage companions so no
+exclusion can hide a failure. Every retrieval row names the pipeline **stage** it scores, and
+the report carries a stage note explaining why the same question scores differently at each.
+A metric that cannot be honestly computed still prints `n/a`.
+
+**Residual risks (stated, not hidden).** `jaccard(∅,∅) === 1`, `contextRecallAtK` returning 0
+for an empty gold set, and `mean([]) === 0` all survive as pure-function conventions. None is
+reachable from a reported metric — every call site now guards them — but they are traps for a
+future caller and are called out here rather than left to be rediscovered. Judge-error rate
+>5% still invalidates a category by convention (Edge case 3); it is counted in the manifest and
+printed, but not machine-enforced.

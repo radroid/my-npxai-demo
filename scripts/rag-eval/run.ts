@@ -819,6 +819,16 @@ async function main(): Promise<void> {
 					trace_envelope_agrees: traceEnvelopeAgrees,
 					faithfulness: faith.value?.score ?? null,
 					faithfulness_no_claims: faith.value?.noClaims ?? null,
+					// FULL-denominator companion (fix round 2, final audit — the same
+					// vacuous-pass shape as citation coverage). Faithfulness is EXCLUDED
+					// for an answer that makes no verifiable claim (a refusal makes none),
+					// so without this row the faithfulness % could read 100% over a
+					// handful of items while every refusal silently left the denominator.
+					faithfulness_claim_coverage: faith.value
+						? faith.value.noClaims
+							? 0
+							: 1
+						: null,
 					// null (EXCLUDED, not 1.0) when the answer cites NOTHING — issue 1.
 					// A vacuous case is not a perfect score. `citation_coverage` is the
 					// companion that makes zero-citation-ness visible in the report.
@@ -829,6 +839,11 @@ async function main(): Promise<void> {
 					citation_validity_invalid: validity.invalid,
 					citation_support: support.value?.score ?? null,
 					citation_support_no_claims: support.value?.noClaims ?? null,
+					citation_support_claim_coverage: support.value
+						? support.value.noClaims
+							? 0
+							: 1
+						: null,
 					answer_relevancy_raw: relevancyRaw,
 					answer_relevancy: relevancyRaw === null ? null : clamp01(relevancyRaw),
 				},

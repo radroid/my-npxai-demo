@@ -110,6 +110,15 @@ const EXPECTED: Record<string, { range: string; source: string }> = {
 			"companion to validity — validity is UNDEFINED for a zero-citation answer, never a pass",
 		source: "custom metric; deterministic",
 	},
+	"Claim coverage (answers making ≥ 1 verifiable claim)": {
+		range:
+			"companion to faithfulness — faithfulness is UNDEFINED for an answer that claims nothing (a refusal claims nothing)",
+		source: "custom metric; RAGAS no-claims case",
+	},
+	"Cited-claim coverage (answers making ≥ 1 CITED claim)": {
+		range: "companion to claim support — undefined when the answer cites nothing",
+		source: "custom metric; deterministic",
+	},
 	"Consistency (citation-set agreement ×5)": {
 		range: "TARa high-90s target; ~24% of exact repeats differ at temp 0",
 		source: "arXiv 2408.04667; arXiv 2601.19934",
@@ -268,11 +277,22 @@ export function rowsFor(run: Run): Row[] {
 				"no envelope served, or no trace — nothing to compare",
 			);
 			add("Faithfulness", meanDefined(it.map((i) => metric(i, "faithfulness"))), "judge error, or answer made no verifiable claim");
+			// Full-denominator companion: without it, faithfulness could read 100% over
+			// a handful of items while every refusal silently left the denominator —
+			// the same vacuous-pass shape as citation validity. Read the two together.
+			add(
+				"Claim coverage (answers making ≥ 1 verifiable claim)",
+				meanDefined(it.map((i) => metric(i, "faithfulness_claim_coverage"))),
+			);
 			add("Answer relevancy", meanDefined(it.map((i) => metric(i, "answer_relevancy"))), "judge error");
 			add(
 				"Citation correctness (claim support)",
 				meanDefined(it.map((i) => metric(i, "citation_support"))),
 				"judge error, or answer carried no cited claim",
+			);
+			add(
+				"Cited-claim coverage (answers making ≥ 1 CITED claim)",
+				meanDefined(it.map((i) => metric(i, "citation_support_claim_coverage"))),
 			);
 			// Issue 1: zero-citation answers are EXCLUDED from validity (score is
 			// null), not counted as 1.0. The coverage row below is what makes them
