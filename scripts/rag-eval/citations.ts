@@ -70,11 +70,22 @@ export function isCitationValid(
 export interface CitationValidity {
 	total: number;
 	valid: number;
-	// 1.0 when the answer contains no citations at all — validity measures
-	// "no fabricated pointers", not citation coverage (coverage is 5b's and
-	// the ship battery's job). Reported alongside `total` so zero-citation
-	// answers are visible.
-	score: number;
+	/**
+	 * valid/total, or NULL when the answer contains ZERO citations.
+	 *
+	 * PR #8 fix round 1 (issue 1). This used to return 1 for a zero-citation
+	 * answer, and report.ts's meanDefined() only drops null/undefined — so every
+	 * OOS refusal, low-confidence fallback, guard-blocked response and empty
+	 * answer was averaged in as PERFECT citation validity. The "Citation
+	 * validity (deterministic)" row would read ~100% precisely when citations
+	 * disappeared. A vacuous case is not a pass: it is NOT MEASURABLE, so it is
+	 * excluded from the mean (null) and its absence is surfaced separately by
+	 * `hasCitations` → the report's "Citation coverage" row. Zero-citation-ness
+	 * is never silently a pass.
+	 */
+	score: number | null;
+	/** 1 when the answer cites at least once, 0 when it cites nothing. */
+	hasCitations: 0 | 1;
 	invalid: Citation[];
 }
 
@@ -89,8 +100,9 @@ export function scoreCitationValidity(
 		valid: citations.length - invalid.length,
 		score:
 			citations.length === 0
-				? 1
+				? null
 				: (citations.length - invalid.length) / citations.length,
+		hasCitations: citations.length === 0 ? 0 : 1,
 		invalid,
 	};
 }

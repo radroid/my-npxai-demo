@@ -13,13 +13,36 @@
 // server); its tokens are ESTIMATED with tiktoken in answer.ts.
 
 import OpenAI from "openai";
+import { countTokens } from "./answer";
 import { EMBEDDING_MODEL } from "./config";
 import type { CostAccountant, CostKind } from "./cost";
+
+// PR #8 fix round 1 (issue 4a): every call site below RESERVES its projected
+// cost BEFORE the request leaves the process, so a cap trip aborts the run
+// without spending. `record()` after the response books the ACTUAL usage.
+//
+// Judge completions have no usage field until they return, so the reservation
+// prices the input with tiktoken and assumes the worst-case output below —
+// generous for a JSON verdict (a long faithfulness claim list runs ~400-600
+// tokens). Errs high on purpose: wallet protection fails safe.
+const JUDGE_MAX_OUTPUT_TOKENS = 1500;
 
 export function getEvalOpenAI(): OpenAI {
 	const apiKey = process.env.OPENAI_API_KEY;
 	if (!apiKey) throw new Error("OPENAI_API_KEY must be set (see .env.local)");
 	return new OpenAI({ apiKey });
+}
+
+function embeddingInputTokens(input: unknown): number {
+	if (typeof input === "string") return countTokens(input);
+	if (Array.isArray(input)) {
+		return input.reduce(
+			(acc: number, t: unknown) =>
+				acc + (typeof t === "string" ? countTokens(t) : 0),
+			0,
+		);
+	}
+	return 0;
 }
 
 /**
@@ -41,6 +64,17 @@ export function meteredOpenAI(
 			body: OpenAI.Embeddings.EmbeddingCreateParams,
 			opts?: OpenAI.RequestOptions,
 		) => {
+			// Pre-spend guard (issue 4a). NOTE: lib/retrieval.ts wraps anything
+			// thrown here into RetrievalError — callers must unwrap with
+			// cost.ts's asCostCapError(), or a cap trip reads as an outage.
+			cost.reserve({
+				kind,
+				model: String(body.model),
+				inputTokens: embeddingInputTokens(body.input),
+				outputTokens: 0,
+				estimated: true,
+				label: `${label}:projected`,
+			});
 			const resp = await client.embeddings.create(body, opts);
 			cost.record({
 				kind,
@@ -69,6 +103,14 @@ export async function embedTexts(
 	label: string,
 ): Promise<number[][]> {
 	if (texts.length === 0) return [];
+	cost.reserve({
+		kind: "embeddings",
+		model: EMBEDDING_MODEL,
+		inputTokens: embeddingInputTokens(texts),
+		outputTokens: 0,
+		estimated: true,
+		label: `${label}:projected`,
+	});
 	const resp = await client.embeddings.create({
 		model: EMBEDDING_MODEL,
 		input: texts,
@@ -102,6 +144,16 @@ export async function chatJson(
 	user: string,
 	label: string,
 ): Promise<ChatResult> {
+	// Pre-spend guard (issue 4a) — projected input from tiktoken, worst-case
+	// output. The cap now aborts BEFORE the judge call, not after it.
+	cost.reserve({
+		kind: "judge",
+		model,
+		inputTokens: countTokens(`${system}\n${user}`),
+		outputTokens: JUDGE_MAX_OUTPUT_TOKENS,
+		estimated: true,
+		label: `${label}:projected`,
+	});
 	const resp = await client.chat.completions.create({
 		model,
 		temperature: 0,

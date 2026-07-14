@@ -18,9 +18,21 @@
 // docs/orchestration/research/rag-eval-metrics.md §Realistic score expectations,
 // and that range's citation (I2.4 — no invented metrics, sources cited).
 
+// PR #8 fix round 1 — honest denominators. A metric that cannot be honestly
+// computed prints "n/a", never a number. Every aggregated row carries `n` (the
+// samples actually counted) AND, where any sample was dropped, how many and
+// WHY. Two classes of exclusion exist and both are now visible:
+//   - Zero-citation answers are excluded from citation VALIDITY (issue 1) and
+//     surfaced by the "Citation coverage" row. They used to be scored 1.0 —
+//     making the validity row read ~100% precisely when citations disappeared.
+//   - OOS/guard refusals emit no envelope, so retrieval quality is not
+//     measurable for them (issue 7b). They used to be scored 0. Both directions
+//     of silent fudging are dishonest; both are now exclusions with a reason.
+
 import fs from "node:fs";
 import path from "node:path";
 import { RESULTS_DIR } from "./config";
+import { REFUSAL_BRANCHES } from "./metrics";
 
 interface Manifest {
 	experiment: string;
@@ -35,9 +47,15 @@ interface Manifest {
 		byKind: Record<string, { usd: number; tokens: number }>;
 	};
 	golden_set: { sha256: string; records: number };
+	daily_cap_headroom_at_start?: {
+		available: boolean;
+		remaining: number;
+		cap: number;
+	} | null;
+	projected_daily_cap_calls?: number;
 }
 
-interface Run {
+export interface Run {
 	dir: string;
 	manifest: Manifest;
 	items: Record<string, unknown>[];
@@ -74,6 +92,11 @@ const EXPECTED: Record<string, { range: string; source: string }> = {
 		range: "1.00 expected — any invalid citation is a fabricated pointer",
 		source: "custom metric; deterministic",
 	},
+	"Citation coverage (answers carrying ≥ 1 citation)": {
+		range:
+			"companion to validity — validity is UNDEFINED for a zero-citation answer, never a pass",
+		source: "custom metric; deterministic",
+	},
 	"Consistency (citation-set agreement ×5)": {
 		range: "TARa high-90s target; ~24% of exact repeats differ at temp 0",
 		source: "arXiv 2408.04667; arXiv 2601.19934",
@@ -97,8 +120,10 @@ function pct(x: number | null): string {
 }
 
 /** Mean over defined values only — nulls are EXCLUDED from the denominator
- * (judge errors and no-claims items, per Edge case 3). Returns the count kept. */
-function meanDefined(values: Array<number | null | undefined>): {
+ * (judge errors, no-claims items, zero-citation answers, unmeasurable
+ * retrieval). Returns the count kept AND the count dropped, so no row can print
+ * a percentage whose denominator silently swallowed the vacuous cases. */
+export function meanDefined(values: Array<number | null | undefined>): {
 	value: number | null;
 	n: number;
 	excluded: number;
@@ -145,44 +170,92 @@ function latestRuns(): string[] {
 	return Array.from(byExperiment.values());
 }
 
-interface Row {
+export interface Row {
 	category: string;
 	measured: string;
 	n: string;
+	/** How many samples were dropped from the denominator, and why. */
+	excluded: string;
 }
 
-function rowsFor(run: Run): Row[] {
+export function rowsFor(run: Run): Row[] {
 	const it = run.items;
 	const rows: Row[] = [];
+	/** Aggregated row. `n` is the denominator that produced `measured`; any
+	 *  sample not in it is reported under `excluded` with its reason. */
 	const add = (
 		category: string,
 		agg: { value: number | null; n: number; excluded: number },
+		why = "not measurable (judge error / no claims)",
 	) => {
 		rows.push({
 			category,
 			measured: pct(agg.value),
-			n: agg.excluded > 0 ? `${agg.n} (${agg.excluded} excluded)` : String(agg.n),
+			n: String(agg.n),
+			excluded: agg.excluded > 0 ? `${agg.excluded} — ${why}` : "0",
 		});
+	};
+	/** Row whose value is a plain count/label, not a mean over a denominator. */
+	const addCount = (category: string, measured: string, n: number) => {
+		rows.push({ category, measured, n: String(n), excluded: "0" });
 	};
 
 	switch (run.manifest.experiment) {
 		case "baseline": {
-			add("Retrieval quality (hit rate@8)", meanDefined(it.map((i) => metric(i, "hit_rate_at_k"))));
-			add("Retrieval quality (MRR)", meanDefined(it.map((i) => metric(i, "reciprocal_rank"))));
-			add("Context recall@8", meanDefined(it.map((i) => metric(i, "context_recall_at_k"))));
-			add("Context precision (CP@8)", meanDefined(it.map((i) => metric(i, "context_precision_at_k"))));
-			add("Faithfulness", meanDefined(it.map((i) => metric(i, "faithfulness"))));
-			add("Answer relevancy", meanDefined(it.map((i) => metric(i, "answer_relevancy"))));
-			add("Citation correctness (claim support)", meanDefined(it.map((i) => metric(i, "citation_support"))));
-			add("Citation validity (deterministic)", meanDefined(it.map((i) => metric(i, "citation_validity"))));
-			// False-rejection rate: golden (answerable) questions that took a
-			// fallback branch anyway — the control for the negative experiment.
-			const falseRejections = it.filter((i) => i.fallback_taken !== null).length;
+			// Retrieval quality is computed from the TRUE similarity-ranked pool
+			// (run.ts trace), and is NULL — excluded, never 0 — for items where the
+			// route emitted no envelope (OOS / guard refusal). Issue 7.
+			const noEnvelope =
+				"OOS/guard refusal — route emitted no envelope, so retrieval quality is not measurable (never scored 0)";
+			add("Retrieval quality (hit rate@8)", meanDefined(it.map((i) => metric(i, "hit_rate_at_k"))), noEnvelope);
+			add("Retrieval quality (MRR)", meanDefined(it.map((i) => metric(i, "reciprocal_rank"))), noEnvelope);
+			add("Context recall@8", meanDefined(it.map((i) => metric(i, "context_recall_at_k"))), noEnvelope);
+			add("Context precision (CP@8)", meanDefined(it.map((i) => metric(i, "context_precision_at_k"))), noEnvelope);
+			add("Faithfulness", meanDefined(it.map((i) => metric(i, "faithfulness"))), "judge error, or answer made no verifiable claim");
+			add("Answer relevancy", meanDefined(it.map((i) => metric(i, "answer_relevancy"))), "judge error");
+			add(
+				"Citation correctness (claim support)",
+				meanDefined(it.map((i) => metric(i, "citation_support"))),
+				"judge error, or answer carried no cited claim",
+			);
+			// Issue 1: zero-citation answers are EXCLUDED from validity (score is
+			// null), not counted as 1.0. The coverage row below is what makes them
+			// visible — read the two together or you are reading a lie.
+			add(
+				"Citation validity (deterministic)",
+				meanDefined(it.map((i) => metric(i, "citation_validity"))),
+				"answer contained ZERO citations — validity is undefined, not a pass (see coverage row)",
+			);
+			add(
+				"Citation coverage (answers carrying ≥ 1 citation)",
+				meanDefined(it.map((i) => metric(i, "citation_coverage"))),
+			);
+			// False-rejection rate: golden (answerable) questions the pipeline
+			// REFUSED. The route's limited-context disclaimer is NOT a refusal (the
+			// model still answers), so it does not count here — issue 2.
+			const refusedItems = it.filter((i) =>
+				REFUSAL_BRANCHES.has(String(i.fallback_taken ?? "")),
+			).length;
 			rows.push({
 				category: "False-rejection rate (answerable golden questions refused)",
-				measured: pct(it.length === 0 ? null : falseRejections / it.length),
+				measured: pct(it.length === 0 ? null : refusedItems / it.length),
 				n: String(it.length),
+				excluded: "0",
 			});
+			// Branch census — every item lands in exactly one bucket, so a reader can
+			// reconcile the exclusions above against the run.
+			const branches = new Map<string, number>();
+			for (const i of it) {
+				const b = String(i.fallback_taken ?? "normal_answer");
+				branches.set(b, (branches.get(b) ?? 0) + 1);
+			}
+			addCount(
+				"Route branch census (which path produced each answer)",
+				Array.from(branches.entries())
+					.map(([b, n]) => `${b}: ${n}`)
+					.join(", ") || "—",
+				it.length,
+			);
 			break;
 		}
 		case "ksweep": {
@@ -195,16 +268,20 @@ function rowsFor(run: Run): Row[] {
 							return typeof v === "number" ? v : null;
 						}),
 					);
-				rows.push({ category: `hit rate@${k}`, measured: pct(at("hit_rate").value), n: String(it.length) });
-				rows.push({ category: `context recall@${k}`, measured: pct(at("context_recall").value), n: String(it.length) });
-				rows.push({ category: `context precision@${k}`, measured: pct(at("context_precision").value), n: String(it.length) });
+				add(`hit rate@${k}`, at("hit_rate"), "no k-sweep block on the item");
+				add(`context recall@${k}`, at("context_recall"), "no k-sweep block on the item");
+				add(`context precision@${k}`, at("context_precision"), "no k-sweep block on the item");
 			}
 			break;
 		}
 		case "consistency": {
-			add("Consistency (citation-set agreement ×5)", meanDefined(it.map((i) => metric(i, "citation_set_agreement"))));
-			add("Consistency (TARr exact text ×5)", meanDefined(it.map((i) => metric(i, "tarr_exact_text_agreement"))));
-			add("Answer equivalence among citation-disagreeing pairs", meanDefined(it.map((i) => metric(i, "equivalence_rate"))));
+			add("Consistency (citation-set agreement ×5)", meanDefined(it.map((i) => metric(i, "citation_set_agreement"))), "not measurable");
+			add("Consistency (TARr exact text ×5)", meanDefined(it.map((i) => metric(i, "tarr_exact_text_agreement"))), "not measurable");
+			add(
+				"Answer equivalence among citation-disagreeing pairs",
+				meanDefined(it.map((i) => metric(i, "equivalence_rate"))),
+				"no citation-disagreeing pair to judge (the deterministic KPI already agreed), or judge error",
+			);
 			break;
 		}
 		case "paraphrase": {
@@ -219,29 +296,25 @@ function rowsFor(run: Run): Row[] {
 					equivalents.push(typeof m.answer_equivalent === "boolean" ? (m.answer_equivalent ? 1 : 0) : null);
 				}
 			}
-			add("Paraphrase retrieval Jaccard", meanDefined(jaccards));
-			add("Paraphrase answer-equivalence rate", meanDefined(equivalents));
-			add("Paraphrase citation-set stability", meanDefined(stable));
+			add("Paraphrase retrieval Jaccard", meanDefined(jaccards), "not measurable");
+			add("Paraphrase answer-equivalence rate", meanDefined(equivalents), "judge error");
+			add("Paraphrase citation-set stability", meanDefined(stable), "not measurable");
 			break;
 		}
 		case "negative": {
-			add("Negative rejection", meanDefined(it.map((i) => metric(i, "rejection_success"))));
+			add("Negative rejection", meanDefined(it.map((i) => metric(i, "rejection_success"))), "not measurable");
 			const fabricated = it.filter((i) => (metric(i, "fabricated_citations") ?? 0) > 0).length;
-			rows.push({
-				category: "Fabricated citations inside a rejection (must be 0)",
-				measured: String(fabricated),
-				n: String(it.length),
-			});
+			addCount("Fabricated citations inside a rejection (must be 0)", String(fabricated), it.length);
 			const layers = new Map<string, number>();
 			for (const i of it) {
 				const layer = (i.metrics as { layer?: string } | undefined)?.layer ?? "unknown";
 				layers.set(layer, (layers.get(layer) ?? 0) + 1);
 			}
-			rows.push({
-				category: "Rejection layer that fired",
-				measured: Array.from(layers.entries()).map(([l, n]) => `${l}: ${n}`).join(", "),
-				n: String(it.length),
-			});
+			addCount(
+				"Rejection layer that fired",
+				Array.from(layers.entries()).map(([l, n]) => `${l}: ${n}`).join(", ") || "—",
+				it.length,
+			);
 			break;
 		}
 	}
@@ -305,16 +378,35 @@ function main(): void {
 	lines.push("");
 	lines.push("## Scores");
 	lines.push("");
-	lines.push("| Category | Measured | n | Expected / realistic range | Source |");
-	lines.push("|---|---|---|---|---|");
+	lines.push(
+		"`n` is the denominator that produced `Measured` — the samples actually counted. " +
+			"`Excluded` is every sample dropped from it, with the reason. A metric that cannot be " +
+			"honestly computed prints `n/a`; it is never given a number. In particular: citation " +
+			"validity is UNDEFINED (not 1.0) for an answer that cites nothing — read it together " +
+			"with citation coverage — and retrieval quality is UNDEFINED (not 0) for a question the " +
+			"route refused before building an envelope.",
+	);
+	lines.push("");
+	lines.push("| Category | Measured | n | Excluded (why) | Expected / realistic range | Source |");
+	lines.push("|---|---|---|---|---|---|");
 	for (const run of runs) {
 		for (const row of rowsFor(run)) {
 			const exp = EXPECTED[row.category];
 			lines.push(
-				`| ${row.category} | ${row.measured} | ${row.n} | ${exp?.range ?? "—"} | ${exp?.source ?? "—"} |`,
+				`| ${row.category} | ${row.measured} | ${row.n} | ${row.excluded} | ${exp?.range ?? "—"} | ${exp?.source ?? "—"} |`,
 			);
 		}
 	}
+	lines.push("");
+	lines.push(
+		"Ranking note: the `baseline` rank-sensitive metrics (MRR, CP@8) are computed over the TRUE " +
+			"cosine-similarity ranking of the candidate pool, taken from `lib/retrieval.ts`'s " +
+			"`RetrievalTrace` — not over the `data-sources` frame, whose order is the " +
+			"diversity-reordered envelope and is not a ranking at all. The `ksweep` rows are " +
+			"positional over the ENVELOPE the route would select at each k (that selection IS what " +
+			"the sweep is about), so their positions reflect production's envelope order, including " +
+			"the doc-diversity pass.",
+	);
 	lines.push("");
 	lines.push("## Cost appendix");
 	lines.push("");
@@ -339,8 +431,39 @@ function main(): void {
 	lines.push("");
 	lines.push(
 		"Answerer + server-embedding costs are ESTIMATED with tiktoken (the SSE stream carries " +
-			"no `usage` field); judge and eval-side embedding costs are ACTUAL API `usage` counts.",
+			"no `usage` field); judge and eval-side embedding costs are ACTUAL API `usage` counts. " +
+			"The answerer estimate is taken over the RECONSTRUCTED REAL PROMPT — full `chunk_text` " +
+			"re-fetched by id and re-wrapped with the production `buildContextEnvelope` — not the " +
+			"260-char display snippet in the SSE frame, which under-counted the model's true input " +
+			"by roughly 4-6×. Every unobservable component (unresolved chunks, the route's embedding " +
+			"expansions) is charged with a documented factor that ERRS HIGH: this number may " +
+			"over-state spend, never under-state it.",
 	);
+	lines.push("");
+	lines.push("## Production budget impact");
+	lines.push("");
+	lines.push(
+		"Retrieval-path eval calls are isolated from production: they pass a no-op `recordUsage` " +
+			"into `lib/retrieval.ts`, so they never increment the shared daily OpenAI counter. " +
+			"The ANSWER harness is a different story and is NOT isolated — by design it POSTs the " +
+			"REAL production route (that is the only way generation metrics score the real path), " +
+			"and `x-eval-bypass` skips the circuit-breaker CHECK but not its INCREMENT. A " +
+			"server-backed battery therefore consumes the same `GLOBAL_DAILY_CAP` (2000 calls/day) " +
+			"that real users share, at ~2 calls per question. The runner now reads that headroom in " +
+			"PREFLIGHT and refuses to start a run the budget cannot absorb.",
+	);
+	lines.push("");
+	lines.push("| Run | Headroom at start | Projected calls |");
+	lines.push("|---|---|---|");
+	for (const run of runs) {
+		const h = run.manifest.daily_cap_headroom_at_start;
+		const projected = run.manifest.projected_daily_cap_calls ?? 0;
+		lines.push(
+			`| ${run.manifest.experiment} | ${
+				h?.available ? `${h.remaining} of ${h.cap} left` : "unreadable"
+			} | ${projected || "0 (no server calls)"} |`,
+		);
+	}
 	lines.push("");
 
 	const md = lines.join("\n");
@@ -353,9 +476,15 @@ function main(): void {
 	}
 }
 
-try {
-	main();
-} catch (err) {
-	console.error(`\nFAILED — ${(err as Error).message}`);
-	process.exit(1);
+// Only run the CLI when invoked directly (`bun run eval:rag:report`). The
+// offline self-test IMPORTS rowsFor/meanDefined to assert the aggregation never
+// prints a percentage over a silently-padded denominator (fix round 1), and an
+// import must not execute the CLI.
+if (import.meta.main) {
+	try {
+		main();
+	} catch (err) {
+		console.error(`\nFAILED — ${(err as Error).message}`);
+		process.exit(1);
+	}
 }

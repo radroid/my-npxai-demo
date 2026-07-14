@@ -28,18 +28,50 @@ export class CostCapError extends Error {
 	readonly totalUsd: number;
 	readonly capUsd: number;
 	readonly lastEntry: CostEntry;
+	/** True when the cap tripped on a PRE-call projection (no spend happened). */
+	readonly projected: boolean;
 
-	constructor(totalUsd: number, capUsd: number, lastEntry: CostEntry) {
+	constructor(
+		totalUsd: number,
+		capUsd: number,
+		lastEntry: CostEntry,
+		projected = false,
+	) {
 		super(
 			`EVAL_COST_CAP_USD reached: $${totalUsd.toFixed(4)} >= $${capUsd.toFixed(2)} ` +
-				`(last charge: ${lastEntry.kind}/${lastEntry.model} ` +
-				`${lastEntry.inputTokens} in + ${lastEntry.outputTokens} out)`,
+				`(${projected ? "projected" : "last"} charge: ${lastEntry.kind}/${lastEntry.model} ` +
+				`${lastEntry.inputTokens} in + ${lastEntry.outputTokens} out)` +
+				(projected ? " — call NOT made, aborted before the spend" : ""),
 		);
 		this.name = "CostCapError";
 		this.totalUsd = totalUsd;
 		this.capUsd = capUsd;
 		this.lastEntry = lastEntry;
+		this.projected = projected;
 	}
+}
+
+/**
+ * Unwrap a CostCapError from whatever wrapped it.
+ *
+ * PR #8 fix round 1 (issue 4b). `lib/retrieval.ts` catches ANY throw from the
+ * embedding call and rethrows it as `RetrievalError("embedding", err)` — which
+ * includes OUR OWN cap abort, raised by the metered OpenAI client. A bare
+ * `err instanceof CostCapError` check therefore MISSES a cap trip that happened
+ * inside retrieval: the runner rethrows, skips its finalize block (no
+ * manifest.json, no cost totals), and the operator sees "retrieval_failed:
+ * embedding" — which reads like an outage and invites a re-run, i.e. MORE
+ * spend. Walking the cause chain makes a cap trip always land in the normal
+ * aborted-run finalize path, whatever wrapped it.
+ */
+export function asCostCapError(err: unknown): CostCapError | null {
+	let cur: unknown = err;
+	// Bounded walk — a cyclic `cause` chain must not hang the runner.
+	for (let depth = 0; cur != null && depth < 8; depth++) {
+		if (cur instanceof CostCapError) return cur;
+		cur = (cur as { cause?: unknown }).cause;
+	}
+	return null;
 }
 
 export function priceUsd(
@@ -66,9 +98,41 @@ export class CostAccountant {
 	}
 
 	/**
+	 * PRE-CALL cost-cap check (PR #8 fix round 1, issue 4a). Call this with the
+	 * WORST-CASE token projection for a call you are ABOUT to make; it throws
+	 * CostCapError before a cent is spent when the projected total would reach
+	 * the cap. Nothing is recorded — `record()` still books the actuals after
+	 * the call returns.
+	 *
+	 * `record()` alone is not wallet protection: it pushed the entry and THEN
+	 * threw, i.e. it aborted only AFTER the money was gone. Projections here
+	 * must ERR HIGH; wallet protection fails safe.
+	 */
+	reserve(entry: Omit<CostEntry, "usd">): void {
+		const usd = priceUsd(entry.model, entry.inputTokens, entry.outputTokens);
+		const projected = this.totalUsd() + usd;
+		if (projected >= this.capUsd) {
+			throw new CostCapError(
+				projected,
+				this.capUsd,
+				{ ...entry, usd },
+				/* projected */ true,
+			);
+		}
+	}
+
+	/** Non-throwing form of reserve() — for callers that want to branch. */
+	wouldExceed(entry: Omit<CostEntry, "usd">): boolean {
+		const usd = priceUsd(entry.model, entry.inputTokens, entry.outputTokens);
+		return this.totalUsd() + usd >= this.capUsd;
+	}
+
+	/**
 	 * Record one OpenAI charge. Throws CostCapError when the running total
 	 * reaches the cap — AFTER recording the entry, so the abort report and
-	 * the finalized manifest still include the charge that tripped it.
+	 * the finalized manifest still include the charge that tripped it. This is
+	 * the ACTUALS ledger and the last line of defense; the pre-spend guard is
+	 * reserve() at each call site.
 	 */
 	record(entry: Omit<CostEntry, "usd">): CostEntry {
 		const usd = priceUsd(entry.model, entry.inputTokens, entry.outputTokens);

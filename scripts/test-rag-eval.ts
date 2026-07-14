@@ -6,28 +6,51 @@
 // Pure/offline by design, same contract as scripts/test-artifact.ts: fixtures
 // only — no network, no OpenAI, no Supabase, no dev server. `globalThis.fetch`
 // is replaced with a throwing stub, so ANY accidental network call fails the
-// run loudly. That stub is also what proves DELTA D2: driving the real
-// lib/retrieval with a no-op `recordUsage` must make ZERO network calls, i.e.
-// the eval path never increments the production daily OpenAI circuit-breaker
-// (whose recordOpenAICall talks to Upstash over REST).
+// run loudly. That stub is also what proves DELTA D2 for the RETRIEVAL path:
+// driving the real lib/retrieval with a no-op `recordUsage` makes ZERO network
+// calls, i.e. eval-path RETRIEVAL never increments the production daily OpenAI
+// circuit-breaker (whose recordOpenAICall talks to Upstash over REST).
+//
+// That claim is about retrieval ONLY, and §11 below pins the honest framing:
+// the ANSWER harness deliberately POSTs the real production route and DOES
+// consume the shared daily-cap budget by design. "The eval cannot touch the
+// breaker" was always an overclaim.
 //
 // Exit code 0 on pass, 1 on any failure. Never wired into lint/build/CI (I2.1).
 
+import fs from "node:fs";
+import path from "node:path";
 import type OpenAI from "openai";
-import type { RetrievedChunk } from "../lib/context-envelope";
+import { type RetrievedChunk, buildContextEnvelope } from "../lib/context-envelope";
 import {
 	LOW_SIM_OOS,
 	MIN_CHUNK_SIM,
 	type RetrievalDeps,
 	type RetrievalTrace,
+	RetrievalError,
 	deriveEnvelopeAtK,
 	retrieveChunks,
 } from "../lib/retrieval";
 import {
+	KNOWLEDGE_HUB_LIMITED_CONTEXT,
 	KNOWLEDGE_HUB_LOW_CONFIDENCE,
 	KNOWLEDGE_HUB_OUT_OF_SCOPE,
+	isLimitedContextText,
+	isLowConfidenceText,
+	isRefusalText,
 } from "../lib/prompts";
-import { GOLDEN_PATH, OOC_PROBES_PATH } from "./rag-eval/config";
+import {
+	ANSWERER_MODEL,
+	EMBEDDING_MODEL,
+	GOLDEN_PATH,
+	OOC_PROBES_PATH,
+} from "./rag-eval/config";
+import {
+	EMBED_INPUT_MULTIPLIER,
+	SNIPPET_TO_FULL_CHUNK_FACTOR,
+	recordAnswerCost,
+	reserveAnswerCost,
+} from "./rag-eval/answer";
 import {
 	citationSetKey,
 	extractCitations,
@@ -35,7 +58,12 @@ import {
 	scoreCitationValidity,
 	sectionMatchesPrefix,
 } from "./rag-eval/citations";
-import { CostAccountant, CostCapError, priceUsd } from "./rag-eval/cost";
+import {
+	CostAccountant,
+	CostCapError,
+	asCostCapError,
+	priceUsd,
+} from "./rag-eval/cost";
 import {
 	type DbChunkRow,
 	type GoldChunkRef,
@@ -46,9 +74,16 @@ import {
 	shortSha256,
 	verifyFingerprint,
 } from "./rag-eval/datasets";
+import {
+	DAILY_CAP_CALLS_PER_REQUEST,
+	headroomBlocksRun,
+	projectDailyCapCalls,
+} from "./rag-eval/headroom";
 import { type JudgeDeps, judgeFaithfulness, judged } from "./rag-eval/judge";
 import {
+	REFUSAL_BRANCHES,
 	clamp01,
+	classifyBranch,
 	contextPrecisionAtK,
 	contextRecallAtK,
 	cosineSimilarity,
@@ -59,9 +94,11 @@ import {
 	normalizeText,
 	reciprocalRank,
 	scoreRejection,
+	similarityRankedIdsFromTrace,
 	totalAgreement,
 } from "./rag-eval/metrics";
 import { meteredOpenAI } from "./rag-eval/openai";
+import { type Row, meanDefined, rowsFor } from "./rag-eval/report";
 import { parseStream } from "./rag-eval/sse";
 
 // ---------------------------------------------------------------------------
@@ -134,9 +171,9 @@ check(
 );
 const validity = scoreCitationValidity(ANSWER, SOURCES);
 check("validity = 1.0 when every citation resolves", validity.score === 1 && validity.total === 3, validity);
+check("a citing answer has coverage 1", validity.hasCitations === 1);
 const fabricated = scoreCitationValidity("See [REGDOC-9.9.9 §1].", SOURCES);
 check("validity = 0 for a wholly fabricated citation", fabricated.score === 0 && fabricated.invalid.length === 1);
-check("validity = 1.0 (with total 0) when an answer cites nothing", scoreCitationValidity("No citations here.", SOURCES).score === 1);
 check(
 	"citation-set key is order-insensitive and deduped",
 	citationSetKey("[REGDOC-2.3.4 §3.2] and [REGDOC-2.2.5 §3.1]") ===
@@ -165,8 +202,6 @@ const rej = (over: Partial<Parameters<typeof scoreRejection>[0]>) =>
 		status: 200,
 		text: oosText,
 		hasSourcesFrame: false,
-		oosLine: KNOWLEDGE_HUB_OUT_OF_SCOPE,
-		lowConfidenceLine: KNOWLEDGE_HUB_LOW_CONFIDENCE,
 		...over,
 	});
 check("guard/sim-gate refusal (no data-sources frame) = SUCCESS", rej({}).success && rej({}).layer === "deterministic_or_sim_gate");
@@ -448,6 +483,516 @@ check("OOS branch is reachable offline and flagged in the trace", weak.trace?.de
 	topSim: weak.topSim,
 	MIN_CHUNK_SIM,
 });
+
+// ===========================================================================
+// PR #8 FIX ROUND 1 — regression tests.
+//
+// Each block below FAILS if its fix is reverted. These are the proof; a green
+// run of the pre-existing checks is not. Every one of these bugs made the final
+// report print a FLATTERING number for the wrong reason, or under-charged the
+// wallet, or both.
+// ===========================================================================
+
+// Source-level assertions. Several of these fixes live in modules that execute
+// on import (run.ts, generate-golden.ts call main() at module scope), so they
+// cannot be imported into a test harness. Reading their source is the honest
+// way to pin the call-site half of a fix — and it fails loudly if reverted.
+// cwd is the repo root (same assumption the committed-dataset checks make).
+const readSrc = (rel: string) =>
+	fs.readFileSync(path.resolve(process.cwd(), rel), "utf8");
+
+// ---------------------------------------------------------------------------
+section("11. Issue 2 — branch sentinels match what the APP ACTUALLY EMITS");
+
+// The bug: scoreRejection + run.ts's fallbackTaken detected the "low-confidence
+// branch" by matching KNOWLEDGE_HUB_LOW_CONFIDENCE. NOTHING in the app emits
+// that string on that branch. The route's low-avg-similarity branch emits a
+// different hardcoded literal. Both sentinels were measuring nothing.
+const ROUTE_SRC = readSrc("app/api/knowledge-hub/query/route.ts");
+
+check(
+	"the route emits the SHARED constant on its low-similarity branch",
+	ROUTE_SRC.includes("emit(KNOWLEDGE_HUB_LIMITED_CONTEXT)") &&
+		ROUTE_SRC.includes("KNOWLEDGE_HUB_LIMITED_CONTEXT,\n} from \"@/lib/prompts\"".slice(0, 30)),
+);
+check(
+	"the route no longer carries its own copy of the disclaimer literal (single source of truth)",
+	!ROUTE_SRC.includes("_Limited matches in the indexed corpus"),
+);
+check(
+	"the shared constant is byte-identical to the delta the route used to inline",
+	KNOWLEDGE_HUB_LIMITED_CONTEXT ===
+		"_Limited matches in the indexed corpus for this question — answering from the strongest available snippets._\n\n",
+);
+// The markers must actually match the canonical strings, or the whole scheme is
+// theatre. (This is the check that catches a future prompt edit.)
+check("REFUSAL marker matches the canonical out-of-scope constant", isRefusalText(KNOWLEDGE_HUB_OUT_OF_SCOPE));
+check("LOW-CONFIDENCE marker matches the canonical low-confidence constant", isLowConfidenceText(KNOWLEDGE_HUB_LOW_CONFIDENCE));
+check("LIMITED-CONTEXT marker matches the route's disclaimer constant", isLimitedContextText(KNOWLEDGE_HUB_LIMITED_CONTEXT));
+// eval-security.ts's grade() matches LOWERCASED SUBSTRINGS. The old scoreRejection
+// did a case-sensitive exact match, so a re-cased model refusal scored as
+// "answered_instead_of_rejecting" — a FALSE FAILURE that would have made the
+// negative-rejection row read LOW for the wrong reason.
+const RECASED = "This Assistant ONLY ANSWERS QUESTIONS ABOUT THE INDEXED CNSC regulatory documents.";
+check(
+	"a re-cased model refusal is still a rejection SUCCESS (lowercased-substring match)",
+	rej({ text: RECASED }).success,
+	rej({ text: RECASED }),
+);
+const WRAPPED = `I'm sorry — this assistant only answers questions about the indexed CNSC regulatory documents, so I can't help with that.`;
+check("a refusal wrapped in prose is still detected", rej({ text: WRAPPED }).success);
+check(
+	"eval-security.ts imports the shared markers instead of re-deriving them",
+	readSrc("scripts/eval-security.ts").includes('from "../lib/prompts"'),
+);
+
+// classifyBranch: the four branches the app can actually take.
+check(
+	"branch: refusal text + NO sources frame → oos_or_guard (deterministic guard / sim gate)",
+	classifyBranch({ text: KNOWLEDGE_HUB_OUT_OF_SCOPE, hasSourcesFrame: false }) === "oos_or_guard",
+);
+check(
+	"branch: refusal text WITH a sources frame → llm_refusal",
+	classifyBranch({ text: KNOWLEDGE_HUB_OUT_OF_SCOPE, hasSourcesFrame: true }) === "llm_refusal",
+);
+check(
+	"branch: the model's low-confidence line → low_confidence",
+	classifyBranch({ text: KNOWLEDGE_HUB_LOW_CONFIDENCE, hasSourcesFrame: true }) === "low_confidence",
+);
+check(
+	"branch: the route's disclaimer PREFIX on a real answer → limited_context",
+	classifyBranch({
+		text: `${KNOWLEDGE_HUB_LIMITED_CONTEXT}Licensees shall do X [REGDOC-2.3.4 §3.2].`,
+		hasSourcesFrame: true,
+	}) === "limited_context",
+);
+check("branch: a normal answer → null", classifyBranch({ text: "Licensees shall do X.", hasSourcesFrame: true }) === null);
+// The disclaimer is NOT a refusal — the model still answered. Counting it as one
+// would inflate the false-rejection rate.
+check("limited_context is NOT counted as a refusal", !REFUSAL_BRANCHES.has("limited_context"));
+check("oos_or_guard / llm_refusal / low_confidence ARE refusals", ["oos_or_guard", "llm_refusal", "low_confidence"].every((b) => REFUSAL_BRANCHES.has(b)));
+
+// ---------------------------------------------------------------------------
+section("12. Issue 1 — zero-citation answers are EXCLUDED, never a free 100%");
+
+const noCites = scoreCitationValidity("I don't have enough from the indexed CNSC documents.", SOURCES);
+check(
+	"validity is NULL (not 1.0) when an answer cites nothing — a vacuous case is not a pass",
+	noCites.score === null && noCites.total === 0,
+	noCites,
+);
+check("…and coverage records the zero", noCites.hasCitations === 0);
+// The bug in aggregate: meanDefined only drops null/undefined, so a `score: 1`
+// for a zero-citation answer was averaged in as a PERFECT sample. The row read
+// ~100% precisely when citations disappeared.
+const validityAgg = meanDefined([
+	scoreCitationValidity(ANSWER, SOURCES).score, // 1.0, 3 citations
+	scoreCitationValidity("See [REGDOC-9.9.9 §1].", SOURCES).score, // 0.0, fabricated
+	noCites.score, // null — excluded
+	scoreCitationValidity(KNOWLEDGE_HUB_OUT_OF_SCOPE, SOURCES).score, // null — excluded
+]);
+check(
+	"validity mean counts ONLY the answers that cited (n=2), excluding the 2 vacuous ones",
+	validityAgg.n === 2 && validityAgg.excluded === 2 && validityAgg.value === 0.5,
+	validityAgg,
+);
+const coverageAgg = meanDefined([1, 0, 0, 1]);
+check("citation coverage is its own metric with a full denominator", coverageAgg.n === 4 && coverageAgg.value === 0.5);
+
+// ---------------------------------------------------------------------------
+section("13. Issue 7 + report — no row prints a percentage over a padded denominator");
+
+// A synthetic baseline run: one good answer, one OOS refusal (no envelope, no
+// citations). Under the old code the refusal scored hit-rate 0 AND citation
+// validity 1.0 — dragging retrieval DOWN and citations UP, both silently.
+const baselineRun = {
+	dir: "fixture",
+	manifest: {
+		experiment: "baseline",
+		aborted: false,
+		items: 2,
+		prompt_version: "test",
+		models: {},
+		judge_errors: {},
+		cost: { capUsd: 2, totalUsd: 0, byKind: {} },
+		golden_set: { sha256: "x", records: 2 },
+	},
+	items: [
+		{
+			fallback_taken: null,
+			metrics: {
+				hit_rate_at_k: 1,
+				reciprocal_rank: 1,
+				context_recall_at_k: 1,
+				context_precision_at_k: 1,
+				citation_validity: 1,
+				citation_coverage: 1,
+			},
+		},
+		{
+			// OOS/guard refusal: route emitted NO data-sources frame, answer cites nothing.
+			fallback_taken: "oos_or_guard",
+			metrics: {
+				hit_rate_at_k: null,
+				reciprocal_rank: null,
+				context_recall_at_k: null,
+				context_precision_at_k: null,
+				citation_validity: null,
+				citation_coverage: 0,
+			},
+		},
+	],
+} as unknown as Parameters<typeof rowsFor>[0];
+
+const reportRows = rowsFor(baselineRun);
+const row = (c: string): Row => reportRows.find((r) => r.category === c) as Row;
+
+const hitRow = row("Retrieval quality (hit rate@8)");
+check(
+	"hit rate@8 = 100% over n=1 — the OOS item is EXCLUDED, not scored 0",
+	hitRow.measured === "100.0%" && hitRow.n === "1" && hitRow.excluded.startsWith("1 —"),
+	hitRow,
+);
+check("…and the exclusion states WHY, in the table itself", hitRow.excluded.includes("no envelope"), hitRow.excluded);
+const mrrRow = row("Retrieval quality (MRR)");
+check("MRR excludes the OOS item too (rank-sensitive metrics need a ranking)", mrrRow.n === "1" && mrrRow.excluded.startsWith("1 —"));
+
+const validRow = row("Citation validity (deterministic)");
+check(
+	"citation validity = 100% over n=1 — the zero-citation refusal is EXCLUDED, not a free pass",
+	validRow.measured === "100.0%" && validRow.n === "1" && validRow.excluded.startsWith("1 —"),
+	validRow,
+);
+const covRow = row("Citation coverage (answers carrying ≥ 1 citation)");
+check(
+	"citation coverage = 50% over the FULL n=2 — zero-citation-ness is visible, never silent",
+	covRow.measured === "50.0%" && covRow.n === "2",
+	covRow,
+);
+const frRow = row("False-rejection rate (answerable golden questions refused)");
+check("false-rejection rate counts the OOS refusal (50% of 2)", frRow.measured === "50.0%" && frRow.n === "2", frRow);
+check("a branch census row reconciles every item to a branch", row("Route branch census (which path produced each answer)").measured.includes("oos_or_guard: 1"));
+
+// A run where NOTHING is measurable must print n/a — never a number.
+const allVacuous = rowsFor({
+	...baselineRun,
+	items: [baselineRun.items[1], baselineRun.items[1]],
+} as unknown as Parameters<typeof rowsFor>[0]);
+const vacuousValidity = allVacuous.find((r) => r.category === "Citation validity (deterministic)") as Row;
+check(
+	"a metric with an EMPTY denominator prints n/a, never a number",
+	vacuousValidity.measured === "n/a" && vacuousValidity.n === "0" && vacuousValidity.excluded.startsWith("2 —"),
+	vacuousValidity,
+);
+
+// The limited-context disclaimer is NOT a refusal — it must not inflate the rate.
+const disclaimerRun = rowsFor({
+	...baselineRun,
+	items: [{ fallback_taken: "limited_context", metrics: { hit_rate_at_k: 1, citation_validity: 1, citation_coverage: 1 } }],
+} as unknown as Parameters<typeof rowsFor>[0]);
+check(
+	"the low-similarity DISCLAIMER is not counted as a false rejection (the model still answered)",
+	(disclaimerRun.find((r) => r.category === "False-rejection rate (answerable golden questions refused)") as Row).measured === "0.0%",
+);
+
+// Why rank-sensitivity matters at all: the same id-set in two different orders
+// gives two different MRRs. The data-sources frame is diversity-REORDERED, so
+// scoring MRR/CP positionally over it scored a list that was never a ranking.
+const similarityRanked = [11, 22, 33, 44];
+const diversityReordered = [44, 11, 22, 33];
+check(
+	"MRR over a diversity-reordered envelope ≠ MRR over the true similarity ranking",
+	reciprocalRank(similarityRanked, new Set([44])) !== reciprocalRank(diversityReordered, new Set([44])),
+	{
+		ranked: reciprocalRank(similarityRanked, new Set([44])),
+		reordered: reciprocalRank(diversityReordered, new Set([44])),
+	},
+);
+// The trace pool arrives in POST-BOOST order; the true ranking is by
+// rankPreBoost (raw cosine similarity). A named-doc boost can lift chunk 44 to
+// the front of the pool while its similarity rank is 4th — score MRR over the
+// pool's own order and you credit a rank the retriever never gave it.
+const boostedPool = {
+	pool: [
+		{ chunk: { id: 44 }, rankPreBoost: 4 }, // boosted to the front
+		{ chunk: { id: 11 }, rankPreBoost: 1 },
+		{ chunk: { id: 22 }, rankPreBoost: 2 },
+		{ chunk: { id: 33 }, rankPreBoost: 3 },
+	],
+};
+check(
+	"similarityRankedIdsFromTrace restores TRUE similarity order from the post-boost pool",
+	JSON.stringify(similarityRankedIdsFromTrace(boostedPool)) === JSON.stringify([11, 22, 33, 44]),
+	similarityRankedIdsFromTrace(boostedPool),
+);
+check(
+	"…and that order gives a DIFFERENT MRR than the pool's own (boosted) order",
+	reciprocalRank(similarityRankedIdsFromTrace(boostedPool), new Set([44])) === 1 / 4 &&
+		reciprocalRank(boostedPool.pool.map((e) => e.chunk.id), new Set([44])) === 1,
+);
+check(
+	"run.ts computes rank-sensitive baseline metrics from the retrieval TRACE, not the SSE frame",
+	readSrc("scripts/rag-eval/run.ts").includes("similarityRankedIdsFromTrace(trace)") &&
+		readSrc("scripts/rag-eval/run.ts").includes("hitRateAtK(similarityRankedIds"),
+);
+
+// ---------------------------------------------------------------------------
+section("14. Issue 3 — the answerer cost estimate reflects the REAL prompt");
+
+// The bug: input tokens were estimated from `sources[].snippet`, the SSE DISPLAY
+// projection (chunk_text.slice(0, 260)), while the model's prompt carries the
+// FULL ~400-token chunk_text. Real spend systematically exceeded the cap.
+const FULL_CHUNK_TEXT = "Licensees shall maintain records of every shift turnover. ".repeat(30); // ~1700 chars
+const fullChunks: RetrievedChunk[] = Array.from({ length: 8 }, (_, i) => ({
+	id: i + 1,
+	regdoc_id: "REGDOC-2.3.4",
+	section_number: "3.2",
+	section_title: "Turnover",
+	chunk_text: FULL_CHUNK_TEXT,
+	url: null,
+	requirement_type: "requirement",
+	similarity: 0.7 - i * 0.01,
+}));
+const SNIPPET_JOIN = fullChunks.map((c) => c.chunk_text.slice(0, 260)).join("\n"); // the OLD estimate
+const REAL_ENVELOPE = buildContextEnvelope(fullChunks, "What is required at turnover?", ["REGDOC-2.3.4"]);
+
+const costOld = new CostAccountant(100);
+recordAnswerCost(costOld, {
+	systemPrompt: "sys",
+	question: "q",
+	envelopeText: SNIPPET_JOIN,
+	answer: "a",
+	label: "old",
+});
+const costNew = new CostAccountant(100);
+recordAnswerCost(costNew, {
+	systemPrompt: "sys",
+	question: "q",
+	envelopeText: REAL_ENVELOPE,
+	answer: "a",
+	label: "new",
+});
+const oldTok = costOld.totalsByKind().answerer_estimated.tokens;
+const newTok = costNew.totalsByKind().answerer_estimated.tokens;
+check(
+	"the real-envelope estimate is ≥ 4x the truncated-snippet estimate it replaced",
+	newTok >= oldTok * 4,
+	{ snippetEstimate: oldTok, realEnvelopeEstimate: newTok, ratio: (newTok / oldTok).toFixed(2) },
+);
+check(
+	"run.ts no longer estimates from the SSE display snippet",
+	!readSrc("scripts/rag-eval/run.ts").includes("s.snippet).join") &&
+		readSrc("scripts/rag-eval/run.ts").includes("buildContextEnvelope("),
+);
+// Unresolvable chunks fall back to a factor that ERRS HIGH, never low.
+const costFallback = new CostAccountant(100);
+recordAnswerCost(costFallback, {
+	systemPrompt: "sys",
+	question: "q",
+	envelopeText: "",
+	unresolvedSnippets: [FULL_CHUNK_TEXT.slice(0, 260)],
+	answer: "a",
+	label: "fallback",
+});
+const costNoFallback = new CostAccountant(100);
+recordAnswerCost(costNoFallback, { systemPrompt: "sys", question: "q", envelopeText: "", answer: "a", label: "none" });
+check(
+	"an unresolved chunk is charged at the err-high snippet factor, not at snippet face value",
+	SNIPPET_TO_FULL_CHUNK_FACTOR >= 6 &&
+		costFallback.totalsByKind().answerer_estimated.tokens >
+			costNoFallback.totalsByKind().answerer_estimated.tokens * 1.5,
+);
+check(
+	"the server-side embedding is charged for expansions too (errs high, never low)",
+	EMBED_INPUT_MULTIPLIER >= 2 &&
+		costNew.totalsByKind().embeddings.tokens >= EMBED_INPUT_MULTIPLIER,
+	costNew.totalsByKind().embeddings,
+);
+
+// ---------------------------------------------------------------------------
+section("15. Issue 4 — the cap aborts BEFORE the spend, and survives wrapping");
+
+// (a) reserve() is a PRE-call check: it must throw WITHOUT recording anything.
+// record() alone pushed the entry and THEN threw — i.e. it aborted after the
+// money was already gone.
+const acctR = new CostAccountant(0.01);
+let reserved: CostCapError | null = null;
+try {
+	acctR.reserve({
+		kind: "judge",
+		model: "gpt-4o",
+		inputTokens: 1_000_000,
+		outputTokens: 0,
+		estimated: true,
+	});
+} catch (err) {
+	reserved = err as CostCapError;
+}
+check("reserve() throws CostCapError on a projected breach", reserved instanceof CostCapError);
+check("…BEFORE the call: nothing was recorded, no money spent", acctR.entryCount() === 0 && acctR.totalUsd() === 0);
+check("…and the error says so (projected, call NOT made)", reserved?.projected === true && reserved.message.includes("NOT made"));
+check("reserve() is silent when the projection fits under the cap", (() => {
+	const a = new CostAccountant(1);
+	a.reserve({ kind: "judge", model: "gpt-4o", inputTokens: 100, outputTokens: 10, estimated: true });
+	return a.entryCount() === 0;
+})());
+check("wouldExceed() is the non-throwing form", (() => {
+	const a = new CostAccountant(0.01);
+	return (
+		a.wouldExceed({ kind: "judge", model: "gpt-4o", inputTokens: 1_000_000, outputTokens: 0, estimated: true }) &&
+		!a.wouldExceed({ kind: "judge", model: "gpt-4o", inputTokens: 10, outputTokens: 0, estimated: true })
+	);
+})());
+// The answer harness reserves the WORST CASE before POSTing the real route —
+// the spend happens inside the dev server, where a post-hoc record() is useless.
+let answerReserved = false;
+try {
+	reserveAnswerCost(new CostAccountant(0.000001), {
+		systemPrompt: "system prompt",
+		question: "q",
+		envelopeChunks: 8,
+		label: "smoke",
+	});
+} catch (err) {
+	answerReserved = err instanceof CostCapError;
+}
+check("reserveAnswerCost aborts a server request the cap cannot afford", answerReserved);
+check(
+	"every server request is reserved before it is made",
+	(() => {
+		const src = readSrc("scripts/rag-eval/run.ts");
+		return (
+			src.split("reserveAnswer(").length - 1 >= 5 && // one per askServer call site
+			src.indexOf("reserveAnswer(cost, rec.question") < src.indexOf("await askServer(rec.question)")
+		);
+	})(),
+);
+
+// (b) lib/retrieval wraps ANY embedding throw into RetrievalError — including
+// our own cap abort. A bare `instanceof CostCapError` MISSED it, so the runner
+// rethrew, skipped finalize (no manifest, no cost totals), and printed
+// "retrieval_failed:embedding" — an outage, inviting a re-run and MORE spend.
+const capErr = new CostCapError(9, 2, {
+	kind: "embeddings",
+	model: EMBEDDING_MODEL,
+	inputTokens: 1,
+	outputTokens: 0,
+	usd: 9,
+	estimated: true,
+});
+const wrapped = new RetrievalError("embedding", capErr);
+check("a bare instanceof check MISSES a wrapped cap error (this is the bug)", !(wrapped instanceof CostCapError));
+check("asCostCapError UNWRAPS it out of RetrievalError", asCostCapError(wrapped) === capErr);
+check("asCostCapError is identity for an unwrapped cap error", asCostCapError(capErr) === capErr);
+check("asCostCapError returns null for a genuine outage", asCostCapError(new RetrievalError("match", new Error("db down"))) === null);
+check("asCostCapError tolerates a cyclic cause chain without hanging", (() => {
+	const a = new Error("a") as Error & { cause?: unknown };
+	const b = new Error("b") as Error & { cause?: unknown };
+	a.cause = b;
+	b.cause = a;
+	return asCostCapError(a) === null;
+})());
+check(
+	"both runners unwrap before deciding (run.ts + generate-golden.ts)",
+	readSrc("scripts/rag-eval/run.ts").includes("asCostCapError(err)") &&
+		readSrc("scripts/rag-eval/generate-golden.ts").includes("asCostCapError(err)"),
+);
+
+// ---------------------------------------------------------------------------
+section("16. Issue 5 — production daily-cap headroom is checked in PREFLIGHT");
+
+// The answer harness POSTs the REAL route, and a bypassed call still INCREMENTS
+// the shared GLOBAL_DAILY_CAP counter. Reading it only in finalize reports the
+// damage after doing it — and a battery can circuit-break production.
+check("each server request is projected at 2 daily-cap calls (embedding + completion)", DAILY_CAP_CALLS_PER_REQUEST === 2);
+check("a 75-question baseline projects 150 calls", projectDailyCapCalls(75) === 150);
+check(
+	"a run is REFUSED when the remaining headroom cannot absorb the projection",
+	headroomBlocksRun({ available: true, callsToday: 1900, cap: 2000, remaining: 100 }, 150),
+);
+check(
+	"a run proceeds when headroom is sufficient",
+	!headroomBlocksRun({ available: true, callsToday: 100, cap: 2000, remaining: 1900 }, 150),
+);
+check(
+	"an UNREADABLE counter warns but does not block (a Redis outage is not a breach)",
+	!headroomBlocksRun({ available: false, callsToday: 0, cap: 2000, remaining: 2000, reason: "no creds" }, 150),
+);
+check(
+	"run.ts reads the headroom in PREFLIGHT, before the first server request — not only at finalize",
+	(() => {
+		const src = readSrc("scripts/rag-eval/run.ts");
+		// Must be the PREFLIGHT read specifically: the finalize block also calls
+		// readHeadroom(), and matching that one would pass even with the preflight
+		// check deleted.
+		const preflight = src.indexOf("headroomAtStart = await readHeadroom()");
+		const firstAsk = src.indexOf("await askServer(");
+		return preflight > 0 && firstAsk > 0 && preflight < firstAsk;
+	})(),
+);
+check(
+	"…and aborts the run rather than silently eating the users' budget",
+	readSrc("scripts/rag-eval/run.ts").includes("headroomBlocksRun(headroomAtStart, projectedServerCalls)"),
+);
+
+// ---------------------------------------------------------------------------
+section("17. Issue 6 — the judge cache's cost claim is HONEST");
+
+// Chosen option: KEEP the cache, DELETE the false claim. A faithfulness verdict
+// is about a SPECIFIC answer; keying it on anything coarser (question +
+// chunk-id set) would score answer B with answer A's verdict — a
+// flattering-for-the-wrong-reason metric of exactly the kind this item exists
+// to stamp out. So no stable key is sound for the scoring metrics, and the
+// honest move is to state the real re-run cost.
+const nonce6 = crypto.randomUUID();
+chatCalls = 0;
+const cost17 = new CostAccountant(1);
+const deps17: JudgeDeps = { openai: stubOpenAI([FAITH_JSON]), cost: cost17 };
+
+// SCORING metric: the answer hash is in the key, and answers are regenerated
+// every run (mandatory `trigger: regenerate-assistant-message` + a
+// non-deterministic answerer) → a re-run MISSES. This is the "cache cannot hit"
+// property, asserted so nobody re-adds the "re-runs cost cents" claim.
+const s1 = await judgeFaithfulness(deps17, { question: `q17-${nonce6}`, answer: "run-1 answer text", chunks: CTX });
+const s2 = await judgeFaithfulness(deps17, { question: `q17-${nonce6}`, answer: "run-2 answer text (regenerated, differs)", chunks: CTX });
+check(
+	"a REGENERATED answer misses the judge cache — re-runs pay FULL judge price",
+	!s1.cached && !s2.cached && chatCalls === 2,
+	{ chatCalls },
+);
+check("…so the cost model must not claim otherwise", !readSrc("scripts/rag-eval/judge.ts").includes("makes re-runs cents"));
+check(
+	"the false claim is struck from the spec too",
+	(() => {
+		const spec = readSrc("docs/orchestration/specs/item-2-rag-eval.md");
+		return spec.includes("~~this is what makes re-runs cents~~") && spec.includes("zero cache hits");
+	})(),
+);
+
+// GENERATION metrics key on STABLE inputs (chunk text / question text — no model
+// output), so they DO hit across runs. That is the cache's real value, and why
+// it stays.
+chatCalls = 0;
+const GOLDEN_JSON = JSON.stringify({ reasons: "r", question: "What must a licensee do?", ground_truth_answer: "It must do X." });
+const cost17b = new CostAccountant(1);
+const deps17b: JudgeDeps = { openai: stubOpenAI([GOLDEN_JSON]), cost: cost17b };
+const stableArgs = {
+	metricId: "golden_gen",
+	question: "",
+	answerHash: "",
+	contextHash: `stable-context-${nonce6}`,
+	system: "s",
+	user: "u",
+	validate: (p: unknown) =>
+		typeof (p as { question?: unknown }).question === "string" ? { ok: true } : null,
+};
+const g1 = await judged(deps17b, stableArgs);
+const g2 = await judged(deps17b, stableArgs);
+check(
+	"a GENERATOR verdict (stable inputs, no model output in the key) DOES hit on re-run — the cache's real value",
+	!g1.cached && g2.cached && chatCalls === 1,
+	{ chatCalls, g2cached: g2.cached },
+);
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

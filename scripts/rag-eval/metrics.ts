@@ -10,6 +10,11 @@
 // Judge-backed metrics (faithfulness, relevancy, citation support,
 // answer-equivalence) live in judge.ts; these are the deterministic ones.
 
+import {
+	isLimitedContextText,
+	isLowConfidenceText,
+	isRefusalText,
+} from "../../lib/prompts";
 import { extractCitations } from "./citations";
 
 // ---------------------------------------------------------------------------
@@ -31,6 +36,27 @@ export function reciprocalRank(
 ): number {
 	const idx = rankedIds.findIndex((id) => goldIds.has(id));
 	return idx === -1 ? 0 : 1 / (idx + 1);
+}
+
+/**
+ * The TRUE cosine-similarity ranking of the retrieval candidate pool.
+ *
+ * PR #8 fix round 1 (issue 7a). MRR and context precision are POSITIONAL — they
+ * are only meaningful over a genuinely RANKED list. The `data-sources` frame the
+ * eval used to read is the DIVERSITY-REORDERED envelope (selectDiverseEnvelope
+ * seeds it with the top chunk of each mentioned doc), and the named-doc boost
+ * reorders it again — so scoring rank-sensitive metrics over it scored a list
+ * that was never a ranking. `rankPreBoost` is each chunk's position in the raw
+ * pool sorted by cosine similarity: the only true ranking in the pipeline. Takes
+ * the trace's pool (post-boost order) and restores similarity order.
+ */
+export function similarityRankedIdsFromTrace(trace: {
+	pool: Array<{ chunk: { id: number }; rankPreBoost: number }>;
+}): number[] {
+	return trace.pool
+		.slice()
+		.sort((a, b) => a.rankPreBoost - b.rankPreBoost)
+		.map((e) => e.chunk.id);
 }
 
 /** ID-based context recall: |gold ∩ retrieved@k| / |gold|. */
@@ -120,6 +146,18 @@ export function disagreeingPairs(keys: string[]): Array<[number, number]> {
 // (Edge case 2) before this scorer ever sees it.
 // Any REGDOC/NSCA citation inside a rejection = fabrication = FAILURE.
 //
+// PR #8 fix round 1 (issue 2): detection now uses the SHARED, LOWERCASED
+// SUBSTRING markers from lib/prompts.ts (REFUSAL_MARKER /
+// LOW_CONFIDENCE_MARKER) — the same ones scripts/eval-security.ts grade()
+// uses. The previous case-sensitive full-string match could not see the
+// refusal/low-confidence lines as the MODEL actually emits them (re-cased,
+// re-wrapped, wrapped in prose), so it under-counted rejections. The
+// low-confidence line is emitted by the MODEL (system prompt answer rule 4),
+// NOT by the route — the route's own low-similarity branch emits
+// KNOWLEDGE_HUB_LIMITED_CONTEXT instead, which is a DISCLAIMER on a real
+// answer and is therefore NOT a rejection. Verified against
+// app/api/knowledge-hub/query/route.ts + lib/prompts.ts on main.
+//
 // `layer` records which defense fired, inferred from response shape
 // (Edge case 4): 4xx → request boundary; canonical text with NO
 // data-sources frame → deterministic jailbreak guard or similarity OOS gate
@@ -137,10 +175,8 @@ export function scoreRejection(args: {
 	status: number;
 	text: string;
 	hasSourcesFrame: boolean;
-	oosLine: string;
-	lowConfidenceLine: string;
 }): RejectionVerdict {
-	const { status, text, hasSourcesFrame, oosLine, lowConfidenceLine } = args;
+	const { status, text, hasSourcesFrame } = args;
 	if (status === 429) {
 		throw new Error(
 			"scoreRejection received a 429 — the runner must abort on the first " +
@@ -155,7 +191,7 @@ export function scoreRejection(args: {
 			reason: `blocked_http_${status}`,
 		};
 	}
-	const refused = text.includes(oosLine) || text.includes(lowConfidenceLine);
+	const refused = isRefusalText(text) || isLowConfidenceText(text);
 	if (!refused) {
 		return {
 			success: false,
@@ -179,6 +215,54 @@ export function scoreRejection(args: {
 		fabricatedCitations: 0,
 		reason: "ok",
 	};
+}
+
+// ---------------------------------------------------------------------------
+// 7b. Which branch of the route produced this response (Edge case 9)?
+//
+// PR #8 fix round 1 (issue 2). The old `fallbackTaken` in run.ts matched
+// KNOWLEDGE_HUB_LOW_CONFIDENCE to detect the "disclaimer" branch. NOTHING in
+// the app emits that string on that branch — the route's low-avg-similarity
+// branch emits KNOWLEDGE_HUB_LIMITED_CONTEXT, and KNOWLEDGE_HUB_LOW_CONFIDENCE
+// is what the MODEL is told to say when the snippets are insufficient. The two
+// are different events and are now reported separately:
+//
+//   oos_or_guard    refusal text, NO data-sources frame → deterministic
+//                   jailbreak guard or the similarity OOS gate. No LLM call,
+//                   no envelope: retrieval-quality metrics MUST be excluded
+//                   for this item (issue 7b), not scored 0.
+//   llm_refusal     refusal text WITH a data-sources frame → an envelope was
+//                   built and the model refused anyway.
+//   low_confidence  the model's "I don't have enough…" line (answer rule 4).
+//   limited_context the route's low-avg-sim disclaimer PREFIX. This is NOT a
+//                   refusal — the model still answers from the weak snippets.
+//                   Never counted as a false rejection.
+//   null            a normal answer.
+
+export type RouteBranch =
+	| "oos_or_guard"
+	| "llm_refusal"
+	| "low_confidence"
+	| "limited_context"
+	| null;
+
+/** True for branches where the pipeline declined to answer the question. */
+export const REFUSAL_BRANCHES: ReadonlySet<string> = new Set([
+	"oos_or_guard",
+	"llm_refusal",
+	"low_confidence",
+]);
+
+export function classifyBranch(args: {
+	text: string;
+	hasSourcesFrame: boolean;
+}): RouteBranch {
+	const { text, hasSourcesFrame } = args;
+	if (isRefusalText(text))
+		return hasSourcesFrame ? "llm_refusal" : "oos_or_guard";
+	if (isLowConfidenceText(text)) return "low_confidence";
+	if (isLimitedContextText(text)) return "limited_context";
+	return null;
 }
 
 // ---------------------------------------------------------------------------

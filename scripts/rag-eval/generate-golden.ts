@@ -34,7 +34,7 @@ import {
 	costCapUsd,
 	judgeModel,
 } from "./config";
-import { CostAccountant, CostCapError } from "./cost";
+import { CostAccountant, asCostCapError } from "./cost";
 import {
 	type GoldChunkRef,
 	type GoldenRecord,
@@ -372,8 +372,13 @@ function stratifyGolden(records: GoldenRecord[], want: number): GoldenRecord[] {
 try {
 	await main();
 } catch (err) {
-	if (err instanceof CostCapError) {
-		console.error(`\nABORTED — ${err.message}`);
+	// asCostCapError, not `instanceof` (PR #8 fix round 1, issue 4b): a cap trip
+	// inside a retrieval embedding comes back wrapped in RetrievalError, and a
+	// bare instanceof check would report it as "retrieval_failed:embedding" —
+	// an outage the operator would re-run, spending MORE.
+	const capped = asCostCapError(err);
+	if (capped) {
+		console.error(`\nABORTED — ${capped.message}`);
 		console.error("Raise EVAL_COST_CAP_USD only if you mean to spend more.");
 		process.exit(1);
 	}

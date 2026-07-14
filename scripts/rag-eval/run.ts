@@ -22,6 +22,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { type RetrievedChunk, buildContextEnvelope } from "../../lib/context-envelope";
 import {
 	ENVELOPE_CHUNKS,
 	LOW_SIM_DISCLAIMER,
@@ -32,12 +33,7 @@ import {
 	deriveEnvelopeAtK,
 	retrieveChunks,
 } from "../../lib/retrieval";
-import {
-	KNOWLEDGE_HUB_LOW_CONFIDENCE,
-	KNOWLEDGE_HUB_OUT_OF_SCOPE,
-	KNOWLEDGE_HUB_SYSTEM,
-	PROMPT_VERSION,
-} from "../../lib/prompts";
+import { KNOWLEDGE_HUB_SYSTEM, PROMPT_VERSION } from "../../lib/prompts";
 import {
 	ANSWERER_MODEL,
 	CONSISTENCY_REPEATS,
@@ -52,9 +48,16 @@ import {
 	costCapUsd,
 	judgeModel,
 } from "./config";
-import { type AnswerResult, askServer, freeEncoder, recordAnswerCost, serverReachable } from "./answer";
+import {
+	type AnswerResult,
+	askServer,
+	freeEncoder,
+	recordAnswerCost,
+	reserveAnswerCost,
+	serverReachable,
+} from "./answer";
 import { citationSetKey, extractCitations, scoreCitationValidity } from "./citations";
-import { CostAccountant, CostCapError } from "./cost";
+import { CostAccountant, asCostCapError } from "./cost";
 import {
 	type GoldenRecord,
 	type OocProbe,
@@ -63,7 +66,14 @@ import {
 	isPlaceholderDataset,
 	readJsonl,
 } from "./datasets";
-import { headroomLine, readHeadroom } from "./headroom";
+import {
+	DAILY_CAP_CALLS_PER_REQUEST,
+	type Headroom,
+	headroomBlocksRun,
+	headroomLine,
+	projectDailyCapCalls,
+	readHeadroom,
+} from "./headroom";
 import {
 	type ContextChunk,
 	type JudgeDeps,
@@ -74,7 +84,9 @@ import {
 	judgeRelevancyQuestions,
 } from "./judge";
 import {
+	type RouteBranch,
 	clamp01,
+	classifyBranch,
 	contextPrecisionAtK,
 	contextRecallAtK,
 	cosineSimilarity,
@@ -84,6 +96,7 @@ import {
 	normalizeText,
 	reciprocalRank,
 	scoreRejection,
+	similarityRankedIdsFromTrace,
 	totalAgreement,
 } from "./metrics";
 import { embedTexts, getEvalOpenAI, meteredOpenAI } from "./openai";
@@ -95,6 +108,8 @@ import {
 	getEvalSupabase,
 	verifyGoldenAgainstDb,
 } from "./supabase";
+
+type EvalSupabase = ReturnType<typeof getEvalSupabase>;
 
 const EXPERIMENTS = [
 	"baseline",
@@ -215,11 +230,16 @@ function toContextChunks(
 	return out;
 }
 
-/** Did the pipeline take a fallback branch (Edge case 9)? */
-function fallbackTaken(a: AnswerResult): "oos_or_guard" | "disclaimer" | null {
-	if (a.text.includes(KNOWLEDGE_HUB_OUT_OF_SCOPE)) return "oos_or_guard";
-	if (a.text.includes(KNOWLEDGE_HUB_LOW_CONFIDENCE)) return "disclaimer";
-	return null;
+/**
+ * Which branch of the route produced this response (Edge case 9)?
+ *
+ * PR #8 fix round 1 (issue 2): was matching KNOWLEDGE_HUB_LOW_CONFIDENCE to
+ * detect the route's disclaimer branch — a string the app never emits there.
+ * classifyBranch() matches what the app ACTUALLY emits, via the shared
+ * lowercased-substring markers in lib/prompts.ts.
+ */
+function fallbackTaken(a: AnswerResult): RouteBranch {
+	return classifyBranch({ text: a.text, hasSourcesFrame: a.sources !== null });
 }
 
 function sourcesOf(a: AnswerResult): Array<{
@@ -229,20 +249,84 @@ function sourcesOf(a: AnswerResult): Array<{
 	similarity: number;
 	rank: number;
 }> {
+	// `rank` here is POSITION IN THE data-sources FRAME — i.e. the
+	// diversity-reordered envelope (selectDiverseEnvelope), NOT similarity rank.
+	// It is logged for traceability only. Rank-sensitive metrics (MRR, CP@K)
+	// must NEVER be computed from it — see runBaseline's trace-derived
+	// similarity ranking (issue 7a).
 	return (a.sources ?? []).map((s, i) => ({
 		id: s.id,
 		regdoc_id: s.regdoc_id,
 		section_number: s.section_number,
 		similarity: s.similarity,
+		envelope_position: i + 1,
 		rank: i + 1,
 	}));
 }
 
-function chargeAnswer(cost: CostAccountant, a: AnswerResult, question: string, label: string): void {
+/** Worst-case pre-spend reservation for ONE server answer (issue 4a). */
+function reserveAnswer(cost: CostAccountant, question: string, label: string): void {
+	reserveAnswerCost(cost, {
+		systemPrompt: KNOWLEDGE_HUB_SYSTEM,
+		question,
+		envelopeChunks: ENVELOPE_CHUNKS,
+		label,
+	});
+}
+
+/**
+ * Charge the accountant for one server answer.
+ *
+ * PR #8 fix round 1 (issue 3): the answerer's input used to be estimated from
+ * `sources[].snippet` — the SSE DISPLAY projection, `chunk_text.slice(0, 260)`
+ * (route.ts). The model's real prompt carries the FULL ~400-token `chunk_text`
+ * through buildContextEnvelope, so the estimate ran 4-6x LOW and real spend
+ * systematically exceeded what EVAL_COST_CAP_USD bounded. We now fetch the full
+ * chunk text by id and rebuild the REAL envelope with the production builder.
+ * Any chunk we cannot resolve is charged at the err-high snippet correction
+ * factor (answer.ts) — the estimate may over-charge, never under-charge.
+ */
+async function chargeAnswer(
+	supabase: EvalSupabase,
+	cost: CostAccountant,
+	a: AnswerResult,
+	question: string,
+	label: string,
+): Promise<void> {
+	const src = a.sources ?? [];
+	const corpus = await fetchChunksByIds(
+		supabase,
+		src.map((s) => s.id),
+	);
+	const chunks: RetrievedChunk[] = [];
+	const unresolvedSnippets: string[] = [];
+	for (const s of src) {
+		const full = corpus.get(s.id);
+		if (!full) {
+			unresolvedSnippets.push(s.snippet);
+			continue;
+		}
+		chunks.push({
+			id: full.id,
+			regdoc_id: full.regdoc_id,
+			section_number: full.section_number,
+			section_title: full.section_title,
+			chunk_text: full.chunk_text,
+			url: s.url,
+			requirement_type: full.requirement_type,
+			similarity: s.similarity,
+		});
+	}
+	// buildContextEnvelope's third argument is the route's `mentionedDocs`, which
+	// the SSE frame does not carry. Passing the envelope's distinct regdoc_ids
+	// reproduces the MULTI-DOC SCOPE cue whenever the real prompt could have had
+	// one (and adds it in a few cases where the real prompt did not) — err high.
+	const distinctDocs = Array.from(new Set(chunks.map((c) => c.regdoc_id)));
 	recordAnswerCost(cost, {
 		systemPrompt: KNOWLEDGE_HUB_SYSTEM,
 		question,
-		envelopeText: (a.sources ?? []).map((s) => s.snippet).join("\n"),
+		envelopeText: buildContextEnvelope(chunks, question, distinctDocs),
+		unresolvedSnippets,
 		answer: a.text,
 		label,
 	});
@@ -320,6 +404,88 @@ async function main(): Promise<void> {
 		console.log(`preflight: ${golden.length} golden records selected`);
 	}
 
+	// Datasets the server-backed experiments consume are read HERE, in preflight,
+	// so the daily-cap projection below knows exactly how many requests the run
+	// will make — before a cent is spent (issue 5).
+	let probes: OocProbe[] = [];
+	if (args.experiment === "negative") {
+		probes = readJsonl<OocProbe>(OOC_PROBES_PATH);
+		if (args.only) probes = probes.filter((p) => args.only?.includes(p.probe_id));
+		if (args.limit) probes = probes.slice(0, args.limit);
+		console.log(`preflight: ${probes.length} OOC probes selected`);
+	}
+
+	let paraphrasesByParent = new Map<string, ParaphraseRecord[]>();
+	let paraphraseParents: GoldenRecord[] = [];
+	if (args.experiment === "paraphrase") {
+		const paraphrases = readJsonl<ParaphraseRecord>(PARAPHRASES_PATH);
+		if (paraphrases.some((p) => p.placeholder === true)) {
+			throw new Error(
+				`${PARAPHRASES_PATH} is a PLACEHOLDER dataset — regenerate with \`bun run eval:rag:golden\`.`,
+			);
+		}
+		paraphrasesByParent = new Map<string, ParaphraseRecord[]>();
+		for (const p of paraphrases) {
+			const list = paraphrasesByParent.get(p.parent_question_id) ?? [];
+			list.push(p);
+			paraphrasesByParent.set(p.parent_question_id, list);
+		}
+		paraphraseParents = golden.filter((g) => paraphrasesByParent.has(g.question_id));
+		console.log(
+			`preflight: ${paraphraseParents.length} paraphrase parents selected ` +
+				`(${paraphrases.length} paraphrases)`,
+		);
+	}
+
+	// --- Preflight: PRODUCTION daily-cap headroom (Edge case 2 / issue 5) ------
+	//
+	// The answer harness deliberately POSTs the REAL production route — that is
+	// the only honest way to score generation. `x-eval-bypass` skips the CHECK,
+	// but a bypassed request still INCREMENTS the shared counter
+	// (recordOpenAICall), so this battery DOES consume the GLOBAL_DAILY_CAP=2000
+	// budget real users share. Reading the counter only in FINALIZE (as this
+	// framework used to) tells you what you burned AFTER you burned it. Project
+	// the spend and ABORT here if the headroom cannot absorb it.
+	let headroomAtStart: Headroom | null = null;
+	let projectedServerCalls = 0;
+	if (needsServer) {
+		const requests =
+			args.experiment === "baseline"
+				? golden.length
+				: args.experiment === "consistency"
+					? golden.length * CONSISTENCY_REPEATS
+					: args.experiment === "negative"
+						? probes.length
+						: paraphraseParents.reduce(
+								(acc, p) =>
+									acc + 1 + (paraphrasesByParent.get(p.question_id)?.length ?? 0),
+								0,
+							);
+		projectedServerCalls = projectDailyCapCalls(requests);
+		headroomAtStart = await readHeadroom();
+		console.log(
+			`preflight: ${headroomLine(headroomAtStart)}\n` +
+				`preflight: this run projects ${requests} server requests → ` +
+				`~${projectedServerCalls} daily-cap calls ` +
+				`(${DAILY_CAP_CALLS_PER_REQUEST} per request: embedding + completion)`,
+		);
+		if (headroomBlocksRun(headroomAtStart, projectedServerCalls)) {
+			throw new Error(
+				`Production daily-cap headroom is too low for this run: ${headroomAtStart.remaining} ` +
+					`calls left of ${headroomAtStart.cap}, but this experiment projects ~${projectedServerCalls}. ` +
+					"Real users share that counter (lib/guard.ts GLOBAL_DAILY_CAP) — running anyway could " +
+					"circuit-break production. Aborted BEFORE any spend. Wait for the UTC-midnight reset, " +
+					"or shrink the run with --limit / --only.",
+			);
+		}
+		if (!headroomAtStart.available) {
+			console.warn(
+				`preflight: WARNING — daily-cap headroom is UNREADABLE (${headroomAtStart.reason}). ` +
+					`Cannot verify this run's ~${projectedServerCalls} calls fit the budget real users share.`,
+			);
+		}
+	}
+
 	const rawOpenai = getEvalOpenAI();
 	const openai = meteredOpenAI(rawOpenai, cost, "eval-retrieval");
 	const deps: JudgeDeps = { openai: rawOpenai, cost };
@@ -351,10 +517,18 @@ async function main(): Promise<void> {
 				break;
 		}
 	} catch (err) {
-		if (err instanceof CostCapError) {
+		// asCostCapError, not `instanceof` (PR #8 fix round 1, issue 4b): a cap
+		// trip raised inside an eval retrieval embedding is re-thrown by
+		// lib/retrieval.ts as RetrievalError("embedding", err). The old bare
+		// instanceof check MISSED it, rethrew, and skipped this finalize block —
+		// no manifest.json, no cost totals, and the operator saw
+		// "retrieval_failed:embedding", which reads like an outage and invites a
+		// re-run (i.e. MORE spend). A cap trip must ALWAYS land here.
+		const capped = asCostCapError(err);
+		if (capped) {
 			aborted = true;
-			abortReason = err.message;
-			console.error(`\nABORTED — ${err.message}`);
+			abortReason = capped.message;
+			console.error(`\nABORTED — ${capped.message}`);
 		} else {
 			throw err;
 		}
@@ -394,6 +568,12 @@ async function main(): Promise<void> {
 		judge_errors: judgeErrors,
 		cost: cost.snapshot(),
 		daily_cap_headroom: headroom,
+		// Issue 5: what we projected before the run vs what the counter said at
+		// the start. The answer harness runs the REAL production route, so this
+		// budget is genuinely shared with real users — it is not an eval-only
+		// number and the report must say so.
+		daily_cap_headroom_at_start: headroomAtStart,
+		projected_daily_cap_calls: projectedServerCalls,
 	});
 
 	console.log("\n--- cost ---");
@@ -413,24 +593,84 @@ async function main(): Promise<void> {
 
 	/**
 	 * BASELINE — full golden set once at production settings (k=8), through the
-	 * REAL route. Retrieval metrics come from the `data-sources` frame (that IS
-	 * the envelope the LLM saw); generation metrics are judged against the FULL
-	 * chunk text pulled from the DB (the frame's snippet is truncated at 260
-	 * chars).
+	 * REAL route. Generation metrics are judged against the FULL chunk text
+	 * pulled from the DB (the frame's snippet is truncated at 260 chars).
+	 *
+	 * PR #8 fix round 1 (issue 7). Retrieval metrics NO LONGER come from the
+	 * `data-sources` frame:
+	 *   (a) That frame's order is the DIVERSITY-REORDERED envelope
+	 *       (selectDiverseEnvelope), not similarity rank — so computing MRR and
+	 *       context precision positionally over it scored a list that was never
+	 *       ranked. Rank-sensitive metrics now come from the true
+	 *       similarity-ranked pool via the additive RetrievalTrace seam
+	 *       (`withTrace`), which exists precisely for this. The traced retrieval
+	 *       is offline (no-op recordUsage → never touches the production daily
+	 *       cap) and deterministic given the same query, so it reproduces the
+	 *       pool the server just ranked.
+	 *   (b) On the OOS branch the route emits NO data-sources frame while
+	 *       retrieval still ran; `sources === null` used to become `rankedIds =
+	 *       []`, which scored hit-rate/recall as a silent 0. The pipeline never
+	 *       fed the model an envelope there, so retrieval quality is NOT
+	 *       MEASURABLE for that item: it is EXCLUDED (null) and counted, never
+	 *       scored 0. Silent zeros are as dishonest as silent ones.
 	 */
 	async function runBaseline(): Promise<void> {
 		for (const [i, rec] of golden.entries()) {
+			reserveAnswer(cost, rec.question, `baseline:${rec.question_id}`);
 			const answer = await askServer(rec.question);
-			chargeAnswer(cost, answer, rec.question, `baseline:${rec.question_id}`);
+			await chargeAnswer(supabase, cost, answer, rec.question, `baseline:${rec.question_id}`);
 
 			const sources = sourcesOf(answer);
-			const rankedIds = sources.map((s) => s.id);
+			// The envelope the LLM actually saw (frame order — NOT a ranking).
+			const envelopeIds = sources.map((s) => s.id);
 			const goldIds = new Set(rec.gold_chunks.map((g) => g.chunk_id));
 			const fallback = fallbackTaken(answer);
 
+			// True similarity-ranked pool for the rank-sensitive metrics (7a).
+			let trace: RetrievalTrace | null = null;
+			let traceError: string | null = null;
+			try {
+				const res = await retrieveChunks(
+					rec.question,
+					{ supabase, openai, recordUsage: noopRecordUsage },
+					{ envelopeChunks: PRODUCTION_K, withTrace: true },
+				);
+				trace = res.trace ?? null;
+			} catch (err) {
+				const capped = asCostCapError(err);
+				if (capped) throw capped;
+				traceError = (err as Error).message;
+			}
+			// The only genuinely RANKED list in the pipeline (see metrics.ts).
+			const similarityRankedIds = trace
+				? similarityRankedIdsFromTrace(trace)
+				: [];
+
+			// (7b) Exclusion, made explicit and counted rather than scored 0.
+			const retrievalExcludedReason =
+				answer.sources === null
+					? "no_envelope_emitted:oos_or_guard_branch"
+					: trace === null
+						? `no_trace:${traceError ?? "unknown"}`
+						: null;
+			const measurable = retrievalExcludedReason === null;
+			const retrievalMetrics = measurable
+				? {
+						hit_rate_at_k: hitRateAtK(similarityRankedIds, goldIds, PRODUCTION_K),
+						reciprocal_rank: reciprocalRank(similarityRankedIds, goldIds),
+						context_recall_at_k: contextRecallAtK(similarityRankedIds, goldIds, PRODUCTION_K),
+						context_precision_at_k: contextPrecisionAtK(similarityRankedIds, goldIds, PRODUCTION_K),
+					}
+				: {
+						hit_rate_at_k: null,
+						reciprocal_rank: null,
+						context_recall_at_k: null,
+						context_precision_at_k: null,
+					};
+
 			// Judged metrics need the full text of the chunks the LLM actually saw.
-			const corpus = await fetchChunksByIds(supabase, rankedIds);
-			const ctx = toContextChunks(rankedIds, corpus);
+			const corpus = await fetchChunksByIds(supabase, envelopeIds);
+			const ctx = toContextChunks(envelopeIds, corpus);
 
 			const faith = await judgeFaithfulness(deps, {
 				question: rec.question,
@@ -488,17 +728,28 @@ async function main(): Promise<void> {
 				latency_ms: answer.latencyMs,
 				fallback_taken: fallback,
 				gold_chunk_ids: Array.from(goldIds),
+				// What the LLM saw (frame order) vs what the retriever ranked.
 				retrieved: sources,
+				envelope_ids: envelopeIds,
+				similarity_ranked_ids: similarityRankedIds,
+				retrieval_metric_source: measurable
+					? "retrieval_trace:similarity_rank"
+					: "excluded",
+				retrieval_excluded_reason: retrievalExcludedReason,
 				answer: answer.text,
 				citations: extractCitations(answer.text),
 				metrics: {
-					hit_rate_at_k: hitRateAtK(rankedIds, goldIds, PRODUCTION_K),
-					reciprocal_rank: reciprocalRank(rankedIds, goldIds),
-					context_recall_at_k: contextRecallAtK(rankedIds, goldIds, PRODUCTION_K),
-					context_precision_at_k: contextPrecisionAtK(rankedIds, goldIds, PRODUCTION_K),
+					// null (EXCLUDED, not 0) when the route emitted no envelope — 7b.
+					...retrievalMetrics,
+					retrieval_measurable: measurable ? 1 : 0,
 					faithfulness: faith.value?.score ?? null,
 					faithfulness_no_claims: faith.value?.noClaims ?? null,
+					// null (EXCLUDED, not 1.0) when the answer cites NOTHING — issue 1.
+					// A vacuous case is not a perfect score. `citation_coverage` is the
+					// companion that makes zero-citation-ness visible in the report.
 					citation_validity: validity.score,
+					citation_coverage: validity.hasCitations,
+					citation_count: validity.total,
 					citation_validity_total: validity.total,
 					citation_validity_invalid: validity.invalid,
 					citation_support: support.value?.score ?? null,
@@ -515,7 +766,9 @@ async function main(): Promise<void> {
 				cost_so_far_usd: cost.totalUsd(),
 			});
 			console.log(
-				`[${i + 1}/${golden.length}] ${rec.question_id} hit@8=${hitRateAtK(rankedIds, goldIds, PRODUCTION_K)} ` +
+				`[${i + 1}/${golden.length}] ${rec.question_id} ` +
+					`hit@8=${retrievalMetrics.hit_rate_at_k ?? `excluded(${retrievalExcludedReason})`} ` +
+					`cite=${validity.total === 0 ? "NONE" : `${validity.valid}/${validity.total}`} ` +
 					`faith=${faith.value?.score?.toFixed(2) ?? "n/a"} $${cost.totalUsd().toFixed(4)}`,
 			);
 		}
@@ -595,8 +848,10 @@ async function main(): Promise<void> {
 		for (const [i, rec] of golden.entries()) {
 			const runs: AnswerResult[] = [];
 			for (let r = 0; r < CONSISTENCY_REPEATS; r++) {
+				const label = `consistency:${rec.question_id}:r${r}`;
+				reserveAnswer(cost, rec.question, label);
 				const a = await askServer(rec.question);
-				chargeAnswer(cost, a, rec.question, `consistency:${rec.question_id}:r${r}`);
+				await chargeAnswer(supabase, cost, a, rec.question, label);
 				runs.push(a);
 			}
 			const citationKeys = runs.map((a) => citationSetKey(a.text));
@@ -675,29 +930,23 @@ async function main(): Promise<void> {
 	 * from `data-sources`) + judged answer-equivalence.
 	 */
 	async function runParaphrase(): Promise<void> {
-		const paraphrases = readJsonl<ParaphraseRecord>(PARAPHRASES_PATH);
-		if (paraphrases.some((p) => p.placeholder === true)) {
-			throw new Error(
-				`${PARAPHRASES_PATH} is a PLACEHOLDER dataset — regenerate with \`bun run eval:rag:golden\`.`,
-			);
-		}
-		const byParent = new Map<string, ParaphraseRecord[]>();
-		for (const p of paraphrases) {
-			const list = byParent.get(p.parent_question_id) ?? [];
-			list.push(p);
-			byParent.set(p.parent_question_id, list);
-		}
-		const parents = golden.filter((g) => byParent.has(g.question_id));
+		// Datasets are read + validated in preflight (issue 5) so the daily-cap
+		// projection can size the run before any spend.
+		const byParent = paraphrasesByParent;
+		const parents = paraphraseParents;
 		for (const [i, rec] of parents.entries()) {
+			const canonLabel = `paraphrase:${rec.question_id}:canonical`;
+			reserveAnswer(cost, rec.question, canonLabel);
 			const canonical = await askServer(rec.question);
-			chargeAnswer(cost, canonical, rec.question, `paraphrase:${rec.question_id}:canonical`);
+			await chargeAnswer(supabase, cost, canonical, rec.question, canonLabel);
 			const canonicalIds = new Set(sourcesOf(canonical).map((s) => s.id));
 			const canonicalCitations = citationSetKey(canonical.text);
 
 			const results: unknown[] = [];
 			for (const p of byParent.get(rec.question_id) ?? []) {
+				reserveAnswer(cost, p.question, `paraphrase:${p.paraphrase_id}`);
 				const a = await askServer(p.question);
-				chargeAnswer(cost, a, p.question, `paraphrase:${p.paraphrase_id}`);
+				await chargeAnswer(supabase, cost, a, p.question, `paraphrase:${p.paraphrase_id}`);
 				const ids = new Set(sourcesOf(a).map((s) => s.id));
 				const eq = await judgeAnswerEquivalence(deps, {
 					question: rec.question,
@@ -751,19 +1000,16 @@ async function main(): Promise<void> {
 	 * The false-rejection rate comes from the baseline run, not from here.
 	 */
 	async function runNegative(): Promise<void> {
-		let probes = readJsonl<OocProbe>(OOC_PROBES_PATH);
-		if (args.only) probes = probes.filter((p) => args.only?.includes(p.probe_id));
-		if (args.limit) probes = probes.slice(0, args.limit);
-		console.log(`preflight: ${probes.length} OOC probes selected\n`);
+		// `probes` is read + filtered in preflight (issue 5).
 		for (const [i, probe] of probes.entries()) {
+			reserveAnswer(cost, probe.question, `negative:${probe.probe_id}`);
 			const a = await askServer(probe.question);
-			chargeAnswer(cost, a, probe.question, `negative:${probe.probe_id}`);
+			await chargeAnswer(supabase, cost, a, probe.question, `negative:${probe.probe_id}`);
+			// Markers come from lib/prompts.ts now — no re-derived sentinels (issue 2).
 			const verdict = scoreRejection({
 				status: a.status,
 				text: a.text,
 				hasSourcesFrame: a.sources !== null,
-				oosLine: KNOWLEDGE_HUB_OUT_OF_SCOPE,
-				lowConfidenceLine: KNOWLEDGE_HUB_LOW_CONFIDENCE,
 			});
 			runLog.append({
 				experiment: "negative",

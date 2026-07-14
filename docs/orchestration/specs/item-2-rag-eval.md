@@ -44,7 +44,9 @@ A manually-run (`bun run …`) evaluation framework that measures the Knowledge 
 
 **R5 — Paraphrase set**, committed at `evals/rag-paraphrases.jsonl`: 3 paraphrases each for a stratified 20-question subset of the golden set (cover both difficulties and ≥10 distinct docs), LLM-generated at judge tier, each validated for meaning-equivalence (judge yes/no) before inclusion; fields: `parent_question_id`, `paraphrase_id`, `question`.
 
-**R6 — Judge module** (shared by metrics): OpenAI chat completions; model from `EVAL_JUDGE_MODEL` env, default `gpt-4o` — one tier above the `gpt-4o-mini` answerer (`lib/openai.ts:14`), per research doc §Judge design. Temperature 0, JSON output, rubric per metric with binary or 0–3 integer scale ONLY, and a chain-of-thought `reasons` field emitted BEFORE the verdict field (G-Eval pattern; both per research doc §Judge design). Disk cache under `evals/.judge-cache/` (gitignored): key = sha256 over (judge model, metric id, rubric version string, question, answer hash, context hash); a cache hit costs zero tokens — this is what makes re-runs cents (research doc §Logging requirements). Parse failure handling per Edge case 3.
+**R6 — Judge module** (shared by metrics): OpenAI chat completions; model from `EVAL_JUDGE_MODEL` env, default `gpt-4o` — one tier above the `gpt-4o-mini` answerer (`lib/openai.ts:14`), per research doc §Judge design. Temperature 0, JSON output, rubric per metric with binary or 0–3 integer scale ONLY, and a chain-of-thought `reasons` field emitted BEFORE the verdict field (G-Eval pattern; both per research doc §Judge design). Disk cache under `evals/.judge-cache/` (gitignored): key = sha256 over (judge model, metric id, rubric version string, question, answer hash, context hash); a cache hit costs zero tokens — ~~this is what makes re-runs cents~~ (research doc §Logging requirements). Parse failure handling per Edge case 3.
+
+> **CORRECTION (PR #8 fix round 1, issue 6).** The struck-through clause is FALSE for the scoring metrics. Their cache key includes the ANSWER HASH; the answer harness must send `trigger: "regenerate-assistant-message"` (R8, mandatory) against a non-deterministic answerer, so every run yields new answer text → new hash → **zero cache hits**. Re-running a server-backed experiment costs FULL judge price. This is not fixable by a coarser key: a faithfulness verdict is about a *specific answer*, so keying on (question + chunk ids) would score answer B with answer A's verdict — precisely the kind of flattering-for-the-wrong-reason metric this item exists to prevent. The cache is KEPT (it is correct, and it genuinely saves money where the inputs are stable — see below); only the cost claim is withdrawn. Real re-run cost is in `### Fix round 1`.
 
 **R7 — Metric implementations** (D3 categories; use standard names, no inventions — I2.4). All formulas per the research doc's Metric catalog rows; implement in TypeScript against its definitions (RAGAS/TruLens/DeepEval are Python-only — no new deps):
 
@@ -127,11 +129,12 @@ Discovered during planning:
 - I2.10 Golden records carry re-ingest-stable fingerprints alongside chunk ids; the runner refuses to score against unverified ids.
 - I2.11 The dev server is never started, restarted, or killed by any eval code or executor; server interaction is HTTP-only against port 3001.
 - I2.12 Every OpenAI call path in the framework flows through the single cost accountant; judge verdicts are disk-cached so re-runs cost cents.
+  - **CORRECTION (fix round 1, issue 6):** the first clause holds (and is now enforced BEFORE each call, not after — issue 4). The second clause is FALSE as written for the scoring metrics: their cache keys on the answer hash, answers are non-deterministic, so a re-run of a server-backed experiment gets **zero judge-cache hits and pays full price**. The cache does hit for the golden/paraphrase GENERATORS (stable inputs) and for byte-identical repeats within a run. Kept verbatim above because it is dispatch text; the honest restatement lives in `### Fix round 1`.
 
 ## Open choices
 
 1. **Retrieval-stage access** — (A) extract the route's retrieval into `lib/retrieval.ts` and have the route import it (spec is written for this): zero drift between what's measured and what ships, sweep-able k, testable; cost: an eval PR touches the production route. (B) re-implement retrieval eval-side from the anchors: no production diff, but silently drifts the next time someone tunes `route.ts`. **Lean: A** — drift in a measurement tool is worse than a mechanical refactor guarded by green kb/security evals.
-2. **Slice 2.2 baseline budget** — with the default `gpt-4o` judge, the baseline run's judged metrics land around $2–4, at/over the $2 default cap. (A) keep the $2 default and have the orchestrator authorize `EVAL_COST_CAP_USD=4` for the baseline run only (whole-battery worst case ≈ $5–8, re-runs cents via cache). (B) validate a `gpt-4o-mini` judge against a ~30-item spot sample (research doc §Judge design allows validated downgrades, ~10× cheaper) and run everything under $2. **Lean: A** for the committed report's credibility; B documented as the cost-reduction path.
+2. **Slice 2.2 baseline budget** — with the default `gpt-4o` judge, the baseline run's judged metrics land around $2–4, at/over the $2 default cap. (A) keep the $2 default and have the orchestrator authorize `EVAL_COST_CAP_USD=4` for the baseline run only (whole-battery worst case ≈ $5–8; ~~re-runs cents via cache~~ — **FALSE, see fix round 1 issue 6: a re-run costs the same $5–8, the judge cache cannot hit on regenerated answers**). (B) validate a `gpt-4o-mini` judge against a ~30-item spot sample (research doc §Judge design allows validated downgrades, ~10× cheaper) and run everything under $2. **Lean: A** for the committed report's credibility; B documented as the cost-reduction path.
 3. **Report path** — (A) `evals/rag-eval-report.md` next to the datasets and logs (I2.2 scopes eval artifacts under `evals/`); (B) `docs/`. **Lean: A.**
 
 ## Out of scope
@@ -246,10 +249,20 @@ reviewer reading the PR diff alone cannot tell the two apart.
 default path. On top of that, `test:rag-eval` §10 drives `retrieveChunks` with the eval path's
 no-op `recordUsage` under a `fetch` stub that THROWS on any network call: `recordOpenAICall`
 talks to Upstash over REST, so if the no-op were not honored, the check would fail loudly.
-That is the executable proof that eval-path retrieval never increments the production daily
+That is the executable proof that eval-path **retrieval** never increments the production daily
 circuit-breaker. The same section also asserts that `deriveEnvelopeAtK(trace, k)` returns a
 byte-identical envelope to a direct `retrieveChunks` at that `k`, for every k in {3,5,8,10} —
 the k-sweep's cost optimization cannot silently change what it measures.
+
+> **CORRECTION (fix round 1, issue 5).** D2 was over-claimed in this PR's original notes and in
+> `headroom.ts`'s framing. The honest statement, in full: **retrieval-path calls are isolated**
+> (no-op `recordUsage` → the production counter is never touched), **but the ANSWER harness runs
+> the REAL production route and DOES consume the shared daily-cap budget, by design.**
+> `x-eval-bypass` skips the circuit-breaker CHECK, not its INCREMENT — every server-backed
+> question books ~2 calls against `GLOBAL_DAILY_CAP=2000`, which real users share. "The eval
+> cannot touch the breaker" is false as a blanket claim; it is true only of the retrieval path.
+> The framework knew the ~500-call figure but only read the counter in FINALIZE, i.e. after the
+> spend. It now reads it in PREFLIGHT and refuses to start a run the headroom cannot absorb.
 
 ### What slice 2.2 must know
 
@@ -265,3 +278,121 @@ the k-sweep's cost optimization cannot silently change what it measures.
   spot sample (research doc §Judge design allows validated downgrades, ~10× cheaper) — set
   `EVAL_JUDGE_MODEL`, and note that the cache key includes the model, so a downgrade does not
   reuse gpt-4o verdicts.
+
+### Fix round 1
+
+Applied against the 30-ballot adversarial review's VERDICT: REVISE. Every finding was a
+**methodology** bug, and most of them would have made the committed report print a *flattering
+percentage for the wrong reason*. A metric that reads 100% because it silently scores vacuous
+cases as passes is worse than no metric — this round exists to make that impossible. Each fix
+carries a regression test in `scripts/test-rag-eval.ts` (§§11-17) that was **mutation-tested**:
+the fix was reverted, the suite was confirmed RED, the fix was restored. 12/12 mutations caught.
+
+1. **Citation validity scored vacuous answers as perfect (CRITICAL).**
+   `scoreCitationValidity` returned `score: 1` for an answer with ZERO citations, and
+   `report.ts`'s `meanDefined` only drops null/undefined — so OOS refusals, low-confidence
+   fallbacks, guard-blocked responses and empty answers were all averaged in as PERFECT citation
+   validity. The "Citation validity (deterministic)" row would have read ~100% *precisely when
+   citations disappeared*. Now: `score: null` (EXCLUDED from the mean, never a pass) plus a
+   companion `hasCitations` → a new **"Citation coverage (answers carrying ≥ 1 citation)"** row
+   over the FULL denominator. Both are in the per-item JSONL (`citation_validity`,
+   `citation_coverage`, `citation_count`) and the aggregated table. Zero-citation-ness is now
+   visible in the report, never silently a pass.
+
+2. **The low-confidence / disclaimer sentinels matched a string the app never emits.**
+   `scoreRejection` and `run.ts`'s `fallbackTaken` detected the "low-confidence branch" by
+   matching `KNOWLEDGE_HUB_LOW_CONFIDENCE`. Nothing in the app emits that on that branch: the
+   route's low-avg-similarity branch emits its own hardcoded literal, and
+   `KNOWLEDGE_HUB_LOW_CONFIDENCE` is what the *model* is told to say (system-prompt answer rule
+   4). Two different events, conflated, so both were measuring nothing. Also, `scoreRejection`
+   claimed to mirror `eval-security.ts`'s `grade()` but did a case-SENSITIVE exact match where
+   `grade()` deliberately matches LOWERCASED SUBSTRINGS — a re-cased or prose-wrapped model
+   refusal scored as "answered_instead_of_rejecting", i.e. a false FAILURE that would have made
+   the negative-rejection row read low for the wrong reason. Fixed at the source:
+   `KNOWLEDGE_HUB_LIMITED_CONTEXT` now lives in `lib/prompts.ts` and the route **imports** it
+   (byte-identical emission — the delta is unchanged, `test:artifact` + `lint` + `build` stay
+   green); the lowercased markers (`REFUSAL_MARKER`, `LOW_CONFIDENCE_MARKER`,
+   `LIMITED_CONTEXT_MARKER`) are shared from `lib/prompts.ts`, and `eval-security.ts` now imports
+   them instead of holding a second copy. `classifyBranch()` reports the four branches the app can
+   actually take (`oos_or_guard` / `llm_refusal` / `low_confidence` / `limited_context`). The
+   limited-context disclaimer is **not** a refusal — the model still answers — so it no longer
+   inflates the false-rejection rate.
+
+3. **The cost accountant under-counted the answerer 4-6× (WALLET).** `chargeAnswer` estimated the
+   answerer's input from `sources[].snippet` — but `snippet` is the SSE *display* projection
+   `chunk_text.slice(0, 260)`, while the model's real prompt carries the FULL ~400-token
+   `chunk_text` via `buildContextEnvelope`. Real spend systematically exceeded what
+   `EVAL_COST_CAP_USD` bounded. Now the harness re-fetches the full chunk text by id and
+   reconstructs the REAL prompt with the production `buildContextEnvelope`. Every component it
+   cannot observe is charged with a documented factor that **errs high**: unresolvable chunks at
+   `SNIPPET_TO_FULL_CHUNK_FACTOR` (7), the route's embedding expansions at
+   `EMBED_INPUT_MULTIPLIER` (5). Wallet protection fails safe: the estimate may over-state spend,
+   never under-state it.
+
+4. **The cost cap fired after the spend, and the abort was swallowed (WALLET).**
+   (a) `CostAccountant.record()` pushed the entry and *then* threw — it aborted after the money
+   was gone. Added `reserve()` / `wouldExceed()`: every call site now checks the PROJECTED total
+   **before** the call leaves the process (judge completions, embeddings, and — critically — each
+   server answer, whose spend happens inside the dev server where a post-hoc `record()` is
+   useless). `record()` remains as the actuals ledger.
+   (b) A `CostCapError` raised inside an eval retrieval embedding gets wrapped by
+   `lib/retrieval.ts` into `RetrievalError("embedding", err)`, so the runners'
+   `err instanceof CostCapError` checks MISSED it, rethrew, and skipped the finalize block: no
+   `manifest.json`, no cost totals, and the operator saw `retrieval_failed:embedding` — which
+   reads like an *outage* and invites a re-run, i.e. MORE spend. `asCostCapError()` walks the
+   cause chain, so a cap trip always lands in the normal aborted-run finalize path.
+
+5. **The battery could circuit-break production for real users (WALLET/PROD).** The answer harness
+   POSTs the REAL route (correct — generation metrics must score the real path), and
+   `recordOpenAICall` increments the shared `GLOBAL_DAILY_CAP=2000` counter even for
+   `EVAL_BYPASS_KEY` calls: the bypass skips the CHECK, not the INCREMENT. The framework knew a
+   battery burns ~500 of that budget but only called `readHeadroom()` in FINALIZE — reporting the
+   damage after doing it. `readHeadroom()` now runs in PREFLIGHT: the run prints its projected
+   server-call count and the remaining headroom, and **aborts before any spend** if the headroom
+   cannot absorb it. An unreadable counter warns loudly but does not block (a Redis outage is not
+   a breach). See also the D2 correction above — this is the same overclaim, from the other end.
+
+6. **The judge cache could never hit, while the cost model claimed it did. → Chose: KEEP the
+   cache, DELETE the false claim.** The scoring metrics key on `sha256(answer_text)`, but the
+   answer harness hardcodes `trigger: "regenerate-assistant-message"` (mandatory, to defeat the
+   Redis answer cache) against a non-deterministic answerer — so every run produces new answer
+   text, new hashes, and **zero cache hits**. "Re-runs cost cents" was false.
+   *Why not a stable key:* a faithfulness verdict is a judgement about a SPECIFIC answer. Keying
+   it on (question + retrieved-chunk-id-set + metric) would reuse answer A's verdict to score
+   answer B — a flattering-for-the-wrong-reason metric of exactly the kind this item exists to
+   stamp out. No stable key is *sound* for faithfulness, citation support, relevancy, or answer
+   equivalence, so none was invented.
+   *What the cache actually saves (kept, because this part is real):* the golden/paraphrase
+   **generators** key on stable inputs (chunk text, question text — no model output), so
+   `eval:rag:golden` re-runs really are ~free for anything already generated; and byte-identical
+   repeats within a run hit. **Honest re-run cost: a re-run of a server-backed experiment costs
+   FULL judge price — the same $2-4 baseline / ~$5-8 whole battery as the first run, every time.**
+   The false claim is struck from R6, I2.12, and Open choice 2 above, and from `judge.ts`.
+
+7. **Rank-sensitive metrics were computed over a list that was never ranked.** MRR and context
+   precision are POSITIONAL, but the baseline read `rankedIds = sources.map(s => s.id)` from the
+   `data-sources` frame — whose order is the DIVERSITY-REORDERED envelope
+   (`selectDiverseEnvelope`, plus the named-doc boost), not similarity rank. They now come from
+   the true cosine-similarity ranking of the candidate pool via the additive `RetrievalTrace` /
+   `withTrace` seam (`similarityRankedIdsFromTrace`, sorting on `rankPreBoost`) — the seam exists
+   precisely for this. The traced retrieval is offline (no-op `recordUsage`, so it never touches
+   the production counter) and costs one embedding per baseline question.
+   Separately: on the OOS branch the route emits NO `data-sources` frame while retrieval still
+   ran, so `sources === null` → `rankedIds = []` → hit-rate/recall scored a silent **0**. Those
+   items are now EXCLUDED (null) from retrieval-quality means with an explicit
+   `retrieval_excluded_reason`, and the exclusion is counted and printed. Silent zeros are as
+   dishonest as silent ones — both directions are now visible.
+   *Scope note:* the `ksweep` rows remain positional over the ENVELOPE the route would select at
+   each k, because that selection IS what the sweep measures. `report.ts` now discloses this
+   distinction in the output rather than leaving the reader to assume otherwise.
+
+**Report honesty (cross-cutting).** `report.ts` now emits an `n` (samples counted) AND an
+`Excluded (why)` column on every aggregated row, a branch census for the baseline, and a
+"Production budget impact" section. A metric that cannot be honestly computed prints `n/a` — it is
+never given a number. `report.ts` is now importable (`import.meta.main`-guarded), so the
+aggregation itself is unit-tested: §13 asserts that a run in which nothing is measurable prints
+`n/a` over `n=0` rather than a flattering percentage.
+
+**Still open / for slice 2.2.** `docs/orchestration/backlog.md`'s Resolved DELTAs line still says
+"judge cache makes re-runs cents" — same false claim as issue 6, in a file this item does not own.
+The steward should strike it.

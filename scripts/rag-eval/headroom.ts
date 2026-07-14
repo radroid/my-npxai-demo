@@ -73,3 +73,34 @@ export function headroomLine(h: Headroom): string {
 		`${h.remaining} left today (real users share this budget; lib/guard.ts)`
 	);
 }
+
+// ---------------------------------------------------------------------------
+// PREFLIGHT projection (PR #8 fix round 1, issue 5).
+//
+// The framework knew a battery burns ~500 of the shared 2000-call budget, but
+// only called readHeadroom() in FINALIZE — i.e. it reported the damage after
+// doing it. A run that starts with insufficient headroom can circuit-break
+// PRODUCTION for real users. The runner now projects the spend and ABORTS
+// before the first request.
+
+/**
+ * OpenAI calls the production route books per server request: one for the
+ * retrieval embedding (lib/retrieval.ts) and one for the chat completion
+ * (route.ts) — both go through recordOpenAICall, and `x-eval-bypass` skips the
+ * CHECK, not the INCREMENT. Guard/OOS refusals book fewer, so 2 errs high.
+ */
+export const DAILY_CAP_CALLS_PER_REQUEST = 2;
+
+export function projectDailyCapCalls(serverRequests: number): number {
+	return serverRequests * DAILY_CAP_CALLS_PER_REQUEST;
+}
+
+/**
+ * Must this run be refused? True only when the counter is READABLE and the
+ * remaining headroom cannot absorb the projection. An unreadable counter warns
+ * loudly but does not block — we cannot prove a breach, and blocking every run
+ * on a Redis outage would be its own failure mode.
+ */
+export function headroomBlocksRun(h: Headroom, projectedCalls: number): boolean {
+	return h.available && h.remaining < projectedCalls;
+}

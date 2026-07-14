@@ -16,6 +16,7 @@ import { logGuardEvent } from "@/lib/logger";
 import { getOpenAIClient, OPENAI_MODELS } from "@/lib/openai";
 import { StreamingGuard } from "@/lib/output-guard";
 import {
+	KNOWLEDGE_HUB_LIMITED_CONTEXT,
 	KNOWLEDGE_HUB_OUT_OF_SCOPE,
 	KNOWLEDGE_HUB_SYSTEM,
 	PROMPT_VERSION,
@@ -280,10 +281,13 @@ export const POST = withGuard(
 					return { terminate: r.terminate };
 				};
 
+				// Byte-for-byte the same delta as before — the literal moved to
+				// lib/prompts.ts (KNOWLEDGE_HUB_LIMITED_CONTEXT) so the eval
+				// framework can detect this branch by the app's actual emission
+				// instead of matching a constant nothing emits (PR #8 fix round 1,
+				// issue 2). No behavior change.
 				if (avgSim < LOW_SIM_DISCLAIMER) {
-					emit(
-						"_Limited matches in the indexed corpus for this question — answering from the strongest available snippets._\n\n",
-					);
+					emit(KNOWLEDGE_HUB_LIMITED_CONTEXT);
 				}
 
 				try {
