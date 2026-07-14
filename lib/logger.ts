@@ -77,6 +77,10 @@ export function logRequest(fields: RequestLogFields): void {
 export type GuardReason =
 	| "rate_limit"
 	| "rate_limit_degraded"
+	// Redis is unreachable, so the Redis-backed limiter + circuit breaker are
+	// enforcing nothing. The in-isolate backstop (lib/guard.ts) denied instead.
+	// A run of these means Upstash is down AND the demo is on its reduced budget.
+	| "degraded_backstop"
 	| "validation"
 	| "circuit_breaker"
 	| "output_guard"

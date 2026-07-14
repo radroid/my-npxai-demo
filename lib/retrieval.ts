@@ -228,6 +228,55 @@ export class RetrievalError extends Error {
 	}
 }
 
+// WALLET GUARD (PR #11 fix round 1, B4). A CostCapError means an injected
+// accountant hit its spend ceiling and is deliberately aborting the run — it
+// MUST propagate through retrieveChunks' tolerant accounting catch below.
+//
+// Matched BY NAME, never by import: lib/ must not depend on scripts/. Matching
+// only the IMMEDIATELY caught error was too shallow — any wrapper (`throw new
+// Error("accounting failed", { cause: costCapError })`, an AggregateError from
+// a Promise.all, a re-throw that adds context) would present a non-CostCapError
+// on top, the check would miss it, retrieval would swallow it, and the eval
+// would keep spending past its cap.
+//
+// So walk BOTH edges an error can hide behind (PR #11 round 2, B7). The round-1
+// version claimed to handle an AggregateError and did not: AggregateError puts
+// its sub-errors in `.errors`, and its `.cause` is undefined, so a `cause`-only
+// walk terminated on the first hop and returned false. `isCostCapError(new
+// AggregateError([capErr]))` was a silent miss — i.e. the wallet guard the
+// comment advertised did not exist for the exact shape it named. Breadth-first
+// over `cause` AND `errors` closes it.
+//
+// Bounded: a cyclic, adversarially deep, or adversarially WIDE chain must not
+// hang the route. Depth 8 is far past any real wrapping depth; the node budget
+// stops a 100k-element AggregateError from turning a fail-open catch into a
+// stall. A CostCapError buried past either bound is not a shape we produce.
+const CAUSE_CHAIN_MAX_DEPTH = 8;
+const CAUSE_CHAIN_MAX_NODES = 64;
+function isCostCapError(err: unknown): boolean {
+	const seen = new Set<unknown>();
+	let frontier: unknown[] = [err];
+	for (let depth = 0; depth < CAUSE_CHAIN_MAX_DEPTH; depth++) {
+		if (frontier.length === 0) return false;
+		const next: unknown[] = [];
+		for (const current of frontier) {
+			if (current === null || current === undefined) continue;
+			if (seen.has(current)) continue; // cycle
+			if (seen.size >= CAUSE_CHAIN_MAX_NODES) return false;
+			seen.add(current);
+			if ((current as Error)?.name === "CostCapError") return true;
+			const cause = (current as { cause?: unknown })?.cause;
+			if (cause !== null && cause !== undefined) next.push(cause);
+			// AggregateError (Promise.all / Promise.any rejections) — and anything
+			// else that collects sub-errors under `.errors`.
+			const nested = (current as { errors?: unknown })?.errors;
+			if (Array.isArray(nested)) next.push(...nested);
+		}
+		frontier = next;
+	}
+	return false;
+}
+
 export interface RetrievalDeps {
 	supabase: GuardedHandlerArgs["supabase"];
 	openai: OpenAI;
@@ -416,10 +465,33 @@ export async function retrieveChunks(
 		if (embeddings.length !== embedInputs.length) {
 			throw new Error("embedding count mismatch");
 		}
-		await (deps.recordUsage ?? recordOpenAICall)(0);
 	} catch (err) {
 		console.error("embedding_error", err);
 		throw new RetrievalError("embedding", err);
+	}
+
+	// Accounting, deliberately OUTSIDE the try above. It used to sit inside it,
+	// which meant a dead Redis threw and was re-labelled `RetrievalError
+	// ("embedding")` — the user saw "Embedding failed." while the embedding had
+	// in fact succeeded and been paid for. This placement makes that mislabel
+	// structurally impossible: nothing that happens AFTER a successful embedding
+	// can be reported AS an embedding failure.
+	//
+	// The catch is belt-and-braces. `recordOpenAICall` no longer throws (see
+	// lib/guard.ts), but callers may INJECT their own `recordUsage` — and an
+	// injected accountant that dies must not take a paid-for retrieval down with
+	// it either.
+	//
+	// ONE EXCEPTION, and it is load-bearing: a CostCapError means the eval
+	// harness hit its spend ceiling and is deliberately aborting the run. That
+	// must propagate — swallowing it would silently defeat the wallet guard.
+	// isCostCapError walks the `cause` chain AND `AggregateError.errors`, so a
+	// WRAPPED cost-cap error still aborts (see its definition above).
+	try {
+		await (deps.recordUsage ?? recordOpenAICall)(0);
+	} catch (err) {
+		if (isCostCapError(err)) throw err;
+		console.error("retrieval_accounting_unavailable", err);
 	}
 
 	// Primary retrieval: 20 chunks by open cosine sim.

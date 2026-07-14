@@ -10,8 +10,9 @@
 
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { NextResponse } from "next/server";
+import { cacheDelete, cacheRead, cacheWrite } from "@/lib/cache";
 import { buildContextEnvelope } from "@/lib/context-envelope";
-import { getRedis, recordOpenAICall, withGuard } from "@/lib/guard";
+import { recordOpenAICall, withGuard } from "@/lib/guard";
 import { logGuardEvent } from "@/lib/logger";
 import { getOpenAIClient, OPENAI_MODELS } from "@/lib/openai";
 import { StreamingGuard } from "@/lib/output-guard";
@@ -176,16 +177,18 @@ export const POST = withGuard(
 		// Cache hit check — skips embed + RPC + LLM for repeat queries.
 		// Regenerate requests bypass the cache AND drop the stored entry, so
 		// the new response overwrites the stale one for future hits.
-		const redis = getRedis();
+		//
+		// Every Redis touch goes through lib/cache's fail-open helpers. This read
+		// used to be a bare `await redis.get(...)` — the ONLY unguarded Redis call
+		// in the chat request path — so when Upstash's host stopped resolving
+		// (2026-07-14) the rejection escaped into withGuard's handler catch and
+		// chat answered every request with a blanket 500, BEFORE retrieval was
+		// ever reached. A dead cache is now a permanent MISS, never an outage.
 		const cKey = await cacheKey(query);
-		if (isRegenerate) {
-			redis
-				.del(cKey)
-				.catch((err) => console.error("kh_cache_invalidate_error", err));
-		}
+		if (isRegenerate) void cacheDelete(cKey, "kh_cache_invalidate_error");
 		const cached = isRegenerate
 			? null
-			: ((await redis.get<CachedAnswer>(cKey)) ?? null);
+			: await cacheRead<CachedAnswer>(cKey, "kh_cache_read_error");
 		if (cached?.text) {
 			ctx.logFields.cache = "hit";
 			ctx.logFields.fallback_taken = false;
@@ -342,15 +345,12 @@ export const POST = withGuard(
 				// one sentence before the upstream fetch aborts can't poison the cache
 				// and get served to later identical queries.
 				if (!outputGuardTripped && accumulated.trim().length > 400) {
-					redis
-						.set(
-							cKey,
-							{ text: accumulated, chunks: sourceChunks },
-							{
-								ex: CACHE_TTL_SECONDS,
-							},
-						)
-						.catch((err) => console.error("kh_cache_write_error", err));
+					void cacheWrite(
+						cKey,
+						{ text: accumulated, chunks: sourceChunks },
+						CACHE_TTL_SECONDS,
+						"kh_cache_write_error",
+					);
 				}
 			},
 		});
