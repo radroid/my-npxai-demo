@@ -15,15 +15,38 @@ import {
 	ModeToggle,
 } from "@/components/knowledge-hub/ModeToggle";
 import { SourcesDataUI } from "@/components/knowledge-hub/SourcesDataUI";
+import { shouldSnapToChatOnThreadChange } from "@/lib/knowledge-hub-mode";
 
 export function KnowledgeHubShell() {
 	// Chat ↔ Artifact mode (item-1 slice 1.2). BOTH surfaces stay mounted;
 	// the toggle flips CSS visibility only (`hidden`), never unmounts — this
-	// preserves the chat composer draft, scroll position, and the last
-	// generated artifact across toggles, and an in-flight artifact run keeps
-	// streaming while hidden.
+	// preserves the chat composer draft and the last generated artifact
+	// across toggles, and an in-flight artifact run keeps streaming while
+	// hidden. NOTE (fix round 1, ISSUE 2): chat SCROLL POSITION is NOT
+	// preserved — `hidden` (display:none) removes the viewport's layout box,
+	// which resets its scrollTop; a long transcript reopens at the top. That
+	// is a known, accepted limitation of this slice, not a promise.
 	const [mode, setMode] = useState<HubMode>("chat");
 	const modeToggle = <ModeToggle mode={mode} onModeChange={setMode} />;
+
+	// Fix round 1, ISSUE 1: the Knowledge Hub thread sidebar (rendered by
+	// AppShell, outside the mode-swapped surfaces below) stays live in
+	// Artifact mode — its "New thread" / thread-switch triggers still work
+	// but produce no visible change while chat is hidden. Snap back to Chat
+	// whenever the active thread-list item id changes so the action the user
+	// just took is immediately visible. Guarded (via shouldSnapToChatOnThread
+	// Change + the ref seeded from the first render) so mounting the shell
+	// while already on some thread never fires this on its own.
+	const activeThreadId = useAuiState((s) => s.threadListItem.id);
+	const prevThreadIdRef = useRef(activeThreadId);
+	useEffect(() => {
+		if (
+			shouldSnapToChatOnThreadChange(prevThreadIdRef.current, activeThreadId)
+		) {
+			setMode("chat");
+		}
+		prevThreadIdRef.current = activeThreadId;
+	}, [activeThreadId]);
 
 	return (
 		<>

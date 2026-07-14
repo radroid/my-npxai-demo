@@ -17,6 +17,7 @@
 		"evals:security": "bun run scripts/eval-security.ts",
 		"test:tiers": "bun run scripts/tier-tests.ts",
 		"test:artifact": "bun run scripts/test-artifact.ts",
+		"test:frontend": "bun run scripts/test-frontend.ts",
 		"build:cloudflare": "bunx opennextjs-cloudflare build",
 		"preview:cloudflare": "bunx opennextjs-cloudflare preview",
 		"deploy:cloudflare": "bunx opennextjs-cloudflare deploy"

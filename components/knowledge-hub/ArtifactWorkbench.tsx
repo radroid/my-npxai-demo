@@ -263,7 +263,19 @@ const ArtifactViewer: FC<{
 		timeStyle: "short",
 	});
 	return (
-		<div className="flex flex-col gap-3 pb-4">
+		// Fix round 1, ISSUE 3: SourcesPanel roots itself with
+		// `max-w-(--thread-max-width)`, but that custom property is only ever
+		// defined as an inline style on ThreadPrimitive.Root (thread.tsx) — a
+		// Thread-scoped variable. Rendered here, outside any Thread root, the
+		// var was previously invalid-at-computed-value-time (falls back to
+		// `max-width: none`), silently relying on this column's own
+		// `max-w-[44rem]` ancestor cap to look right. Define the variable
+		// locally so SourcesPanel resolves it correctly on its own, regardless
+		// of ancestor structure.
+		<div
+			className="flex flex-col gap-3 pb-4"
+			style={{ ["--thread-max-width" as string]: "44rem" }}
+		>
 			<div className="overflow-hidden rounded-xl border border-border bg-surface">
 				<div className="flex items-center justify-between gap-2 border-border border-b px-3 py-2">
 					<span
