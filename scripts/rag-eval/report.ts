@@ -435,9 +435,12 @@ function main(): void {
 			"The answerer estimate is taken over the RECONSTRUCTED REAL PROMPT — full `chunk_text` " +
 			"re-fetched by id and re-wrapped with the production `buildContextEnvelope` — not the " +
 			"260-char display snippet in the SSE frame, which under-counted the model's true input " +
-			"by roughly 4-6×. Every unobservable component (unresolved chunks, the route's embedding " +
-			"expansions) is charged with a documented factor that ERRS HIGH: this number may " +
-			"over-state spend, never under-state it.",
+			"by roughly 4-6×. The route's own embedding call (query + every expansion, made inside " +
+			"the dev server) is counted EXACTLY, by calling the same pure `embeddingInputsFor()` " +
+			"production calls — it used to be charged as `question × 5`, a constant billed as a " +
+			"ceiling that a multi-doc query walks straight past. The only component still charged " +
+			"by a factor is a chunk whose full text could not be re-fetched, and that factor ERRS " +
+			"HIGH by construction. This number may over-state spend, never under-state it.",
 	);
 	lines.push("");
 	lines.push("## Production budget impact");

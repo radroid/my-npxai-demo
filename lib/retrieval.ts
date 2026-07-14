@@ -159,6 +159,30 @@ function buildExpansions(
 	return out;
 }
 
+// ADDITIVE (item-2 PR #8 fix round 2, issue 3 — WALLET): the EXACT list of
+// strings retrieveChunks will send to `embeddings.create` for a query — the
+// primary query plus every expansion. Pure, offline, network-free, free.
+//
+// Why this exists. The eval cost accountant cannot observe the dev server's
+// internal embedding call, so it used to charge `countTokens(question) *
+// EMBED_INPUT_MULTIPLIER` with EMBED_INPUT_MULTIPLIER = 5, documented as
+// "1 primary + 4 expansions, above the practical ceiling". It is NOT a ceiling.
+// buildExpansions() emits, PER mentioned doc, one NARROW expansion per mentioned
+// section + one CONCEPT expansion per matched seed + one BROAD `${doc} ${query}`.
+// extractMentionedDocs() can return an unbounded number of docs (every REGDOC the
+// query names, plus up to 4 CONCEPT_DOC_HINTS), and each BROAD expansion carries
+// the WHOLE query — so a multi-doc question sends far more than 5x the query's
+// tokens and the "err-high" factor silently erred LOW on the one spending path
+// the eval cannot see. Counting exactly is free, so we count exactly.
+//
+// retrieveChunks builds its own inputs through this same function, so the eval's
+// count and production's call can never drift.
+export function embeddingInputsFor(query: string): string[] {
+	const docs = extractMentionedDocs(query);
+	const sections = extractMentionedSections(query);
+	return [query, ...buildExpansions(query, docs, sections)];
+}
+
 // Doc-diversity pass: when multiple docs are mentioned, seed the envelope
 // with the TOP chunk from each mentioned doc before filling by overall
 // score. Without this, a single doc's chunks can sweep the top 8 and the
@@ -306,8 +330,12 @@ export async function retrieveChunks(
 	// each mentioned doc so that chunks in heavy-legal or glossary docs
 	// (NSCA §48, REGDOC-3.5.3 §5.4) can surface even when they embed
 	// weakly against the verbose natural-language question.
-	const expansions = buildExpansions(query, mentionedDocs, mentionedSections);
-	const embedInputs = [query, ...expansions];
+	//
+	// Routed through embeddingInputsFor() (fix round 2, issue 3) so the eval
+	// cost accountant charges the SAME list this call actually sends — one
+	// source of truth, no drift, no guessed multiplier.
+	const embedInputs = embeddingInputsFor(query);
+	const expansions = embedInputs.slice(1);
 
 	let embeddings: number[][];
 	try {

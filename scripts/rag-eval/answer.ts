@@ -18,6 +18,7 @@
 // error.
 
 import { get_encoding } from "tiktoken";
+import { embeddingInputsFor } from "../../lib/retrieval";
 import { ANSWERER_MODEL, EMBEDDING_MODEL, baseUrl } from "./config";
 import type { CostAccountant } from "./cost";
 import { type ParsedStream, parseStream } from "./sse";
@@ -114,7 +115,7 @@ export function freeEncoder(): void {
 	encoder = null;
 }
 
-// --- Err-high constants for the parts of the real prompt we cannot observe ---
+// --- Charging the parts of the real prompt we cannot observe ---
 //
 // PR #8 fix round 1 (issue 3). The accountant used to estimate the answerer's
 // input from `sources[].snippet` — but `snippet` is the SSE DISPLAY projection
@@ -124,7 +125,13 @@ export function freeEncoder(): void {
 // 4-6x on the input side. Callers now reconstruct the REAL envelope from full
 // chunk_text (fetched by id) and pass it as `envelopeText`.
 //
-// Every fallback below ERRS HIGH by construction — wallet protection fails safe.
+// PR #8 fix round 2 (issue 3). The route's embedding call is now counted
+// EXACTLY (serverEmbeddingInputTokens below) rather than guessed at with a
+// multiplier — see that function for why the old "err-high" constant erred LOW.
+//
+// What remains a factor is the ONE unobservable left (a chunk whose full text
+// could not be re-fetched), and it ERRS HIGH by construction — wallet protection
+// fails safe: over-estimate, never under-estimate.
 
 /**
  * Correction factor for a chunk whose full text we could NOT fetch (id missing
@@ -136,12 +143,34 @@ export function freeEncoder(): void {
 export const SNIPPET_TO_FULL_CHUNK_FACTOR = 7;
 
 /**
- * The route embeds the query PLUS one expansion per mentioned doc/section
- * (lib/retrieval.ts buildExpansions) in ONE embeddings.create call. The eval
- * observes only the question, so charge the question's tokens this many times.
- * 5 = 1 primary + 4 expansions, above the practical ceiling for a single query.
+ * EXACT token count of the embedding call the ROUTE makes for this question
+ * (PR #8 fix round 2, issue 3 — WALLET).
+ *
+ * THE BUG THIS REPLACES. The route embeds the query PLUS every expansion
+ * `buildExpansions` generates, in ONE `embeddings.create` call inside the dev
+ * server — a spending path the eval script cannot observe. It used to be charged
+ * as the question's tokens times a hardcoded multiplier of 5, documented as
+ * "1 primary + 4 expansions, above the practical ceiling". That was not a
+ * ceiling and it errs LOW: `buildExpansions` emits, per mentioned doc,
+ * one narrow expansion per mentioned section + one per matched concept seed + one
+ * BROAD `${doc} ${query}` that carries the WHOLE query. `extractMentionedDocs`
+ * can return an unbounded number of docs (every REGDOC named, plus up to 4
+ * concept hints), so the real input is roughly `(1 + docs) x tokens(query)` plus
+ * the narrow/concept expansions — past 5x as soon as 5 docs are in scope, which
+ * the golden set's multi-doc questions are built to do.
+ *
+ * The honest fix is not a bigger guess: the expansion list is a PURE FUNCTION of
+ * the query, so we call the SAME function production calls
+ * (`lib/retrieval.ts embeddingInputsFor`) and count the real strings. Free, no
+ * network, EXACT rather than bounded. text-embedding-3-small tokenizes with
+ * cl100k_base — the encoder used here — so the count is the count OpenAI bills.
  */
-export const EMBED_INPUT_MULTIPLIER = 5;
+export function serverEmbeddingInputTokens(question: string): number {
+	return embeddingInputsFor(question).reduce(
+		(acc, input) => acc + countTokens(input),
+		0,
+	);
+}
 
 /** Nominal full chunk size in tokens (scripts/ingest.ts:21) — used only by the
  *  pre-call worst-case projection below. */
@@ -181,7 +210,8 @@ export function reserveAnswerCost(
 	cost.reserve({
 		kind: "embeddings",
 		model: EMBEDDING_MODEL,
-		inputTokens: countTokens(args.question) * EMBED_INPUT_MULTIPLIER,
+		// EXACT (issue 3): the same input list production will send, counted.
+		inputTokens: serverEmbeddingInputTokens(args.question),
 		outputTokens: 0,
 		estimated: true,
 		label: `${args.label}:server-embedding:projected`,
@@ -224,12 +254,14 @@ export function recordAnswerCost(
 		estimated: true,
 		label: args.label,
 	});
-	// The route embeds the query AND its expansions in one call; we can only see
-	// the question, so charge it EMBED_INPUT_MULTIPLIER times (errs high).
+	// The route embeds the query AND every expansion in one call. We cannot see
+	// that call, but its input is a pure function of the question — so we count
+	// the REAL strings via lib/retrieval's embeddingInputsFor (issue 3), instead
+	// of multiplying the question by a constant that was never a ceiling.
 	cost.record({
 		kind: "embeddings",
 		model: EMBEDDING_MODEL,
-		inputTokens: countTokens(args.question) * EMBED_INPUT_MULTIPLIER,
+		inputTokens: serverEmbeddingInputTokens(args.question),
 		outputTokens: 0,
 		estimated: true,
 		label: `${args.label}:server-embedding`,

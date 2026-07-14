@@ -29,6 +29,7 @@ import {
 	type RetrievalTrace,
 	RetrievalError,
 	deriveEnvelopeAtK,
+	embeddingInputsFor,
 	retrieveChunks,
 } from "../lib/retrieval";
 import {
@@ -46,10 +47,11 @@ import {
 	OOC_PROBES_PATH,
 } from "./rag-eval/config";
 import {
-	EMBED_INPUT_MULTIPLIER,
 	SNIPPET_TO_FULL_CHUNK_FACTOR,
+	countTokens,
 	recordAnswerCost,
 	reserveAnswerCost,
+	serverEmbeddingInputTokens,
 } from "./rag-eval/answer";
 import {
 	citationSetKey,
@@ -510,10 +512,19 @@ section("11. Issue 2 — branch sentinels match what the APP ACTUALLY EMITS");
 // different hardcoded literal. Both sentinels were measuring nothing.
 const ROUTE_SRC = readSrc("app/api/knowledge-hub/query/route.ts");
 
+// PR #8 fix round 2 (issue 5 — test hygiene): this used to assert
+// `ROUTE_SRC.includes('KNOWLEDGE_HUB_LIMITED_CONTEXT,\n} from "@/lib/prompts"'.slice(0, 30))`.
+// The .slice(0, 30) truncated the needle to just the identifier, so the
+// import-SOURCE half it appeared to check was never checked at all. The two
+// substrings are now asserted separately, unsliced.
 check(
 	"the route emits the SHARED constant on its low-similarity branch",
-	ROUTE_SRC.includes("emit(KNOWLEDGE_HUB_LIMITED_CONTEXT)") &&
-		ROUTE_SRC.includes("KNOWLEDGE_HUB_LIMITED_CONTEXT,\n} from \"@/lib/prompts\"".slice(0, 30)),
+	ROUTE_SRC.includes("emit(KNOWLEDGE_HUB_LIMITED_CONTEXT)"),
+);
+check(
+	"…and imports that constant from lib/prompts (not a local literal)",
+	ROUTE_SRC.includes("\tKNOWLEDGE_HUB_LIMITED_CONTEXT,") &&
+		ROUTE_SRC.includes('} from "@/lib/prompts";'),
 );
 check(
 	"the route no longer carries its own copy of the disclaimer literal (single source of truth)",
@@ -802,11 +813,100 @@ check(
 		costFallback.totalsByKind().answerer_estimated.tokens >
 			costNoFallback.totalsByKind().answerer_estimated.tokens * 1.5,
 );
+// ---------------------------------------------------------------------------
+section("14b. Issue 3 (round 2) — the 'err-high' embedding factor erred LOW");
+
+// The bug: the route's embedding call (query + every expansion, made INSIDE the
+// dev server where the eval cannot see it) was charged as
+// `countTokens(question) * EMBED_INPUT_MULTIPLIER` with the constant 5,
+// documented as "above the practical ceiling". It is not a ceiling.
+// buildExpansions emits, PER mentioned doc, one narrow expansion per mentioned
+// section + one per matched concept seed + one BROAD `${doc} ${query}` carrying
+// the WHOLE query — and extractMentionedDocs can return an unbounded number of
+// docs (named REGDOCs + up to 4 concept hints). Wallet protection that errs low
+// is not wallet protection.
+const OLD_EMBED_MULTIPLIER = 5; // the constant this fix deletes
+
+// 7 docs in scope: 4 named (3 REGDOCs + NSCA) + 3 concept hints (graded
+// approach → 3.5.3, ALARA → 2.7.1, waste management → 2.11.1).
+const MULTI_DOC_Q =
+	"Compare REGDOC-2.5.2, REGDOC-2.2.5 and REGDOC-2.3.4 with NSCA section 48 on " +
+	"offence reporting requirements, applying the graded approach and ALARA to " +
+	"radioactive waste management.";
+const multiInputs = embeddingInputsFor(MULTI_DOC_Q);
 check(
-	"the server-side embedding is charged for expansions too (errs high, never low)",
-	EMBED_INPUT_MULTIPLIER >= 2 &&
-		costNew.totalsByKind().embeddings.tokens >= EMBED_INPUT_MULTIPLIER,
-	costNew.totalsByKind().embeddings,
+	"a multi-doc query generates FAR more than the 5 embedding inputs the old constant assumed",
+	multiInputs.length > OLD_EMBED_MULTIPLIER,
+	{ inputs: multiInputs.length, oldConstant: OLD_EMBED_MULTIPLIER },
+);
+const exactMultiTokens = serverEmbeddingInputTokens(MULTI_DOC_Q);
+const oldMultiEstimate = countTokens(MULTI_DOC_Q) * OLD_EMBED_MULTIPLIER;
+check(
+	"…and the old constant UNDER-CHARGED it — the 'err-high' factor errs LOW (WALLET)",
+	exactMultiTokens > oldMultiEstimate,
+	{ exact: exactMultiTokens, oldEstimate: oldMultiEstimate },
+);
+
+// Exactness, not a bound: the eval charges the SAME strings production sends.
+// Capture the real `embeddings.create` input from a driven retrieveChunks.
+let capturedEmbedInputs: string[] = [];
+const capturingOpenAI = {
+	embeddings: {
+		create: async (body: { input: string | string[] }) => {
+			capturedEmbedInputs = Array.isArray(body.input) ? body.input : [body.input];
+			return {
+				data: capturedEmbedInputs.map(() => ({ embedding: [0.1, 0.2, 0.3] })),
+				usage: { prompt_tokens: 1 },
+			};
+		},
+	},
+} as unknown as OpenAI;
+await retrieveChunks(
+	MULTI_DOC_Q,
+	{
+		supabase: fakeSupabase,
+		openai: capturingOpenAI,
+		recordUsage: async () => {},
+	},
+	{ envelopeChunks: 8 },
+);
+check(
+	"embeddingInputsFor() is EXACTLY what retrieveChunks sends to embeddings.create — no drift",
+	JSON.stringify(capturedEmbedInputs) === JSON.stringify(multiInputs),
+	{ sent: capturedEmbedInputs.length, counted: multiInputs.length },
+);
+check(
+	"the charged embedding tokens equal the exact sum of those real inputs",
+	exactMultiTokens ===
+		capturedEmbedInputs.reduce((acc, s) => acc + countTokens(s), 0),
+);
+// And it is wired into BOTH the pre-call reservation and the post-call ledger.
+const costEmbed = new CostAccountant(100);
+recordAnswerCost(costEmbed, {
+	systemPrompt: "sys",
+	question: MULTI_DOC_Q,
+	envelopeText: "",
+	answer: "a",
+	label: "embed",
+});
+check(
+	"recordAnswerCost charges the exact server-embedding input, not question x 5",
+	costEmbed.totalsByKind().embeddings.tokens === exactMultiTokens &&
+		costEmbed.totalsByKind().embeddings.tokens > oldMultiEstimate,
+	costEmbed.totalsByKind().embeddings,
+);
+check(
+	"answer.ts no longer carries the guessed multiplier at all",
+	!readSrc("scripts/rag-eval/answer.ts").includes("EMBED_INPUT_MULTIPLIER"),
+);
+// A single-doc query is the case the old constant over-charged; the exact count
+// must still be exact there (this is a COUNT, not a fudge factor in either
+// direction).
+const simpleQ = "What is required at shift turnover?";
+check(
+	"a query naming no doc embeds exactly ONE input (the query itself)",
+	embeddingInputsFor(simpleQ).length === 1 &&
+		serverEmbeddingInputTokens(simpleQ) === countTokens(simpleQ),
 );
 
 // ---------------------------------------------------------------------------
