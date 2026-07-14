@@ -5,12 +5,27 @@
 // Uses SUPABASE_SERVICE_ROLE_KEY — runs only from dev machines, never bundled
 // into runtime. See Appendix A.5 for the key/role separation rule.
 //
-// Idempotent: TRUNCATEs regdoc_chunks first (derived data, safe to rebuild).
+// Non-destructive-until-safe: the new corpus is batch-inserted into the
+// regdoc_chunks_staging table first — regdoc_chunks itself is never touched
+// until the row count in staging is verified to match, at which point a
+// single atomic DB-side swap (ingest_swap_regdoc_chunks_staging, see
+// supabase/migrations/20260714020000_regdoc_chunks_staging_swap.sql)
+// truncates regdoc_chunks and refills it from staging inside one Postgres
+// transaction. Any failure before the swap call leaves the existing corpus
+// completely intact; any failure during the swap itself rolls back
+// automatically, so regdoc_chunks can never be observed half-wiped.
+//
+// Refuses to run against a non-local Supabase URL (almost certainly the
+// hosted demo) unless --force or ALLOW_REMOTE_INGEST=1 is set, so a hosted
+// re-ingest is always a deliberate, explicit choice rather than whatever
+// `.env.local` happens to point at.
 //
 // CLI:
 //   bun run ingest                # full run
 //   bun run ingest --dry-run      # chunk + print stats, no API or DB writes
 //   bun run ingest --only=REGDOC-2.3.4   # restrict to one doc (debug)
+//   bun run ingest --force        # allow running against a non-local URL
+//                                 # (same as ALLOW_REMOTE_INGEST=1)
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -29,6 +44,18 @@ const EMBEDDING_MODEL = "text-embedding-3-small";
 const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run");
 const ONLY = argv.find((a) => a.startsWith("--only="))?.split("=")[1];
+const FORCE_REMOTE = argv.includes("--force") || process.env.ALLOW_REMOTE_INGEST === "1";
+
+// Anything that isn't loopback is treated as "probably hosted" — a re-ingest
+// there wipes-and-refills the LIVE demo's corpus, so it must be opt-in.
+function isLocalSupabaseUrl(url: string): boolean {
+	try {
+		const { hostname } = new URL(url);
+		return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+	} catch {
+		return false;
+	}
+}
 
 type ScrapedRequirementType = "informational" | "guidance" | "requirement";
 
@@ -251,6 +278,19 @@ async function main() {
 		process.exit(1);
 	}
 
+	if (!DRY_RUN && !isLocalSupabaseUrl(supabaseUrl) && !FORCE_REMOTE) {
+		console.error(
+			`Refusing to run: ${supabaseUrl} doesn't look like a local Supabase URL ` +
+				`(127.0.0.1/localhost) — this is almost certainly the hosted demo DB.`,
+		);
+		console.error(
+			"  A hosted re-ingest wipes-and-refills the LIVE corpus (via a staged swap, " +
+				"see supabase/LOCAL.md). Re-run with --force or ALLOW_REMOTE_INGEST=1 once " +
+				"you're sure that's what you want.",
+		);
+		process.exit(1);
+	}
+
 	const dir = join(process.cwd(), "scraped_regdocs");
 	const entries = await readdir(dir);
 	let files = entries.filter((f) => f.endsWith(".json") && !f.startsWith("_"));
@@ -311,11 +351,16 @@ async function main() {
 	});
 	const openai = new OpenAI({ apiKey: openaiKey });
 
-	// Wipe existing chunks (derived data). Rerun-safe.
-	console.log("\nClearing regdoc_chunks…");
-	const { error: delErr } = await supabase.from("regdoc_chunks").delete().gte("id", 0);
-	if (delErr) {
-		console.error("  delete failed:", delErr.message);
+	// Clear any leftover rows from a previous crashed run. This is the
+	// scratch staging table, not regdoc_chunks itself — there is nothing of
+	// value to lose here, so wiping it first is safe.
+	console.log("\nClearing regdoc_chunks_staging (leftovers from a previous run, if any)…");
+	const { error: stagingDelErr } = await supabase
+		.from("regdoc_chunks_staging")
+		.delete()
+		.gte("id", 0);
+	if (stagingDelErr) {
+		console.error("  staging clear failed:", stagingDelErr.message);
 		process.exit(1);
 	}
 
@@ -334,25 +379,102 @@ async function main() {
 		console.log(`  ${rows.length}/${allChunks.length}`);
 	}
 
-	// Insert
-	console.log(`\nInserting (batch=${INSERT_BATCH_SIZE})…`);
+	// Insert into staging — regdoc_chunks is not touched yet. A failure
+	// anywhere in this loop leaves the existing (good) corpus exactly as it
+	// was; the only thing left behind is a partial staging table, which the
+	// next run clears before it starts.
+	console.log(`\nInserting into regdoc_chunks_staging (batch=${INSERT_BATCH_SIZE})…`);
 	for (let i = 0; i < rows.length; i += INSERT_BATCH_SIZE) {
 		const batch = rows.slice(i, i + INSERT_BATCH_SIZE);
-		const { error } = await supabase.from("regdoc_chunks").insert(batch);
+		const { error } = await supabase.from("regdoc_chunks_staging").insert(batch);
 		if (error) {
-			console.error(`  insert failed at batch ${i / INSERT_BATCH_SIZE}:`, error.message);
+			console.error(
+				`  staging insert failed at batch ${i / INSERT_BATCH_SIZE}:`,
+				error.message,
+			);
+			console.error(
+				"\n  regdoc_chunks was never touched — the existing corpus is still intact. " +
+					"Fix the error above and re-run `bun run ingest`.",
+			);
 			process.exit(1);
 		}
 		console.log(`  ${Math.min(i + INSERT_BATCH_SIZE, rows.length)}/${rows.length}`);
 	}
+
+	// Verify staging client-side before asking Postgres to swap it in —
+	// belt-and-braces on top of the swap function's own server-side recheck.
+	const { count: stagedCount, error: stagedCountErr } = await supabase
+		.from("regdoc_chunks_staging")
+		.select("*", { count: "exact", head: true });
+	if (stagedCountErr || stagedCount == null || stagedCount !== rows.length) {
+		console.error(
+			`\n❌ Ingestion FAILED: regdoc_chunks_staging has ` +
+				`${stagedCount ?? "an unverifiable"} row(s), expected ${rows.length}. ` +
+				`regdoc_chunks was never touched. Investigate, then re-run \`bun run ingest\`.`,
+		);
+		process.exit(1);
+	}
+
+	// Atomic swap: truncate regdoc_chunks and refill it from staging inside
+	// one Postgres transaction (see
+	// supabase/migrations/20260714020000_regdoc_chunks_staging_swap.sql). If
+	// this call fails for any reason, the function rolls back everything it
+	// did — regdoc_chunks keeps whatever was in it before this run.
+	console.log("\nSwapping staged corpus into regdoc_chunks (atomic)…");
+	const { data: swappedCount, error: swapErr } = await supabase.rpc(
+		"ingest_swap_regdoc_chunks_staging",
+		{ expected_count: rows.length },
+	);
+	if (swapErr) {
+		console.error(
+			`\n❌ Ingestion FAILED: atomic swap rejected by the DB: ${swapErr.message}\n` +
+				`  The swap function rolled back on failure, so regdoc_chunks still holds ` +
+				`whatever was there before this run — it was NOT wiped. The new corpus is ` +
+				`sitting safely in regdoc_chunks_staging; investigate, then re-run ` +
+				`\`bun run ingest\` (it clears staging itself first).`,
+		);
+		process.exit(1);
+	}
+	console.log(`  swap complete: ${swappedCount} row(s) now live in regdoc_chunks`);
 
 	// C.6 verification
 	console.log("\n— C.6 verification —");
 	const { count: totalCount, error: countErr } = await supabase
 		.from("regdoc_chunks")
 		.select("*", { count: "exact", head: true });
-	if (countErr) console.error("  count failed:", countErr.message);
-	else console.log(`  total chunks in DB: ${totalCount}`);
+	if (countErr) {
+		console.error("  count failed:", countErr.message);
+		console.error(
+			`\n❌ Ingestion FAILED: could not verify row count after the swap. The swap ` +
+				`function itself already reported success, but re-run \`bun run ingest\` ` +
+				`before trusting this DB for evals or the app.`,
+		);
+		process.exit(1);
+	}
+	if (totalCount == null) {
+		// PostgREST returns no Content-Range (and no error) if it can't produce
+		// an exact count — treat this as "couldn't verify," not "corrupted."
+		// The swap function already asserted the row count server-side before
+		// returning success, so a null count here is a verification gap, not
+		// evidence of a partial corpus.
+		console.warn(
+			`  total chunks in DB: unknown (PostgREST returned no count; expected ${rows.length}). ` +
+				`The atomic swap already verified this count server-side, so this is not itself ` +
+				`a sign of a partial corpus — but if you want to double-check, run ` +
+				`\`SELECT count(*) FROM regdoc_chunks\` directly.`,
+		);
+	} else {
+		console.log(`  total chunks in DB: ${totalCount} (expected ${rows.length})`);
+		if (totalCount !== rows.length) {
+			console.error(
+				`\n❌ Ingestion FAILED: expected ${rows.length} rows, found ${totalCount} in ` +
+					`regdoc_chunks right after a swap that reported success. This should not be ` +
+					`reachable — something wrote to regdoc_chunks concurrently with this run. Do ` +
+					`not treat this DB as ready for evals or the app; investigate before re-running.`,
+			);
+			process.exit(1);
+		}
+	}
 
 	const { count: nullEmbedCount } = await supabase
 		.from("regdoc_chunks")

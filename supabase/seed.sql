@@ -1,0 +1,17 @@
+-- LOCAL-ONLY seed. Runs on `supabase start` and `supabase db reset`.
+--
+-- CAUTION — "local-only" describes `db push`, not every hosted-touching
+-- command: `supabase db push` never runs this file, but `supabase db reset
+-- --linked` DOES run it (and every migration) against a LINKED database.
+-- Never run `db reset --linked` against the hosted project — it wipes and
+-- rebuilds the schema from scratch. See supabase/LOCAL.md's migrations
+-- section for the safe hosted-apply sequence.
+--
+-- This file is intentionally empty of statements right now. The
+-- `service_role` statement_timeout bump that used to live here moved to
+-- supabase/migrations/20260714010000_service_role_statement_timeout.sql so it
+-- reaches hosted via `db push` too (hosted ingestion needs the higher cap at
+-- least as much as local does — see that migration's header for why).
+--
+-- Safe place for future local-only dev-ergonomics tweaks that must never
+-- reach hosted — just remember `db reset --linked` is still an exception.
