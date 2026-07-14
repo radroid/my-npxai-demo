@@ -144,3 +144,124 @@ Discovered during planning:
 - Do not touch `docs/orchestration/specs/item-1-artifact-mode.md` or any artifact-mode files (parallel item).
 - Do not commit raw per-item result logs or the judge cache — only the datasets, the report, and the summary JSON.
 - Do not start/restart/kill the dev server; do not clear `.next/`.
+
+## Execution notes (PR #7)
+
+Slice 2.1 only. Written by the third executor on this slice — the first two died on
+infra errors (usage limits / stream stalls) after pushing a checkpoint commit
+(`135ea8b`, "wip(rag-eval): framework checkpoint pre-judge-module"). This section
+inventories what the checkpoint contained and what this executor added, because a
+reviewer reading the PR diff alone cannot tell the two apart.
+
+### What the checkpoint already contained (verified, not rewritten)
+
+- `lib/retrieval.ts` — the R2 extraction did NOT happen in this PR. It already existed
+  from PR #6 (item-1), per the Resolved DELTA "retrieval access = reuse `lib/retrieval.ts`
+  from PR #6 (never re-extract)". The checkpoint added three ADDITIVE things to it, all
+  gated so production behavior is unchanged:
+  - `RetrievalTrace` + `opts.withTrace` (DELTA D1) — the ranked pool with pre/post-boost
+    ranks, expansions, `topSim`, and the fallback decision. Neither route sets `withTrace`,
+    so neither pays for it.
+  - `deriveEnvelopeAtK(trace, k)` — replays the route's own envelope selection at any k, so
+    the k-sweep costs ONE embedding for four k values instead of four retrievals.
+  - `deps.recordUsage?` (DELTA D2) — the OpenAI-call accounting hook, defaulting to
+    `recordOpenAICall`. **This DELTA was already complete, not half-done**: the call site is
+    `await (deps.recordUsage ?? recordOpenAICall)(0)` and both production routes omit the
+    dep, so they keep the byte-identical default. This executor verified it rather than
+    re-implementing it, and added the missing proof (below).
+- `scripts/rag-eval/{config,cost,datasets,metrics,citations,sse}.ts` — config + price table,
+  the cost accountant with `CostCapError`, dataset schemas + JSONL IO + fingerprint
+  verification, the deterministic metrics (hit rate/MRR/recall/CP@K, TAR-style agreement,
+  Jaccard, rejection scorer, cosine), citation extraction/validity, and the SSE parser
+  extended to capture the `data-sources` frame. All of it correct on inspection; none of it
+  was rewritten. `datasets.ts` already carried the `placeholder?: boolean` field, i.e. the
+  prior executor had already hit the Supabase outage below.
+
+### What this executor added
+
+- **R6 judge** (`judge.ts`): `EVAL_JUDGE_MODEL` (default `gpt-4o`), temperature 0, JSON
+  output, CoT `reasons` emitted BEFORE the verdict in every rubric (G-Eval), binary/0-3
+  scales only, rubrics that explicitly neutralize verbosity bias and treat answer text as
+  DATA (Edge case 10). Verdicts are disk-cached under `evals/.judge-cache/` keyed on
+  sha256(judge model, metric id, `RUBRIC_VERSION`, question, answer hash, context hash) —
+  a hit costs zero tokens. `PROMPT_VERSION` changes self-invalidate for free: a new prompt
+  produces a new answer, which changes the answer hash (Edge case 5; there is a self-test
+  check for exactly this). Unparseable/off-schema JSON → ONE repair retry → `judge_error`,
+  uncached, excluded from that metric's denominator, counted in the manifest (Edge case 3).
+  Judged metrics: faithfulness (RAGAS inferable-claim standard, judged against FULL chunk
+  text fetched from the DB — the SSE snippet is truncated at 260 chars), citation support
+  (R7 5b), relevancy reverse-questions, answer equivalence, plus golden/paraphrase
+  generation and paraphrase meaning-equivalence validation.
+- **R9 metering** (`openai.ts`): every framework OpenAI call flows through the accountant.
+  `meteredOpenAI()` is a Proxy over the client handed to `retrieveChunks`, so retrieval's
+  internal embedding spend is charged from its real `usage` field WITHOUT adding cost
+  plumbing to `lib/retrieval.ts` (which the production routes share).
+- **R8 answer harness** (`answer.ts`): POSTs the real route with `x-eval-bypass` and the
+  mandatory `trigger: "regenerate-assistant-message"`; first 429 is fatal, never retried;
+  answerer + server-embedding cost estimated with tiktoken. **Ships but is UNEXERCISED** —
+  the dev server was down for this slice and I2.11 forbids starting it. Slice 2.2 is its
+  first real execution.
+- **Corpus access** (`supabase.ts`): read-only (I2.8) against `regdoc_chunks`; full
+  `chunk_text` by id for judging; fingerprint verify/re-map so a re-ingest's BIGSERIAL drift
+  can never silently mis-score (Edge case 6 / I2.10).
+- **`headroom.ts`**: reads (never writes) the production `GLOBAL_DAILY_CAP` counter so every
+  server-backed run prints its impact on the 2000-call budget real users share (Edge case 2).
+- **R3/R5 generator** (`generate-golden.ts`) and **R4 probe set**
+  (`evals/rag-ooc-probes.jsonl`, 23 probes: 19 out-of-corpus + 4 false-premise; verified that
+  0 of them trip `detectJailbreakMarkers`, so they exercise the similarity gate / LLM refusal
+  rather than short-circuiting at the request boundary).
+- **R10 runner + aggregator** (`run.ts`, `report.ts`) and **R11 wiring** (`eval:rag`,
+  `eval:rag:golden`, `eval:rag:report`, `test:rag-eval`; `.gitignore` for `evals/results/` +
+  `evals/.judge-cache/`; the four eval env vars documented in `.env.example`).
+- **`test:rag-eval`** — offline self-test, fixtures only, following `scripts/test-artifact.ts`
+  conventions (throwing `fetch` stub, `check()` helper, exit 1 on any failure). 60 checks.
+
+### Deviations (all small-call, logged per contract §2)
+
+1. **Golden set + paraphrases shipped as PLACEHOLDERS** (spec D4 fallback, explicitly
+   authorized). The Supabase project is paused again — NXDOMAIN on the REST host, the exact
+   signature in `supabase/RECOVERY.md`. The generator's preflight aborted before spending a
+   cent (**$0.00 actually spent**), which is Edge case 1 working as designed. Both files carry
+   `placeholder: true` and the runner REFUSES to score them. `evals/rag-ooc-probes.jsonl` is
+   real and complete — it needs no corpus access.
+2. **Paraphrase generation lives inside `eval:rag:golden`**, not a separate script. Paraphrases
+   are derived from the golden set, so a separate entry point could only ever run after it;
+   one command keeps them in sync. Spec R5 does not name a command.
+3. **Hand-written golden records carry an empty `ground_truth_answer`.** They are reused from
+   `evals/knowledge-hub.jsonl`, which asserts *behavior* (must_cite / must_contain), not a
+   reference answer. Their `gold_chunks` (resolved from `must_cite` + `must_cite_section` by DB
+   lookup) are what the ID-based retrieval metrics need, and the generation metrics used here
+   (faithfulness, relevancy) are reference-free. Fabricating a reference answer would have been
+   worse than leaving it empty.
+4. **Baseline retrieval metrics are computed from the `data-sources` frame**, not from an
+   offline trace. That frame IS the envelope the LLM saw, so it is the more honest source; the
+   offline trace is used for the k-sweep, where four k values must come from one embedding.
+5. **`bun.lock` was left untouched.** `bun install` rewrote it (the committed lockfile carried
+   stale `latest` specifiers against a pinned `package.json`), which is unrelated churn — this
+   PR adds no dependencies, so the rewrite was reverted rather than committed.
+
+### Proof of zero production drift (DELTA D2 / I2.7)
+
+`bun run test:artifact` stays green — it drives the real `retrieveChunks` through the routes'
+default path. On top of that, `test:rag-eval` §10 drives `retrieveChunks` with the eval path's
+no-op `recordUsage` under a `fetch` stub that THROWS on any network call: `recordOpenAICall`
+talks to Upstash over REST, so if the no-op were not honored, the check would fail loudly.
+That is the executable proof that eval-path retrieval never increments the production daily
+circuit-breaker. The same section also asserts that `deriveEnvelopeAtK(trace, k)` returns a
+byte-identical envelope to a direct `retrieveChunks` at that `k`, for every k in {3,5,8,10} —
+the k-sweep's cost optimization cannot silently change what it measures.
+
+### What slice 2.2 must know
+
+- **Un-pause Supabase first**, then `bun run eval:rag:golden`. Everything else is blocked on
+  the golden set. Three rows are queued in `docs/orchestration/manual-verification.md`.
+- The answer harness has never made a live request. Smoke it (`--experiment baseline --limit 5`)
+  before committing to the full battery.
+- The `gpt-4o` judge baseline will need `EVAL_COST_CAP_USD=4` (authorized in the backlog's
+  Resolved DELTAs); every other experiment fits under the default 2.
+- `ksweep` needs no dev server and no judge — it is embeddings-only and can run while the
+  server is down.
+- Cost-reduction path if the battery runs hot: validate a `gpt-4o-mini` judge against a ~30-item
+  spot sample (research doc §Judge design allows validated downgrades, ~10× cheaper) — set
+  `EVAL_JUDGE_MODEL`, and note that the cache key includes the model, so a downgrade does not
+  reuse gpt-4o verdicts.
