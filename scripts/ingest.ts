@@ -351,8 +351,28 @@ async function main() {
 	const { count: totalCount, error: countErr } = await supabase
 		.from("regdoc_chunks")
 		.select("*", { count: "exact", head: true });
-	if (countErr) console.error("  count failed:", countErr.message);
-	else console.log(`  total chunks in DB: ${totalCount}`);
+	if (countErr) {
+		console.error("  count failed:", countErr.message);
+		console.error(
+			`\n❌ Ingestion FAILED: could not verify row count after insert. The table` +
+				` was wiped before this run and may now hold a partial corpus. Re-run` +
+				` \`bun run ingest\` before trusting this DB for evals or the app.`,
+		);
+		process.exit(1);
+	}
+	console.log(`  total chunks in DB: ${totalCount} (expected ${rows.length})`);
+	if (totalCount !== rows.length) {
+		console.error(
+			`\n❌ Ingestion FAILED: expected ${rows.length} rows, found ${totalCount}.` +
+				` regdoc_chunks was wiped before this run (TRUNCATE-then-insert, not` +
+				` transactional) and now holds a PARTIAL corpus — likely an insert` +
+				` batch timed out (check that` +
+				` 20260714010000_service_role_statement_timeout.sql applied). Do not` +
+				` treat this DB as ready for evals or the app; re-run \`bun run ingest\`` +
+				` to rebuild it fully before trusting query results.`,
+		);
+		process.exit(1);
+	}
 
 	const { count: nullEmbedCount } = await supabase
 		.from("regdoc_chunks")

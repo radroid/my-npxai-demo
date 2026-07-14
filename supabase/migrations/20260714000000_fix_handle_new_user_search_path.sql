@@ -27,7 +27,11 @@
 -- existing profiles row keeps signing in fine; only fresh signups break.
 --
 -- Fix, belt and braces:
---   1. Restate SET search_path = public.
+--   1. Restate SET search_path = public, pg_temp — matching the convention
+--      every other SECURITY DEFINER function in this repo has used since
+--      2026-04-17 (list_threads, save_message, save_report, delete_report,
+--      ...). pg_temp is appended (not omitted) so a malicious temp-schema
+--      object can't shadow a call the function makes.
 --   2. Schema-qualify public.profiles so the function is correct even if the
 --      search_path is ever cleared again by a future CREATE OR REPLACE.
 --
@@ -37,7 +41,7 @@ CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public AS $$
+SET search_path = public, pg_temp AS $$
 DECLARE
   v_tier TEXT := CASE
     WHEN lower(NEW.email) IN (

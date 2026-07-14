@@ -66,27 +66,83 @@ Restart the dev server after editing `.env.local` — Next.js only reads env at 
 
 ## Migrations
 
-`supabase/migrations/` is the source of truth. 15 migrations, all replay clean.
+`supabase/migrations/` is the source of truth. 16 migrations, all replay clean locally.
 
 ```bash
 bun run db:local:reset     # local: wipe + replay all migrations, then seed.sql
-bunx supabase db push      # hosted: apply only NOT-yet-applied migrations. Does NOT run seed.sql.
 ```
 
 - **`db reset`** is the local workhorse — destructive and idempotent. Use it freely; it's the only way to prove the migration chain works from zero.
-- **`db push`** is the hosted path. It never runs `seed.sql`, so local-only tweaks in that file can't leak to production.
 
-New migration: `bunx supabase migration new <name>`, edit the generated file, `bun run db:local:reset` to test, then `bunx supabase db push` when you're ready to ship it to hosted.
+### Applying to hosted: **do NOT run bare `bunx supabase db push`**
 
-### `seed.sql` — local-only, and load-bearing
-
-`supabase/seed.sql` raises `statement_timeout` for `service_role` to 120s. Without it, ingest **intermittently** dies:
+This repo's earliest five migrations (`20260416120000`–`20260416120400`) are
+**reconstructed** foundational schema — the original schema was applied by
+hand in the SQL editor pre-CLI and never committed (see `supabase/RECOVERY.md`
+and commit `e389209`). Hosted's `schema_migrations` table has no row for them
+and starts at `20260417015131`, and they sort *before* every migration hosted
+has recorded. That combination makes both of the obvious commands wrong:
 
 ```
-insert failed at batch 3: canceling statement due to statement timeout
+$ bunx supabase db push --dry-run --linked
+Found local migration files to be inserted before the last migration on remote database.
+Rerun the command with --include-all flag to apply these migrations:
+supabase/migrations/20260416120000_enable_vector_extension.sql
+supabase/migrations/20260416120100_core_tables.sql
+supabase/migrations/20260416120200_core_rls.sql
+supabase/migrations/20260416120300_rpc_functions.sql
+supabase/migrations/20260416120400_auth_profiles_and_tier.sql
 ```
 
-PostgREST logs in as `authenticator` (`statement_timeout=8s`) and `SET ROLE`s to `service_role`, which had no override. Each 500-row batch of 1536-dim vectors has to maintain the HNSW index, and on a busy machine that tips past 8s. It's load-dependent, so it looks flaky — it succeeded on the first run and died mid-run on the second, leaving **1,500 of 1,945 rows** in the table. A truncated corpus that still *looks* fine is worse than a clean failure: the evals would quietly score against a partial index. The `anon` (3s) and `authenticator` (8s) caps are deliberately untouched — they guard the request path the app actually serves.
+- **Plain `bunx supabase db push`** — aborts outright and applies *nothing*.
+  Whatever fix you were trying to ship (e.g. the search_path fix below) stays
+  unshipped on hosted, silently.
+- **`bunx supabase db push --include-all`** — the flag the CLI itself
+  suggests, so a hurried operator types it — **replays all five reconstructed
+  migrations against the LIVE hosted database**: `DROP POLICY`/`CREATE POLICY`
+  on `profiles`, `REVOKE ALL ... FROM anon, authenticated`, `CREATE INDEX ...
+  hnsw`, `CREATE OR REPLACE` on the RPCs. That silently overwrites whatever is
+  actually live on production — a real security-surface rewrite, not a no-op,
+  even though the DDL is "the same" schema. **Never run `--include-all`
+  against hosted.**
+
+**Correct sequence — mark the reconstructed five as already-applied (without
+executing them), then push:**
+
+```bash
+bunx supabase migration repair --status applied \
+  20260416120000 20260416120100 20260416120200 20260416120300 20260416120400
+bunx supabase db push
+```
+
+`migration repair --status applied` only writes rows into hosted's
+`schema_migrations` table — it does not execute the SQL in those five files.
+After that, hosted's history correctly reflects "these already exist" (they
+do — they were applied by hand, this just tells the CLI), and the follow-up
+`bunx supabase db push` applies only what's actually missing — at the time of
+writing, that's `20260714000000_fix_handle_new_user_search_path.sql` and
+`20260714010000_service_role_statement_timeout.sql`.
+
+New migration: `bunx supabase migration new <name>`, edit the generated file,
+`bun run db:local:reset` to test, then the repair-then-push sequence above
+when you're ready to ship it to hosted (the `migration repair` step is only
+needed once, the first time you push after this doc was written — subsequent
+new migrations push cleanly since they sort after hosted's recorded history).
+
+### `seed.sql` — local-only (with one exception), no longer load-bearing
+
+`supabase/seed.sql` runs on `supabase start`, `supabase db reset`, **and
+`supabase db reset --linked` against a linked (hosted) database** — the
+"local-only" framing describes `db push` (which never runs it), not every
+hosted-touching command. **Never run `db reset --linked` against hosted** —
+besides running seed.sql, `db reset` drops and rebuilds the schema from
+scratch, which is catastrophic against a live database.
+
+The `statement_timeout` bump that used to live in `seed.sql` moved to
+`supabase/migrations/20260714010000_service_role_statement_timeout.sql` so it
+reaches hosted via the `db push` path above too — see the next section for
+why hosted needs it more than local does. `seed.sql` itself is now just a
+placeholder for future local-only tweaks; it carries no executable statements.
 
 ---
 
@@ -105,13 +161,22 @@ bun run ingest
 Expected tail:
 
 ```
-  total chunks in DB: 1945
+  total chunks in DB: 1945 (expected 1945)
   chunks with NULL embedding: 0  (expect 0)
   smoke query "shift turnover" → 3 matches
 ✅ Ingestion complete
 ```
 
-**1,945 chunks across 19 docs.** Anything materially lower means a batch timed out — check `seed.sql` applied (`bun run db:local:reset` runs it).
+**1,945 chunks across 19 docs.** The script wipes `regdoc_chunks` before it
+inserts (non-transactional TRUNCATE-then-insert), so a batch that times out
+mid-run leaves the table wiped-and-partial. It now asserts the post-insert row
+count matches the number of rows it intended to insert and **exits non-zero
+with a loud error** on any mismatch instead of printing `✅ Ingestion
+complete` over a truncated corpus — treat that exit code as "do not trust this
+DB," not just a warning. If it fires, check that
+`20260714010000_service_role_statement_timeout.sql` applied (local:
+`bun run db:local:reset` replays it; hosted: see the migrations section
+above), then re-run `bun run ingest`.
 
 ---
 
@@ -313,9 +378,9 @@ The eval runners POST to the dev server, so it needs to be running (`bun dev`, :
 | Symptom | Cause / fix |
 |---|---|
 | `Cannot connect to the Docker daemon` | Docker Desktop isn't running. `open -a Docker`, wait, retry. |
-| `insert failed at batch N: canceling statement due to statement timeout` | `seed.sql` didn't apply. `bun run db:local:reset` (it runs seed), then re-ingest. |
-| `500: Database error saving new user` on sign-in | The `handle_new_user` search_path bug — fixed in `20260714000000_fix_handle_new_user_search_path.sql`. Make sure you're on a DB that has it: `bun run db:local:reset`. |
+| `insert failed at batch N: canceling statement due to statement timeout` | `20260714010000_service_role_statement_timeout.sql` didn't apply. Local: `bun run db:local:reset` (replays migrations). Hosted: run the repair-then-push sequence above, then re-ingest. |
+| `500: Database error saving new user` on sign-in | The `handle_new_user` search_path bug — fixed in `20260714000000_fix_handle_new_user_search_path.sql`. Make sure you're on a DB that has it: `bun run db:local:reset` (local) or the repair-then-push sequence above (hosted). |
 | Magic-link email never arrives | It didn't leave the machine, by design. It's in Inbucket: `http://127.0.0.1:54324`. |
-| Chunk count < 1945 | A batch timed out mid-run and the table is half-populated. Re-ingest; check `seed.sql`. |
+| Chunk count < 1945 / ingest exits non-zero after "Inserting" | A batch timed out mid-run and the table is wiped-and-partial — `bun run ingest` now detects this itself and fails loudly instead of printing success. Check the statement_timeout migration applied, then re-ingest. |
 | Port already in use | Something else owns 54321-54324. `bunx supabase stop`, then `bun run db:local`. |
 | App still hitting hosted after editing `.env.local` | Next.js reads env at boot — restart the dev server. |

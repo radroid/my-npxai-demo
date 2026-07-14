@@ -1,26 +1,17 @@
 -- LOCAL-ONLY seed. Runs on `supabase start` and `supabase db reset`.
--- NOT applied to the hosted project: `supabase db push` only replays
--- supabase/migrations/. Safe place for local dev-ergonomics tweaks.
 --
--- Why this exists: raise the statement timeout for `service_role`.
+-- CAUTION — "local-only" describes `db push`, not every hosted-touching
+-- command: `supabase db push` never runs this file, but `supabase db reset
+-- --linked` DOES run it (and every migration) against a LINKED database.
+-- Never run `db reset --linked` against the hosted project — it wipes and
+-- rebuilds the schema from scratch. See supabase/LOCAL.md's migrations
+-- section for the safe hosted-apply sequence.
 --
--- `bun run ingest` batch-inserts 1,945 chunks × 1536-dim vectors (500 rows per
--- statement) through PostgREST. PostgREST logs in as `authenticator`, which
--- ships with `statement_timeout=8s`, then does SET ROLE to `service_role`,
--- which had no override of its own — so the 8s cap applied to the inserts.
+-- This file is intentionally empty of statements right now. The
+-- `service_role` statement_timeout bump that used to live here moved to
+-- supabase/migrations/20260714010000_service_role_statement_timeout.sql so it
+-- reaches hosted via `db push` too (hosted ingestion needs the higher cap at
+-- least as much as local does — see that migration's header for why).
 --
--- Each 500-row batch has to maintain the HNSW index over 1536-dim vectors, and
--- on a busy machine that tips past 8s. The failure is load-dependent, so it
--- looks flaky: the same command succeeds on an idle box and dies mid-run on a
--- busy one, with
---
---   insert failed at batch 3: canceling statement due to statement timeout
---
--- leaving the table half-populated (1,500/1,945) and the RAG evals quietly
--- running against a truncated corpus — worse than a clean failure.
---
--- 120s is generous for a 500-row batch; it exists to absorb load spikes during
--- a one-shot offline ingest, not to mask a slow query in a hot path. The `anon`
--- (3s) and `authenticator` (8s) caps are deliberately left alone — those guard
--- the request path the app actually serves.
-ALTER ROLE service_role SET statement_timeout = '120s';
+-- Safe place for future local-only dev-ergonomics tweaks that must never
+-- reach hosted — just remember `db reset --linked` is still an exception.
