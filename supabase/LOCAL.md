@@ -110,18 +110,33 @@ supabase/migrations/20260416120400_auth_profiles_and_tier.sql
 executing them), then push:**
 
 ```bash
-bunx supabase migration repair --status applied \
+bunx supabase migration repair --status applied --linked \
   20260416120000 20260416120100 20260416120200 20260416120300 20260416120400
-bunx supabase db push
+bunx supabase db push --linked
 ```
+
+`--linked` is the CLI's default target when a project is linked (this repo is,
+to `ptepxophdneugvcziqny`), so both commands would resolve the same way
+without it. It's spelled out here anyway — with a live database at stake,
+the doc should say explicitly where these commands point rather than lean on
+an implicit default.
 
 `migration repair --status applied` only writes rows into hosted's
 `schema_migrations` table — it does not execute the SQL in those five files.
 After that, hosted's history correctly reflects "these already exist" (they
 do — they were applied by hand, this just tells the CLI), and the follow-up
-`bunx supabase db push` applies only what's actually missing — at the time of
-writing, that's `20260714000000_fix_handle_new_user_search_path.sql` and
-`20260714010000_service_role_statement_timeout.sql`.
+`bunx supabase db push --linked` applies only what's actually missing — at
+the time of writing, that's `20260714000000_fix_handle_new_user_search_path.sql`,
+`20260714010000_service_role_statement_timeout.sql`, and
+`20260714020000_regdoc_chunks_staging_swap.sql`.
+
+`20260714010000` ends in `NOTIFY pgrst, 'reload config';` — `db push` applies
+the `ALTER ROLE` in that file but does not restart or signal hosted
+PostgREST, and `ALTER ROLE` (a shared-object DDL) doesn't trip Supabase's
+`pgrst_ddl_watch` event trigger the way table/function DDL does. Without the
+NOTIFY, a long-lived hosted PostgREST process keeps enforcing the old 8s
+`service_role` timeout forever after this migration "applies" — see the
+troubleshooting table below for how to verify it actually took effect.
 
 New migration: `bunx supabase migration new <name>`, edit the generated file,
 `bun run db:local:reset` to test, then the repair-then-push sequence above
@@ -148,7 +163,7 @@ placeholder for future local-only tweaks; it carries no executable statements.
 
 ## Re-ingest the corpus
 
-Needs `scraped_regdocs/` (gitignored, 21 files). Costs **~2¢** of OpenAI embeddings (`text-embedding-3-small`, ~780k tokens). The script truncates `regdoc_chunks` first, so it's idempotent.
+Needs `scraped_regdocs/` (gitignored, 21 files). Costs **~2¢** of OpenAI embeddings (`text-embedding-3-small`, ~780k tokens). The script is idempotent — see below for how.
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
@@ -157,6 +172,11 @@ bun run ingest
 ```
 
 `OPENAI_API_KEY` is picked up from `.env.local` automatically — you never have to paste it. The inline vars override Bun's autoload, so this targets local **even while `.env.local` still points at hosted**. That's the one command you can run without swapping env first.
+
+Against anything that isn't `127.0.0.1`/`localhost`, the script refuses to run
+unless you pass `--force` or set `ALLOW_REMOTE_INGEST=1` — a hosted re-ingest
+is treated as deliberate, not something `.env.local` should trigger by
+accident.
 
 Expected tail:
 
@@ -167,16 +187,21 @@ Expected tail:
 ✅ Ingestion complete
 ```
 
-**1,945 chunks across 19 docs.** The script wipes `regdoc_chunks` before it
-inserts (non-transactional TRUNCATE-then-insert), so a batch that times out
-mid-run leaves the table wiped-and-partial. It now asserts the post-insert row
-count matches the number of rows it intended to insert and **exits non-zero
-with a loud error** on any mismatch instead of printing `✅ Ingestion
-complete` over a truncated corpus — treat that exit code as "do not trust this
-DB," not just a warning. If it fires, check that
-`20260714010000_service_role_statement_timeout.sql` applied (local:
-`bun run db:local:reset` replays it; hosted: see the migrations section
-above), then re-run `bun run ingest`.
+**1,945 chunks across 19 docs.** The script is non-destructive-until-safe:
+the new corpus is batch-inserted into `regdoc_chunks_staging` first, and
+`regdoc_chunks` itself is only touched by one atomic swap
+(`ingest_swap_regdoc_chunks_staging`, see
+`supabase/migrations/20260714020000_regdoc_chunks_staging_swap.sql`) that
+truncates and refills it inside a single Postgres transaction, called only
+after the staging row count is verified to match. A batch that times out or
+otherwise fails during the insert loop leaves `regdoc_chunks` completely
+untouched — the old corpus is still live, nothing to roll back. The script
+still asserts the post-swap row count matches the number of rows it intended
+to insert and **exits non-zero with a loud error** on any mismatch (this
+should be unreachable now, since the swap function verifies server-side
+before it commits — if it fires, something wrote to `regdoc_chunks`
+concurrently with the run). If a run fails, re-run `bun run ingest` — it
+clears `regdoc_chunks_staging` itself before it starts.
 
 ---
 
@@ -378,9 +403,9 @@ The eval runners POST to the dev server, so it needs to be running (`bun dev`, :
 | Symptom | Cause / fix |
 |---|---|
 | `Cannot connect to the Docker daemon` | Docker Desktop isn't running. `open -a Docker`, wait, retry. |
-| `insert failed at batch N: canceling statement due to statement timeout` | `20260714010000_service_role_statement_timeout.sql` didn't apply. Local: `bun run db:local:reset` (replays migrations). Hosted: run the repair-then-push sequence above, then re-ingest. |
+| `staging insert failed at batch N: canceling statement due to statement timeout` | **Not** "the migration didn't apply" — `ALTER ROLE` writes the catalog (`pg_roles.rolconfig`) regardless, that part always "works." The real cause is almost always that the *running* PostgREST process hasn't reloaded it: PostgREST only applies a role's `rolconfig` at boot or on `NOTIFY pgrst, 'reload config'`, never on `SET ROLE` alone. **Don't trust `SELECT rolconfig FROM pg_roles WHERE rolname = 'service_role'`** to diagnose this — that only proves the catalog is right, which was never in doubt. To check what PostgREST is *actually enforcing*, drive it through the REST API: create a throwaway `pg_sleep()`-wrapping RPC granted to `service_role`, call it via `curl .../rest/v1/rpc/<fn>` with a duration between the old and new caps (e.g. 3s if you expect 8s→120s), and see whether it survives. Local: `bun run db:local:reset` restarts the PostgREST container, so it re-reads the catalog at boot "for free" — a passing local run does **not** prove the migration's `NOTIFY pgrst, 'reload config';` line does anything; it can pass even without it. Hosted: the repair-then-push sequence above ships the migration including its NOTIFY, which is what makes hosted's long-lived PostgREST pick up the new value **without a restart**; if it still times out after that, reissue `NOTIFY pgrst, 'reload config';` by hand and retest via the REST API (not `pg_roles`). |
 | `500: Database error saving new user` on sign-in | The `handle_new_user` search_path bug — fixed in `20260714000000_fix_handle_new_user_search_path.sql`. Make sure you're on a DB that has it: `bun run db:local:reset` (local) or the repair-then-push sequence above (hosted). |
 | Magic-link email never arrives | It didn't leave the machine, by design. It's in Inbucket: `http://127.0.0.1:54324`. |
-| Chunk count < 1945 / ingest exits non-zero after "Inserting" | A batch timed out mid-run and the table is wiped-and-partial — `bun run ingest` now detects this itself and fails loudly instead of printing success. Check the statement_timeout migration applied, then re-ingest. |
+| Chunk count < 1945 / ingest exits non-zero | Should not be reachable via the normal flow anymore — the atomic swap function verifies the row count server-side before it ever touches `regdoc_chunks`, so `regdoc_chunks` itself cannot end up partial. If a run fails after the staging-insert step but before the swap call, `regdoc_chunks_staging` may hold a leftover partial batch — harmless, `bun run ingest` clears staging itself before the next run. If you see this error *after* "swap complete", something wrote to `regdoc_chunks` concurrently with the run; investigate before re-ingesting. |
 | Port already in use | Something else owns 54321-54324. `bunx supabase stop`, then `bun run db:local`. |
 | App still hitting hosted after editing `.env.local` | Next.js reads env at boot — restart the dev server. |

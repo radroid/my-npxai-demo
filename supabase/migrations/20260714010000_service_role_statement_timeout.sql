@@ -20,3 +20,20 @@
 -- The `anon` (3s) and `authenticator` (8s) caps are deliberately left alone —
 -- those guard the request path the app actually serves.
 ALTER ROLE service_role SET statement_timeout = '120s';
+
+-- ALTER ROLE only writes pg_db_role_setting (a catalog row). Postgres applies
+-- rolconfig at LOGIN time; `SET ROLE` — which is how PostgREST impersonates
+-- service_role per-request — explicitly does NOT re-read it. PostgREST is
+-- what actually turns this row into a per-request `SET LOCAL
+-- statement_timeout`, and it only does that with settings it loaded into
+-- memory at boot or at its last config reload. A long-lived hosted PostgREST
+-- process that was already running when this migration lands would keep
+-- enforcing the inherited 8s `authenticator` timeout for service_role
+-- forever, silently, because nothing here tells it to re-read the catalog.
+-- `supabase db push` applies the DDL above but does not restart or signal
+-- hosted PostgREST, and `ALTER ROLE` targets a shared object so Supabase's
+-- `pgrst_ddl_watch` event trigger (which fires `NOTIFY pgrst, 'reload
+-- schema'` on table/function DDL) doesn't fire for it either. This NOTIFY is
+-- the only thing that makes the setting above take effect without a manual
+-- restart — see https://supabase.com/docs/guides/database/postgres/timeouts.
+NOTIFY pgrst, 'reload config';
