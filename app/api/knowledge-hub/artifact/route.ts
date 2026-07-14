@@ -17,8 +17,9 @@ import {
 	type ArtifactSource,
 	assembleArtifactDocument,
 } from "@/lib/artifact-template";
+import { cacheRead, cacheWrite } from "@/lib/cache";
 import { buildContextEnvelope } from "@/lib/context-envelope";
-import { getRedis, recordOpenAICall, withGuard } from "@/lib/guard";
+import { recordOpenAICall, withGuard } from "@/lib/guard";
 import { logGuardEvent } from "@/lib/logger";
 import { getArtifactModel, getOpenAIClient } from "@/lib/openai";
 import {
@@ -156,15 +157,17 @@ export const POST = withGuard(
 			return sseErrorResponse("out_of_scope", KNOWLEDGE_HUB_OUT_OF_SCOPE);
 		}
 
-		// Cache hit check — skips embed + RPC + LLM for repeat queries.
-		const redis = getRedis();
+		// Cache hit check — skips embed + RPC + LLM for repeat queries. Fail-open
+		// via lib/cache: this read was already wrapped, but `getRedis()` sat
+		// OUTSIDE the try — and getRedis() itself throws when the Upstash env vars
+		// are missing, so that half of the path was unguarded. The helper acquires
+		// the client and issues the call inside ONE try, so both failure modes
+		// degrade to a cache MISS.
 		const cKey = await cacheKey(query, model);
-		let cached: CachedArtifact | null = null;
-		try {
-			cached = (await redis.get<CachedArtifact>(cKey)) ?? null;
-		} catch (err) {
-			console.error("artifact_cache_read_error", err);
-		}
+		const cached = await cacheRead<CachedArtifact>(
+			cKey,
+			"artifact_cache_read_error",
+		);
 		if (cached?.html) {
 			ctx.logFields.cache = "hit";
 			ctx.logFields.fallback_taken = false;
@@ -349,11 +352,12 @@ export const POST = withGuard(
 				// Cache only clean, complete artifacts — truncated ones must stay
 				// regenerable.
 				if (!truncated) {
-					redis
-						.set(cKey, { html, sources } satisfies CachedArtifact, {
-							ex: ARTIFACT_CACHE_TTL_SECONDS,
-						})
-						.catch((err) => console.error("artifact_cache_write_error", err));
+					void cacheWrite(
+						cKey,
+						{ html, sources } satisfies CachedArtifact,
+						ARTIFACT_CACHE_TTL_SECONDS,
+						"artifact_cache_write_error",
+					);
 				}
 
 				send("artifact", {

@@ -320,10 +320,24 @@ export function withGuard(
 // degraded until Redis returns. We log it loudly rather than deny service —
 // but a persistent `openai_accounting_unavailable` in the logs means the spend
 // cap is not being enforced and Redis must be restored.
-export async function recordOpenAICall(costUsd = 0): Promise<void> {
+//
+// `deps.redis` is a TEST SEAM, never passed in production (both routes call
+// `recordOpenAICall(0)`). It exists because getRedis() MEMOISES its client:
+// once anything in the process has built one, swapping UPSTASH_REDIS_REST_URL
+// to a dead host injects no failure at all, and a test that relies on that is
+// vacuous. Injecting a rejecting client reproduces the actual incident — the
+// Upstash REST call rejecting — deterministically and offline.
+export type AccountingRedis = Pick<Redis, "incr" | "expire" | "incrby">;
+
+export async function recordOpenAICall(
+	costUsd = 0,
+	deps: { redis?: AccountingRedis } = {},
+): Promise<void> {
 	try {
 		const today = new Date().toISOString().slice(0, 10);
-		const redis = getRedis();
+		// Inside the try on purpose: getRedis() THROWS when the env vars are
+		// missing, and that must be swallowed here like any other Redis fault.
+		const redis = deps.redis ?? getRedis();
 		// Increment + set TTL on first write (48h — generous headroom over daily reset).
 		const calls = await redis.incr(`openai:calls:${today}`);
 		if (calls === 1) await redis.expire(`openai:calls:${today}`, 60 * 60 * 48);

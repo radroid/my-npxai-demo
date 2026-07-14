@@ -228,6 +228,34 @@ export class RetrievalError extends Error {
 	}
 }
 
+// WALLET GUARD (PR #11 fix round 1, B4). A CostCapError means an injected
+// accountant hit its spend ceiling and is deliberately aborting the run — it
+// MUST propagate through retrieveChunks' tolerant accounting catch below.
+//
+// Matched BY NAME, never by import: lib/ must not depend on scripts/. Matching
+// only the IMMEDIATELY caught error was too shallow — any wrapper (`throw new
+// Error("accounting failed", { cause: costCapError })`, an AggregateError from
+// a Promise.all, a re-throw that adds context) would present a non-CostCapError
+// on top, the check would miss it, retrieval would swallow it, and the eval
+// would keep spending past its cap. So walk the `cause` chain.
+//
+// Bounded depth: a cyclic or adversarially deep chain must not hang the route.
+// 8 is far past any real wrapping depth; a CostCapError buried deeper than that
+// is not a shape we produce.
+const CAUSE_CHAIN_MAX_DEPTH = 8;
+function isCostCapError(err: unknown): boolean {
+	const seen = new Set<unknown>();
+	let current: unknown = err;
+	for (let depth = 0; depth < CAUSE_CHAIN_MAX_DEPTH; depth++) {
+		if (current === null || current === undefined) return false;
+		if (seen.has(current)) return false; // cycle
+		seen.add(current);
+		if ((current as Error)?.name === "CostCapError") return true;
+		current = (current as { cause?: unknown })?.cause;
+	}
+	return false;
+}
+
 export interface RetrievalDeps {
 	supabase: GuardedHandlerArgs["supabase"];
 	openai: OpenAI;
@@ -436,11 +464,12 @@ export async function retrieveChunks(
 	// ONE EXCEPTION, and it is load-bearing: a CostCapError means the eval
 	// harness hit its spend ceiling and is deliberately aborting the run. That
 	// must propagate — swallowing it would silently defeat the wallet guard.
-	// Matched by name, not by import: lib/ must not depend on scripts/.
+	// isCostCapError walks the `cause` chain, so a WRAPPED cost-cap error still
+	// aborts (see its definition above).
 	try {
 		await (deps.recordUsage ?? recordOpenAICall)(0);
 	} catch (err) {
-		if ((err as Error)?.name === "CostCapError") throw err;
+		if (isCostCapError(err)) throw err;
 		console.error("retrieval_accounting_unavailable", err);
 	}
 
