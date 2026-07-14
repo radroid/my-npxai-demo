@@ -7,6 +7,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
+import { EMBEDDING_DIMENSIONS, OPENAI_MODELS } from "../lib/openai";
 
 const supabase = createClient(
 	process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,8 +47,9 @@ const PROBES: Array<{ q: string; expect: string }> = [
 let passed = 0;
 for (const probe of PROBES) {
 	const { data: embData } = await openai.embeddings.create({
-		model: "text-embedding-3-small",
+		model: OPENAI_MODELS.embedding,
 		input: probe.q,
+		dimensions: EMBEDDING_DIMENSIONS,
 	});
 	const embedding = embData[0]!.embedding;
 	const { data: matches, error } = await supabase.rpc("match_regdoc_chunks", {

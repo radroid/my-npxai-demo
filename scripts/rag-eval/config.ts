@@ -13,8 +13,13 @@
 //   EVAL_BYPASS_KEY    rate-limit/circuit-breaker bypass header value
 //                      (lib/guard.ts) — required for server experiments
 
+import { EMBEDDING_DIMENSIONS, OPENAI_MODELS } from "../../lib/openai";
+
 export const ANSWERER_MODEL = "gpt-4o-mini"; // lib/openai.ts OPENAI_MODELS.chat
-export const EMBEDDING_MODEL = "text-embedding-3-small";
+// Mirror lib/openai.ts so the eval framework embeds in the SAME space as
+// production retrieval — model AND dimensions (text-embedding-3-large @ 3072).
+export const EMBEDDING_MODEL = OPENAI_MODELS.embedding;
+export { EMBEDDING_DIMENSIONS };
 export const DEFAULT_JUDGE_MODEL = "gpt-4o";
 
 export function judgeModel(): string {
@@ -31,7 +36,7 @@ export function baseUrl(): string {
 }
 
 // USD per MILLION tokens. Source: https://platform.openai.com/pricing,
-// retrieved 2026-07-13. Update the date when you touch a number.
+// retrieved 2026-07-14. Update the date when you touch a number.
 export const PRICES_USD_PER_MTOK: Record<
 	string,
 	{ input: number; output: number }
@@ -39,6 +44,7 @@ export const PRICES_USD_PER_MTOK: Record<
 	"gpt-4o": { input: 2.5, output: 10 },
 	"gpt-4o-mini": { input: 0.15, output: 0.6 },
 	"text-embedding-3-small": { input: 0.02, output: 0 },
+	"text-embedding-3-large": { input: 0.13, output: 0 },
 };
 
 // Committed datasets (I2.6 — same evals/ convention as knowledge-hub.jsonl).

@@ -14,7 +14,7 @@
 
 import OpenAI from "openai";
 import { countTokens } from "./answer";
-import { EMBEDDING_MODEL } from "./config";
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "./config";
 import type { CostAccountant, CostKind } from "./cost";
 
 // PR #8 fix round 1 (issue 4a): every call site below RESERVES its projected
@@ -114,6 +114,7 @@ export async function embedTexts(
 	const resp = await client.embeddings.create({
 		model: EMBEDDING_MODEL,
 		input: texts,
+		dimensions: EMBEDDING_DIMENSIONS,
 	});
 	cost.record({
 		kind: "embeddings",
