@@ -30,7 +30,8 @@ import {
 	MATCH_COUNT,
 	MIN_CHUNK_SIM,
 	type RetrievalTrace,
-	deriveEnvelopeAtK,
+	envelopeIdsAtK,
+	postFilterRankedIdsFromTrace,
 	retrieveChunks,
 } from "../../lib/retrieval";
 import { KNOWLEDGE_HUB_SYSTEM, PROMPT_VERSION } from "../../lib/prompts";
@@ -84,19 +85,19 @@ import {
 	judgeRelevancyQuestions,
 } from "./judge";
 import {
+	RETRIEVAL_METRIC_STAGE,
 	type RouteBranch,
 	clamp01,
 	classifyBranch,
-	contextPrecisionAtK,
-	contextRecallAtK,
 	cosineSimilarity,
-	hitRateAtK,
 	jaccard,
+	kSweepExclusion,
 	mean,
 	normalizeText,
 	reciprocalRank,
+	scoreEnvelopeAtK,
 	scoreRejection,
-	similarityRankedIdsFromTrace,
+	scoreRetrievalStages,
 	totalAgreement,
 } from "./metrics";
 import { embedTexts, getEvalOpenAI, meteredOpenAI } from "./openai";
@@ -596,23 +597,31 @@ async function main(): Promise<void> {
 	 * REAL route. Generation metrics are judged against the FULL chunk text
 	 * pulled from the DB (the frame's snippet is truncated at 260 chars).
 	 *
-	 * PR #8 fix round 1 (issue 7). Retrieval metrics NO LONGER come from the
-	 * `data-sources` frame:
-	 *   (a) That frame's order is the DIVERSITY-REORDERED envelope
-	 *       (selectDiverseEnvelope), not similarity rank — so computing MRR and
-	 *       context precision positionally over it scored a list that was never
-	 *       ranked. Rank-sensitive metrics now come from the true
-	 *       similarity-ranked pool via the additive RetrievalTrace seam
-	 *       (`withTrace`), which exists precisely for this. The traced retrieval
-	 *       is offline (no-op recordUsage → never touches the production daily
-	 *       cap) and deterministic given the same query, so it reproduces the
-	 *       pool the server just ranked.
-	 *   (b) On the OOS branch the route emits NO data-sources frame while
-	 *       retrieval still ran; `sources === null` used to become `rankedIds =
-	 *       []`, which scored hit-rate/recall as a silent 0. The pipeline never
-	 *       fed the model an envelope there, so retrieval quality is NOT
-	 *       MEASURABLE for that item: it is EXCLUDED (null) and counted, never
-	 *       scored 0. Silent zeros are as dishonest as silent ones.
+	 * PR #8 fix round 1 (issue 7b) + fix round 2 (issue 2): every retrieval metric
+	 * reads the STAGE its definition requires, and says which one.
+	 *
+	 *   hit rate@8 / context recall@8 / context precision CP@8  →  ENVELOPE.
+	 *     RAGAS scores these over `retrieved_contexts` — the window handed to the
+	 *     generator. Ours is the envelope, and the `data-sources` frame IS that
+	 *     envelope in prompt order (route.ts builds the frame from the same array
+	 *     it passes to buildContextEnvelope). Round 1 moved them onto the trace's
+	 *     candidate POOL, which is the unfiltered match_regdoc_chunks output — a
+	 *     superset production never shows the model. Scoring "did the model get
+	 *     the gold chunk?" against chunks the model never saw answers a different
+	 *     question than the one the row claims to answer.
+	 *
+	 *   MRR  →  POST-FILTER SIMILARITY-RANKED POOL.
+	 *     A rank metric needs a genuine ranking (round 1 was right: the envelope
+	 *     is diversity-reordered and named-doc-boosted, so it is not one). But the
+	 *     honest denominator is the pool production could actually surface: chunks
+	 *     below MIN_CHUNK_SIM are ineligible, so ranking them credits the
+	 *     retriever with a rank the pipeline discards.
+	 *
+	 * Exclusions, always counted and never a silent 0 or 1: on the OOS/guard
+	 * branch the route emits NO envelope and NO eligible pool — retrieval quality
+	 * is NOT MEASURABLE there, so it is null (not 0). An item with no gold chunks
+	 * is excluded too (empty denominator). Silent zeros are as dishonest as
+	 * silent ones.
 	 */
 	async function runBaseline(): Promise<void> {
 		for (const [i, rec] of golden.entries()) {
@@ -621,12 +630,16 @@ async function main(): Promise<void> {
 			await chargeAnswer(supabase, cost, answer, rec.question, `baseline:${rec.question_id}`);
 
 			const sources = sourcesOf(answer);
-			// The envelope the LLM actually saw (frame order — NOT a ranking).
+			// STAGE: envelope. The `data-sources` frame is built from the very array
+			// the route hands to buildContextEnvelope (route.ts), so its ORDER is the
+			// prompt order the model reads. It is production truth for this stage —
+			// no re-derivation, no drift.
 			const envelopeIds = sources.map((s) => s.id);
 			const goldIds = new Set(rec.gold_chunks.map((g) => g.chunk_id));
 			const fallback = fallbackTaken(answer);
 
-			// True similarity-ranked pool for the rank-sensitive metrics (7a).
+			// The trace supplies the stages the SSE frame cannot: the raw candidate
+			// pool and the MIN_CHUNK_SIM-eligible ranked pool (fix round 2, issue 2).
 			let trace: RetrievalTrace | null = null;
 			let traceError: string | null = null;
 			try {
@@ -641,32 +654,38 @@ async function main(): Promise<void> {
 				if (capped) throw capped;
 				traceError = (err as Error).message;
 			}
-			// The only genuinely RANKED list in the pipeline (see metrics.ts).
-			const similarityRankedIds = trace
-				? similarityRankedIdsFromTrace(trace)
-				: [];
+			// The stage each metric scores is decided INSIDE scoreRetrievalStages —
+			// a pure, unit-tested function — so this call site cannot wire a metric to
+			// the wrong pool (issue 2). It hands over the SERVED envelope (production
+			// truth) and the trace (the only source of the pool stages) and gets back
+			// stage-correct scores plus a reason for every exclusion.
+			const retrievalMetrics = scoreRetrievalStages({
+				goldIds,
+				k: PRODUCTION_K,
+				servedEnvelopeIds: answer.sources === null ? null : envelopeIds,
+				trace,
+				traceError,
+			});
+			const { envelopeExcludedReason, mrrExcludedReason } = retrievalMetrics;
+			const envelopeMeasurable = envelopeExcludedReason === null;
+			const mrrMeasurable = mrrExcludedReason === null;
 
-			// (7b) Exclusion, made explicit and counted rather than scored 0.
-			const retrievalExcludedReason =
-				answer.sources === null
-					? "no_envelope_emitted:oos_or_guard_branch"
-					: trace === null
-						? `no_trace:${traceError ?? "unknown"}`
-						: null;
-			const measurable = retrievalExcludedReason === null;
-			const retrievalMetrics = measurable
-				? {
-						hit_rate_at_k: hitRateAtK(similarityRankedIds, goldIds, PRODUCTION_K),
-						reciprocal_rank: reciprocalRank(similarityRankedIds, goldIds),
-						context_recall_at_k: contextRecallAtK(similarityRankedIds, goldIds, PRODUCTION_K),
-						context_precision_at_k: contextPrecisionAtK(similarityRankedIds, goldIds, PRODUCTION_K),
-					}
-				: {
-						hit_rate_at_k: null,
-						reciprocal_rank: null,
-						context_recall_at_k: null,
-						context_precision_at_k: null,
-					};
+			// Logged for diagnosis; no reported metric scores the raw pool.
+			const postFilterRankedIds = trace
+				? postFilterRankedIdsFromTrace(trace)
+				: [];
+			const rawRankedIds = trace ? trace.stages.rawRankedIds : [];
+
+			// Integrity canary: the offline trace must reproduce the envelope the
+			// SERVER actually served, or the pool-stage metric above is describing a
+			// different retrieval than the one that produced this answer.
+			const traceEnvelopeAgrees =
+				trace === null || answer.sources === null
+					? null
+					: JSON.stringify(envelopeIdsAtK(trace, PRODUCTION_K)) ===
+							JSON.stringify(envelopeIds)
+						? 1
+						: 0;
 
 			// Judged metrics need the full text of the chunks the LLM actually saw.
 			const corpus = await fetchChunksByIds(supabase, envelopeIds);
@@ -728,20 +747,34 @@ async function main(): Promise<void> {
 				latency_ms: answer.latencyMs,
 				fallback_taken: fallback,
 				gold_chunk_ids: Array.from(goldIds),
-				// What the LLM saw (frame order) vs what the retriever ranked.
 				retrieved: sources,
-				envelope_ids: envelopeIds,
-				similarity_ranked_ids: similarityRankedIds,
-				retrieval_metric_source: measurable
-					? "retrieval_trace:similarity_rank"
-					: "excluded",
-				retrieval_excluded_reason: retrievalExcludedReason,
+				// The THREE stages, logged distinctly (issue 2). Each reported metric
+				// names the one it scores; nothing is scored against a list the
+				// pipeline never surfaced.
+				stages: {
+					envelope_ids: envelopeIds,
+					post_filter_ranked_ids: postFilterRankedIds,
+					raw_ranked_ids: rawRankedIds,
+				},
+				retrieval_metric_stage: RETRIEVAL_METRIC_STAGE,
+				retrieval_excluded_reason: envelopeExcludedReason,
+				mrr_excluded_reason: mrrExcludedReason,
+				// Does the offline trace reproduce the envelope the SERVER served? If
+				// not, the pool-stage metric is describing a different retrieval than
+				// the one that produced this answer — and the report must say so.
+				trace_envelope_agrees: traceEnvelopeAgrees,
 				answer: answer.text,
 				citations: extractCitations(answer.text),
 				metrics: {
-					// null (EXCLUDED, not 0) when the route emitted no envelope — 7b.
-					...retrievalMetrics,
-					retrieval_measurable: measurable ? 1 : 0,
+					// null (EXCLUDED, not 0) when the stage this metric scores does not
+					// exist for the item — round 1 issue 7b, round 2 issue 2.
+					hit_rate_at_k: retrievalMetrics.hit_rate_at_k,
+					context_recall_at_k: retrievalMetrics.context_recall_at_k,
+					context_precision_at_k: retrievalMetrics.context_precision_at_k,
+					reciprocal_rank: retrievalMetrics.reciprocal_rank,
+					retrieval_measurable: envelopeMeasurable ? 1 : 0,
+					mrr_measurable: mrrMeasurable ? 1 : 0,
+					trace_envelope_agrees: traceEnvelopeAgrees,
 					faithfulness: faith.value?.score ?? null,
 					faithfulness_no_claims: faith.value?.noClaims ?? null,
 					// null (EXCLUDED, not 1.0) when the answer cites NOTHING — issue 1.
@@ -767,7 +800,8 @@ async function main(): Promise<void> {
 			});
 			console.log(
 				`[${i + 1}/${golden.length}] ${rec.question_id} ` +
-					`hit@8=${retrievalMetrics.hit_rate_at_k ?? `excluded(${retrievalExcludedReason})`} ` +
+					`hit@8=${retrievalMetrics.hit_rate_at_k ?? `excluded(${envelopeExcludedReason})`} ` +
+					`mrr=${retrievalMetrics.reciprocal_rank?.toFixed(2) ?? `excluded(${mrrExcludedReason})`} ` +
 					`cite=${validity.total === 0 ? "NONE" : `${validity.valid}/${validity.total}`} ` +
 					`faith=${faith.value?.score?.toFixed(2) ?? "n/a"} $${cost.totalUsd().toFixed(4)}`,
 			);
@@ -790,18 +824,43 @@ async function main(): Promise<void> {
 			);
 			const trace = res.trace as RetrievalTrace;
 			const goldIds = new Set(rec.gold_chunks.map((g) => g.chunk_id));
+
+			// Fix round 2 (issue 2), ksweep semantics re-verified. The sweep scores
+			// the ENVELOPE the route would select at each k — that selection IS what
+			// the sweep is about. Two exclusions, both counted:
+			//
+			//  - OOS items. The gate fires on the RAW pool's top-1 and is therefore
+			//    k-INDEPENDENT: at every k the route refuses and builds NO envelope.
+			//    deriveEnvelopeAtK still hands back the full ranked pool there
+			//    (it mirrors retrieveChunks' return value, which the route discards),
+			//    so the old code sliced that pool to k and could score hit@k = 1 for
+			//    a question production actually REFUSED. That is a flattering number
+			//    for a pool nobody was shown. Excluded, with a reason — and excluding
+			//    them keeps the denominator CONSTANT across k, without which the
+			//    across-k comparison the sweep exists for is not even well-formed.
+			//  - Items with no gold chunk: the |gold| denominator is empty.
+			const excludedReason = kSweepExclusion(trace, goldIds);
+			const measurable = excludedReason === null;
+
 			const perK: Record<string, unknown> = {};
 			for (const k of K_SWEEP) {
-				const env = deriveEnvelopeAtK(trace, k);
-				const ids = env.map((c) => c.id).slice(0, k);
-				perK[`k${k}`] = {
-					retrieved_ids: ids,
-					hit_rate: hitRateAtK(ids, goldIds, k),
-					reciprocal_rank: reciprocalRank(ids, goldIds),
-					context_recall: contextRecallAtK(ids, goldIds, k),
-					context_precision: contextPrecisionAtK(ids, goldIds, k),
-				};
+				// STAGE: envelope@k — decided inside scoreEnvelopeAtK, which reads
+				// envelopeIdsAtK ([] on the OOS branch), never deriveEnvelopeAtK.
+				perK[`k${k}`] = scoreEnvelopeAtK({
+					trace,
+					goldIds,
+					k,
+					excludedReason,
+				});
 			}
+
+			// MRR is k-INDEPENDENT: it ranks the post-filter candidate pool, which the
+			// envelope size does not change. Reporting it inside the per-k block (as
+			// the old code did, over the k-truncated envelope) implied a k-sensitivity
+			// the metric does not have. It gets one item-level value, stage-named.
+			const postFilterRankedIds = postFilterRankedIdsFromTrace(trace);
+			const mrrMeasurable = measurable && postFilterRankedIds.length > 0;
+
 			runLog.append({
 				experiment: "ksweep",
 				question_id: rec.question_id,
@@ -815,6 +874,12 @@ async function main(): Promise<void> {
 				decision: trace.decision,
 				top_sim: trace.topSim,
 				expansions: trace.expansions,
+				stages: {
+					post_filter_ranked_ids: postFilterRankedIds,
+					raw_ranked_ids: trace.stages.rawRankedIds,
+				},
+				retrieval_metric_stage: RETRIEVAL_METRIC_STAGE,
+				ksweep_excluded_reason: excludedReason,
 				pool: trace.pool.map((e) => ({
 					id: e.chunk.id,
 					regdoc_id: e.chunk.regdoc_id,
@@ -826,12 +891,24 @@ async function main(): Promise<void> {
 					rank_post_boost: e.rankPostBoost,
 				})),
 				k_sweep: perK,
+				metrics: {
+					// STAGE: post_filter_pool. k-independent by construction.
+					reciprocal_rank: mrrMeasurable
+						? reciprocalRank(postFilterRankedIds, goldIds)
+						: null,
+					ksweep_measurable: measurable ? 1 : 0,
+				},
 				timestamp: new Date().toISOString(),
 				cost_so_far_usd: cost.totalUsd(),
 			});
 			console.log(
 				`[${i + 1}/${golden.length}] ${rec.question_id} ` +
-					K_SWEEP.map((k) => `hit@${k}=${(perK[`k${k}`] as { hit_rate: number }).hit_rate}`).join(" ") +
+					(measurable
+						? K_SWEEP.map(
+								(k) =>
+									`hit@${k}=${(perK[`k${k}`] as { hit_rate: number }).hit_rate}`,
+							).join(" ")
+						: `EXCLUDED(${excludedReason})`) +
 					` $${cost.totalUsd().toFixed(4)}`,
 			);
 		}

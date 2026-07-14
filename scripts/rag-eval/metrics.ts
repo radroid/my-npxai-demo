@@ -15,6 +15,11 @@ import {
 	isLowConfidenceText,
 	isRefusalText,
 } from "../../lib/prompts";
+import {
+	type RetrievalTrace,
+	envelopeIdsAtK,
+	postFilterRankedIdsFromTrace,
+} from "../../lib/retrieval";
 import { extractCitations } from "./citations";
 
 // ---------------------------------------------------------------------------
@@ -38,17 +43,61 @@ export function reciprocalRank(
 	return idx === -1 ? 0 : 1 / (idx + 1);
 }
 
+// ---------------------------------------------------------------------------
+// 1b. WHICH STAGE does a retrieval metric score? (PR #8 fix round 2, issue 2)
+//
+// Fix round 1 was right that the `data-sources` frame is not a RANKING, and
+// moved the rank-sensitive metrics onto lib/retrieval's `RetrievalTrace`. But it
+// then scored them over `trace.pool` — the UNFILTERED merged candidate list out
+// of match_regdoc_chunks. That is a SUPERSET production never surfaces: a
+// context-precision or MRR number computed over it does not describe the shipped
+// pipeline. A metric that reports a number for a pool nobody was ever shown is
+// exactly the failure mode this item exists to prevent.
+//
+// So every retrieval metric now names the stage its DEFINITION requires, and the
+// report prints that stage in the row label. No metric may silently pick
+// whichever list flatters it.
+export type RetrievalStageId = "raw_pool" | "post_filter_pool" | "envelope";
+
+export const RETRIEVAL_STAGE_LABELS: Record<RetrievalStageId, string> = {
+	// Diagnostic only. NO reported metric scores this — production never shows it.
+	raw_pool:
+		"raw candidate pool (pre-filter, pre-boost) — never shown to the LLM; diagnostic only",
+	// MRR: a rank metric needs a genuine ranking, restricted to what could
+	// actually be surfaced. Chunks below MIN_CHUNK_SIM are ineligible, so ranking
+	// them would credit the retriever with a rank production discards.
+	post_filter_pool:
+		"post-MIN_CHUNK_SIM similarity-ranked pool — the candidates production could actually surface",
+	// hit rate / context recall / context precision: RAGAS scores these over
+	// `retrieved_contexts`, i.e. the window handed to the generator. Ours is the
+	// envelope, in prompt order — the order the model reads, and the order whose
+	// noise causes the generation errors context precision exists to measure.
+	envelope:
+		"envelope the LLM was shown (RAGAS retrieved_contexts), in prompt order",
+};
+
+/** Which stage each reported retrieval metric scores. The report prints these. */
+export const RETRIEVAL_METRIC_STAGE = {
+	hit_rate_at_k: "envelope",
+	context_recall_at_k: "envelope",
+	context_precision_at_k: "envelope",
+	reciprocal_rank: "post_filter_pool",
+} as const satisfies Record<string, RetrievalStageId>;
+
 /**
- * The TRUE cosine-similarity ranking of the retrieval candidate pool.
+ * The RAW (pre-filter, pre-boost) cosine-similarity order of the candidate pool.
  *
- * PR #8 fix round 1 (issue 7a). MRR and context precision are POSITIONAL — they
- * are only meaningful over a genuinely RANKED list. The `data-sources` frame the
- * eval used to read is the DIVERSITY-REORDERED envelope (selectDiverseEnvelope
- * seeds it with the top chunk of each mentioned doc), and the named-doc boost
- * reorders it again — so scoring rank-sensitive metrics over it scored a list
- * that was never a ranking. `rankPreBoost` is each chunk's position in the raw
- * pool sorted by cosine similarity: the only true ranking in the pipeline. Takes
- * the trace's pool (post-boost order) and restores similarity order.
+ * PR #8 fix round 1 (issue 7a) introduced this because the trace's `pool` arrives
+ * in POST-boost order: `rankPreBoost` is each chunk's position in the raw pool
+ * sorted by cosine similarity, and a named-doc boost can lift a chunk to the
+ * front of the pool while its similarity rank is 4th — score positionally over
+ * the pool's own order and you credit a rank the retriever never gave it.
+ *
+ * PR #8 fix round 2 (issue 2): it is NO LONGER what MRR reads. The raw pool is
+ * unfiltered — it contains chunks below MIN_CHUNK_SIM that production can never
+ * surface. MRR now reads `postFilterRankedIdsFromTrace`. This function survives
+ * as the definition of the `raw_pool` stage (diagnostic, and the invariant that
+ * pins `trace.stages.rawRankedIds` to genuine cosine order — see the self-test).
  */
 export function similarityRankedIdsFromTrace(trace: {
 	pool: Array<{ chunk: { id: number }; rankPreBoost: number }>;
@@ -57,6 +106,136 @@ export function similarityRankedIdsFromTrace(trace: {
 		.slice()
 		.sort((a, b) => a.rankPreBoost - b.rankPreBoost)
 		.map((e) => e.chunk.id);
+}
+
+// ---------------------------------------------------------------------------
+// 1c. The stage-correct retrieval scorers (PR #8 fix round 2, issue 2).
+//
+// These take the TRACE and the SERVED envelope and pick the stage themselves, so
+// a caller CANNOT wire a metric to the wrong pool. The stage choice is the thing
+// that was wrong; putting it behind a pure, unit-tested function makes the wrong
+// thing impossible rather than merely asserted. run.ts calls these; the self-test
+// drives them directly with fixtures.
+
+export interface RetrievalStageScores {
+	/** STAGE: envelope (RAGAS retrieved_contexts). null = EXCLUDED, never 0. */
+	hit_rate_at_k: number | null;
+	context_recall_at_k: number | null;
+	context_precision_at_k: number | null;
+	/** STAGE: post-filter similarity-ranked pool. null = EXCLUDED, never 0. */
+	reciprocal_rank: number | null;
+	envelopeExcludedReason: string | null;
+	mrrExcludedReason: string | null;
+}
+
+/**
+ * Baseline retrieval scoring, one stage per metric.
+ *
+ *  - hit rate / context recall / context precision score the ENVELOPE the LLM was
+ *    actually shown (`servedEnvelopeIds` — the data-sources frame, which route.ts
+ *    builds from the very array it hands buildContextEnvelope, so its order IS
+ *    the prompt order). That is RAGAS's `retrieved_contexts`.
+ *  - MRR ranks the POST-FILTER pool from the trace: the candidates production
+ *    could actually surface. The RAW pool would credit the retriever with ranks
+ *    for chunks MIN_CHUNK_SIM discards and the model never sees.
+ *
+ * Every unmeasurable case is EXCLUDED with a reason — never a silent 0 (which
+ * would deflate) and never a silent 1 (which would flatter).
+ */
+export function scoreRetrievalStages(args: {
+	goldIds: Set<number>;
+	k: number;
+	/** The served data-sources frame ids, or null when the route emitted no frame. */
+	servedEnvelopeIds: number[] | null;
+	/** The offline retrieval trace, or null when it could not be captured. */
+	trace: RetrievalTrace | null;
+	traceError?: string | null;
+}): RetrievalStageScores {
+	const { goldIds, k } = args;
+	const noGold = goldIds.size === 0;
+
+	const envelopeExcludedReason = noGold
+		? "no_gold_chunks:denominator_is_empty"
+		: args.servedEnvelopeIds === null
+			? "no_envelope_emitted:oos_or_guard_branch"
+			: args.servedEnvelopeIds.length === 0
+				? "empty_envelope:nothing_surfaced"
+				: null;
+
+	// The pool stage is EMPTY on the OOS branch — a different condition from the
+	// envelope's, so it carries its own reason rather than borrowing one.
+	const pool = args.trace ? postFilterRankedIdsFromTrace(args.trace) : null;
+	const mrrExcludedReason = noGold
+		? "no_gold_chunks:denominator_is_empty"
+		: pool === null
+			? `no_trace:${args.traceError ?? "unknown"}`
+			: pool.length === 0
+				? "oos_gate:no_eligible_pool"
+				: null;
+
+	const env = args.servedEnvelopeIds ?? [];
+	return {
+		hit_rate_at_k:
+			envelopeExcludedReason === null ? hitRateAtK(env, goldIds, k) : null,
+		context_recall_at_k:
+			envelopeExcludedReason === null ? contextRecallAtK(env, goldIds, k) : null,
+		context_precision_at_k:
+			envelopeExcludedReason === null
+				? contextPrecisionAtK(env, goldIds, k)
+				: null,
+		reciprocal_rank:
+			mrrExcludedReason === null ? reciprocalRank(pool ?? [], goldIds) : null,
+		envelopeExcludedReason,
+		mrrExcludedReason,
+	};
+}
+
+export interface KSweepStageScores {
+	stage: RetrievalStageId;
+	retrieved_ids: number[];
+	hit_rate: number | null;
+	context_recall: number | null;
+	context_precision: number | null;
+}
+
+/**
+ * K-sweep scoring at one k — always the ENVELOPE stage, because the envelope
+ * selection at k IS what the sweep measures.
+ *
+ * `envelopeIdsAtK` returns [] on the OOS branch, where the route refuses and
+ * builds no envelope at ANY k (the gate fires on the raw pool's top-1 and is
+ * k-independent). `deriveEnvelopeAtK` — which mirrors retrieveChunks' RETURN
+ * value, and that value is the full ranked pool there — must NOT be used: slicing
+ * that pool to k would report a hit rate for chunks the pipeline explicitly
+ * declined to show anyone, and would vary the denominator across k, which alone
+ * makes the across-k comparison the sweep exists for ill-formed.
+ */
+export function scoreEnvelopeAtK(args: {
+	trace: RetrievalTrace;
+	goldIds: Set<number>;
+	k: number;
+	/** Set when the item is excluded outright (OOS gate, no gold chunk). */
+	excludedReason: string | null;
+}): KSweepStageScores {
+	const ids = envelopeIdsAtK(args.trace, args.k);
+	const ok = args.excludedReason === null;
+	return {
+		stage: "envelope",
+		retrieved_ids: ids,
+		hit_rate: ok ? hitRateAtK(ids, args.goldIds, args.k) : null,
+		context_recall: ok ? contextRecallAtK(ids, args.goldIds, args.k) : null,
+		context_precision: ok ? contextPrecisionAtK(ids, args.goldIds, args.k) : null,
+	};
+}
+
+/** Why this item is unscoreable in the k-sweep (null = scoreable). */
+export function kSweepExclusion(
+	trace: RetrievalTrace,
+	goldIds: Set<number>,
+): string | null {
+	if (goldIds.size === 0) return "no_gold_chunks:denominator_is_empty";
+	if (trace.decision === "oos") return "oos_gate:no_envelope_at_any_k";
+	return null;
 }
 
 /** ID-based context recall: |gold ∩ retrieved@k| / |gold|. */

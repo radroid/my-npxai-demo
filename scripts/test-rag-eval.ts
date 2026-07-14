@@ -30,6 +30,8 @@ import {
 	RetrievalError,
 	deriveEnvelopeAtK,
 	embeddingInputsFor,
+	envelopeIdsAtK,
+	postFilterRankedIdsFromTrace,
 	retrieveChunks,
 } from "../lib/retrieval";
 import {
@@ -84,6 +86,7 @@ import {
 import { type JudgeDeps, judgeFaithfulness, judged } from "./rag-eval/judge";
 import {
 	REFUSAL_BRANCHES,
+	RETRIEVAL_METRIC_STAGE,
 	clamp01,
 	classifyBranch,
 	contextPrecisionAtK,
@@ -92,10 +95,13 @@ import {
 	disagreeingPairs,
 	hitRateAtK,
 	jaccard,
+	kSweepExclusion,
 	mean,
 	normalizeText,
 	reciprocalRank,
+	scoreEnvelopeAtK,
 	scoreRejection,
+	scoreRetrievalStages,
 	similarityRankedIdsFromTrace,
 	totalAgreement,
 } from "./rag-eval/metrics";
@@ -658,14 +664,16 @@ const baselineRun = {
 const reportRows = rowsFor(baselineRun);
 const row = (c: string): Row => reportRows.find((r) => r.category === c) as Row;
 
-const hitRow = row("Retrieval quality (hit rate@8)");
+const HIT_ROW = "Retrieval quality — hit rate@8 [stage: envelope shown to the LLM]";
+const MRR_ROW = "Retrieval quality — MRR [stage: post-filter similarity-ranked pool]";
+const hitRow = row(HIT_ROW);
 check(
 	"hit rate@8 = 100% over n=1 — the OOS item is EXCLUDED, not scored 0",
 	hitRow.measured === "100.0%" && hitRow.n === "1" && hitRow.excluded.startsWith("1 —"),
 	hitRow,
 );
-check("…and the exclusion states WHY, in the table itself", hitRow.excluded.includes("no envelope"), hitRow.excluded);
-const mrrRow = row("Retrieval quality (MRR)");
+check("…and the exclusion states WHY, in the table itself", hitRow.excluded.includes("NO envelope"), hitRow.excluded);
+const mrrRow = row(MRR_ROW);
 check("MRR excludes the OOS item too (rank-sensitive metrics need a ranking)", mrrRow.n === "1" && mrrRow.excluded.startsWith("1 —"));
 
 const validRow = row("Citation validity (deterministic)");
@@ -741,11 +749,11 @@ check(
 	reciprocalRank(similarityRankedIdsFromTrace(boostedPool), new Set([44])) === 1 / 4 &&
 		reciprocalRank(boostedPool.pool.map((e) => e.chunk.id), new Set([44])) === 1,
 );
-check(
-	"run.ts computes rank-sensitive baseline metrics from the retrieval TRACE, not the SSE frame",
-	readSrc("scripts/rag-eval/run.ts").includes("similarityRankedIdsFromTrace(trace)") &&
-		readSrc("scripts/rag-eval/run.ts").includes("hitRateAtK(similarityRankedIds"),
-);
+// NOTE (fix round 2, issue 2): round 1 asserted here that run.ts computed the
+// rank-sensitive baseline metrics from `similarityRankedIdsFromTrace(trace)`.
+// That was only half right — see §18. The trace WAS the correct seam, but that
+// function returns the RAW (pre-filter) pool, which production never surfaces.
+// The stage-discipline assertions now live in §18.
 
 // ---------------------------------------------------------------------------
 section("14. Issue 3 — the answerer cost estimate reflects the REAL prompt");
@@ -1092,6 +1100,241 @@ check(
 	"a GENERATOR verdict (stable inputs, no model output in the key) DOES hit on re-run — the cache's real value",
 	!g1.cached && g2.cached && chatCalls === 1,
 	{ chatCalls, g2cached: g2.cached },
+);
+
+// ===========================================================================
+// PR #8 FIX ROUND 2 — regression tests.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+section("18. Issue 2 — each retrieval metric scores the STAGE its definition requires");
+
+// The bug: round 1 moved the rank-sensitive metrics onto the RetrievalTrace seam
+// (right), then scored them over `trace.pool` — the UNFILTERED merged candidate
+// list out of match_regdoc_chunks (wrong). That pool is a SUPERSET production
+// never surfaces: it still contains chunks below MIN_CHUNK_SIM, which the route
+// filters out and the model never sees. A hit rate / MRR / CP number over it does
+// not describe the shipped pipeline.
+//
+// Build a pool where the gold chunk sits BELOW MIN_CHUNK_SIM — production can
+// never show it, so every honest metric must say "we did not retrieve it".
+const belowFilterPool = [
+	makeChunk(1, 0.72),
+	makeChunk(2, 0.55),
+	// gold, but at 0.30 < MIN_CHUNK_SIM (0.35) → filtered out by production.
+	makeChunk(999, 0.3),
+	makeChunk(3, 0.28),
+];
+const belowFilterSupabase = {
+	rpc: async () => ({ data: belowFilterPool, error: null }),
+} as unknown as RetrievalDeps["supabase"];
+const bf = await retrieveChunks(
+	"a question whose gold chunk embeds weakly",
+	{
+		supabase: belowFilterSupabase,
+		openai: meteredOpenAI(fakeOpenAI, new CostAccountant(1), "stage-test"),
+		recordUsage: async () => {},
+	},
+	{ envelopeChunks: 8, withTrace: true },
+);
+const bfTrace = bf.trace as RetrievalTrace;
+const GOLD_BELOW = new Set([999]);
+
+check(
+	"the trace exposes the three stages distinctly (raw / post-filter / envelope)",
+	Array.isArray(bfTrace.stages.rawRankedIds) &&
+		Array.isArray(bfTrace.stages.postFilterRankedIds) &&
+		Array.isArray(bfTrace.stages.envelopeIds),
+);
+check(
+	"raw pool CONTAINS the sub-MIN_CHUNK_SIM gold chunk (production never shows it)",
+	bfTrace.stages.rawRankedIds.includes(999),
+	bfTrace.stages.rawRankedIds,
+);
+check(
+	"post-filter pool DROPS it — MIN_CHUNK_SIM makes it ineligible",
+	!bfTrace.stages.postFilterRankedIds.includes(999),
+	bfTrace.stages.postFilterRankedIds,
+);
+check(
+	"the envelope (what the LLM sees) drops it too",
+	!bfTrace.stages.envelopeIds.includes(999) &&
+		JSON.stringify(bfTrace.stages.envelopeIds) ===
+			JSON.stringify(bf.envelope.map((c) => c.id)),
+);
+// THE BUG, made executable: the raw pool credits a rank production discards.
+check(
+	"scoring MRR over the RAW pool CREDITS a chunk production filtered out (the bug)",
+	reciprocalRank(similarityRankedIdsFromTrace(bfTrace), GOLD_BELOW) === 1 / 3,
+	reciprocalRank(similarityRankedIdsFromTrace(bfTrace), GOLD_BELOW),
+);
+check(
+	"…while MRR over the POST-FILTER pool honestly says 0 — it was never retrievable",
+	reciprocalRank(postFilterRankedIdsFromTrace(bfTrace), GOLD_BELOW) === 0,
+);
+check(
+	"…and hit rate over the ENVELOPE honestly says 0 (the LLM was never shown it)",
+	hitRateAtK(envelopeIdsAtK(bfTrace, 8), GOLD_BELOW, 8) === 0 &&
+		hitRateAtK(similarityRankedIdsFromTrace(bfTrace), GOLD_BELOW, 8) === 1,
+);
+// The raw stage really is cosine order (pins the stage's definition).
+check(
+	"trace.stages.rawRankedIds IS the raw cosine ranking",
+	JSON.stringify(bfTrace.stages.rawRankedIds) ===
+		JSON.stringify(similarityRankedIdsFromTrace(bfTrace)),
+);
+
+// OOS branch: the route refuses and builds NO envelope, but deriveEnvelopeAtK
+// (which mirrors retrieveChunks' RETURN value) still hands back the full ranked
+// pool. Slicing that to k and scoring it prints a hit rate for chunks the
+// pipeline explicitly declined to show anyone.
+const oosTrace = weak.trace as RetrievalTrace;
+const OOS_GOLD = new Set([oosTrace.pool[0].chunk.id]);
+check(
+	"OOS: deriveEnvelopeAtK still returns the pool (it mirrors retrieveChunks' return value)",
+	deriveEnvelopeAtK(oosTrace, 8).length > 0,
+);
+check(
+	"OOS: scoring THAT would report hit@8 = 1 for a question production REFUSED (the bug)",
+	hitRateAtK(
+		deriveEnvelopeAtK(oosTrace, 8).slice(0, 8).map((c) => c.id),
+		OOS_GOLD,
+		8,
+	) === 1,
+);
+check(
+	"OOS: envelopeIdsAtK is EMPTY — the route feeds the LLM nothing at any k",
+	envelopeIdsAtK(oosTrace, 3).length === 0 &&
+		envelopeIdsAtK(oosTrace, 8).length === 0 &&
+		oosTrace.stages.envelopeIds.length === 0,
+);
+check(
+	"OOS: the eligible pool is EMPTY too, so MRR has nothing to rank (excluded, not 0)",
+	postFilterRankedIdsFromTrace(oosTrace).length === 0 &&
+		oosTrace.stages.postFilterRankedIds.length === 0,
+);
+
+// THE SCORERS THEMSELVES. The stage choice is made INSIDE scoreRetrievalStages /
+// scoreEnvelopeAtK — pure functions run.ts delegates to — so a call site cannot
+// wire a metric to the wrong pool. That is deliberate: round 1's fix was pinned
+// only by a source-level string match, and a mutation that swapped the pool while
+// keeping the call shape sailed straight through it. These drive the real
+// functions, so any mutation of the stage choice fails behaviourally.
+const bfServedEnvelope = bfTrace.stages.envelopeIds; // what the route served
+const bfScores = scoreRetrievalStages({
+	goldIds: GOLD_BELOW,
+	k: 8,
+	servedEnvelopeIds: bfServedEnvelope,
+	trace: bfTrace,
+});
+check(
+	"scoreRetrievalStages: MRR = 0 for a gold chunk below MIN_CHUNK_SIM (raw pool would say 1/3)",
+	bfScores.reciprocal_rank === 0 &&
+		reciprocalRank(similarityRankedIdsFromTrace(bfTrace), GOLD_BELOW) === 1 / 3,
+	bfScores,
+);
+check(
+	"scoreRetrievalStages: hit rate / recall / CP = 0 — the LLM was shown no gold chunk",
+	bfScores.hit_rate_at_k === 0 &&
+		bfScores.context_recall_at_k === 0 &&
+		bfScores.context_precision_at_k === 0,
+);
+check(
+	"scoreRetrievalStages: a measurable item carries NO exclusion reason",
+	bfScores.envelopeExcludedReason === null && bfScores.mrrExcludedReason === null,
+);
+// A gold chunk that IS eligible ranks honestly at its post-filter position.
+const eligibleScores = scoreRetrievalStages({
+	goldIds: new Set([2]), // similarity 0.55, post-filter rank 2
+	k: 8,
+	servedEnvelopeIds: bfServedEnvelope,
+	trace: bfTrace,
+});
+check(
+	"scoreRetrievalStages: MRR = 1/2 for a gold chunk at post-filter rank 2",
+	eligibleScores.reciprocal_rank === 0.5 && eligibleScores.hit_rate_at_k === 1,
+	eligibleScores,
+);
+// OOS: both stages vanish, so BOTH exclusions fire — never a 0, never a 1.
+const oosScores = scoreRetrievalStages({
+	goldIds: OOS_GOLD,
+	k: 8,
+	servedEnvelopeIds: null, // the route emitted no data-sources frame
+	trace: oosTrace,
+});
+check(
+	"scoreRetrievalStages: an OOS item EXCLUDES every retrieval metric (never scores 0)",
+	oosScores.hit_rate_at_k === null &&
+		oosScores.context_recall_at_k === null &&
+		oosScores.context_precision_at_k === null &&
+		oosScores.reciprocal_rank === null,
+	oosScores,
+);
+check(
+	"…with a DISTINCT reason per stage (the envelope and the pool vanish for different causes)",
+	oosScores.envelopeExcludedReason === "no_envelope_emitted:oos_or_guard_branch" &&
+		oosScores.mrrExcludedReason === "oos_gate:no_eligible_pool",
+	oosScores,
+);
+// An empty gold set is an empty denominator, not a score.
+const noGoldScores = scoreRetrievalStages({
+	goldIds: new Set<number>(),
+	k: 8,
+	servedEnvelopeIds: bfServedEnvelope,
+	trace: bfTrace,
+});
+check(
+	"scoreRetrievalStages: no gold chunk → EXCLUDED (an empty denominator is not a 0)",
+	noGoldScores.hit_rate_at_k === null &&
+		noGoldScores.context_recall_at_k === null &&
+		noGoldScores.envelopeExcludedReason === "no_gold_chunks:denominator_is_empty",
+);
+
+// K-SWEEP. The OOS gate fires on the raw pool's top-1 and is k-INDEPENDENT, so
+// the route builds no envelope at ANY k. Scoring the pool it refused would print
+// a hit rate for chunks nobody was shown — and would vary the denominator across
+// k, which alone makes the across-k comparison the sweep exists for ill-formed.
+check(
+	"kSweepExclusion flags an OOS item at every k",
+	kSweepExclusion(oosTrace, OOS_GOLD) === "oos_gate:no_envelope_at_any_k",
+);
+check("kSweepExclusion passes a normal item", kSweepExclusion(bfTrace, GOLD_BELOW) === null);
+for (const k of [3, 5, 8, 10]) {
+	const s = scoreEnvelopeAtK({
+		trace: oosTrace,
+		goldIds: OOS_GOLD,
+		k,
+		excludedReason: kSweepExclusion(oosTrace, OOS_GOLD),
+	});
+	check(
+		`ksweep k=${k}: an OOS item is EXCLUDED, not scored 1 against the refused pool`,
+		s.hit_rate === null && s.context_recall === null && s.context_precision === null && s.retrieved_ids.length === 0,
+		s,
+	);
+}
+const sweepOk = scoreEnvelopeAtK({ trace: bfTrace, goldIds: new Set([2]), k: 8, excludedReason: null });
+check(
+	"ksweep: a normal item scores the ENVELOPE at k, and names that stage",
+	sweepOk.stage === "envelope" && sweepOk.hit_rate === 1,
+	sweepOk,
+);
+// And the report names the stage in the row label, so no reader has to guess.
+const stageRows = rowsFor(baselineRun).map((r) => r.category);
+check(
+	"every reported retrieval row NAMES its stage",
+	stageRows.some((c) => c.includes("[stage: envelope shown to the LLM]")) &&
+		stageRows.some((c) => c.includes("[stage: post-filter similarity-ranked pool]")),
+	stageRows,
+);
+check(
+	"no reported row scores the RAW pool (it is diagnostic only)",
+	!stageRows.some((c) => c.toLowerCase().includes("raw")),
+);
+check(
+	"metric→stage map is exported so the item log records which pool each number came from",
+	RETRIEVAL_METRIC_STAGE.reciprocal_rank === "post_filter_pool" &&
+		RETRIEVAL_METRIC_STAGE.hit_rate_at_k === "envelope" &&
+		RETRIEVAL_METRIC_STAGE.context_precision_at_k === "envelope",
 );
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);

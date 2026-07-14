@@ -277,6 +277,75 @@ export interface RetrievalTrace {
 	topSim: number;
 	decision: "oos" | "disclaimer" | "normal";
 	pool: TracePoolEntry[];
+	// ADDITIVE (item-2 PR #8 fix round 2, issue 2).
+	stages: RetrievalStages;
+}
+
+// ADDITIVE (item-2 PR #8 fix round 2, issue 2): the pipeline's three DISTINCT
+// stages, exposed separately so every retrieval metric reads the list its
+// DEFINITION requires — and NAMES it — instead of all of them sharing whichever
+// list is most convenient.
+//
+// Fix round 1 correctly moved the rank-sensitive metrics off the `data-sources`
+// frame (whose order is the diversity-reordered envelope, not a ranking) and
+// onto this trace. But it then scored them over `pool`, which is the UNFILTERED
+// merged candidate list straight out of `match_regdoc_chunks` — a SUPERSET that
+// production never surfaces to the model. A metric computed over a pool the
+// pipeline never showed anyone does not describe the shipped pipeline.
+//
+//   rawRankedIds         The merged candidate pool in raw cosine-similarity
+//                        order, BEFORE the MIN_CHUNK_SIM filter and BEFORE the
+//                        named-doc boost. This is the retriever's unfiltered
+//                        candidate set; production NEVER shows it to the model.
+//                        Diagnostic only — no reported metric scores it.
+//
+//   postFilterRankedIds  The same list with MIN_CHUNK_SIM applied, still in
+//                        cosine order: the chunks that are ELIGIBLE to reach the
+//                        model. This is the honest denominator for a rank metric
+//                        (MRR): a chunk below the filter can never be surfaced,
+//                        so ranking it credits the retriever with a rank
+//                        production discards. EMPTY on the OOS branch — nothing
+//                        is eligible there, the route refuses without an
+//                        envelope.
+//
+//   envelopeIds          What the route ACTUALLY feeds the LLM, in prompt order:
+//                        post-boost, post-filter, doc-diversity selected, trimmed
+//                        to `opts.envelopeChunks`. This is RAGAS's
+//                        `retrieved_contexts` — the window whose noise causes the
+//                        generation errors context precision exists to measure.
+//                        EMPTY on the OOS branch (see envelopeIdsAtK).
+export interface RetrievalStages {
+	rawRankedIds: number[];
+	postFilterRankedIds: number[];
+	envelopeIds: number[];
+}
+
+// ADDITIVE (fix round 2, issue 2): the ids the ROUTE would feed the LLM at
+// envelope size k. EMPTY on the OOS branch, where the route short-circuits with
+// the canonical out-of-scope line and builds NO envelope at all.
+//
+// Deliberately DISTINCT from deriveEnvelopeAtK, which mirrors retrieveChunks'
+// RETURN value — and that value is the full ranked pool on the OOS branch, which
+// the route then discards. Scoring "what the model saw" against that list would
+// credit the pipeline for chunks it refused to show. Use this for any
+// envelope-stage metric; use deriveEnvelopeAtK only to reproduce retrieveChunks.
+export function envelopeIdsAtK(trace: RetrievalTrace, k: number): number[] {
+	if (trace.decision === "oos") return [];
+	return deriveEnvelopeAtK(trace, k)
+		.slice(0, k)
+		.map((c) => c.id);
+}
+
+// ADDITIVE (fix round 2, issue 2): the similarity-ranked, MIN_CHUNK_SIM-eligible
+// pool — the honest denominator for MRR. The trace's `pool` arrives in POST-boost
+// order, so restore cosine order via rankPreBoost before filtering.
+export function postFilterRankedIdsFromTrace(trace: RetrievalTrace): number[] {
+	if (trace.decision === "oos") return [];
+	return trace.pool
+		.slice()
+		.sort((a, b) => a.rankPreBoost - b.rankPreBoost)
+		.filter((e) => e.similarity >= MIN_CHUNK_SIM)
+		.map((e) => e.chunk.id);
 }
 
 // ADDITIVE (item-2 DELTA D1): replay the route's envelope selection at any k
@@ -445,18 +514,18 @@ export async function retrieveChunks(
 		const preBoostRank = new Map<number, number>(
 			rawPool.map((c, i) => [c.id, i + 1]),
 		);
+		const oos = topSim < LOW_SIM_OOS;
 		trace = {
 			query,
 			expansions,
 			mentionedDocs: Array.from(mentionedDocs),
 			mentionedSections,
 			topSim,
-			decision:
-				topSim < LOW_SIM_OOS
-					? "oos"
-					: avgSim < LOW_SIM_DISCLAIMER
-						? "disclaimer"
-						: "normal",
+			decision: oos
+				? "oos"
+				: avgSim < LOW_SIM_DISCLAIMER
+					? "disclaimer"
+					: "normal",
 			pool: ranked.map((c, i) => ({
 				chunk: c,
 				similarity: c.similarity,
@@ -466,6 +535,21 @@ export async function retrieveChunks(
 				rankPreBoost: preBoostRank.get(c.id) ?? 0,
 				rankPostBoost: i + 1,
 			})),
+			// The three stages, each named so a metric can say which one it scores
+			// (fix round 2, issue 2). On the OOS branch the route refuses WITHOUT
+			// building an envelope, so the eligible pool and the envelope are both
+			// EMPTY — even though `chunks` (this function's return value) carries the
+			// full ranked pool there. Reporting that pool as "what was retrieved"
+			// would score a list the pipeline explicitly declined to show anyone.
+			stages: {
+				rawRankedIds: rawPool.map((c) => c.id),
+				postFilterRankedIds: oos
+					? []
+					: rawPool
+							.filter((c) => c.similarity >= MIN_CHUNK_SIM)
+							.map((c) => c.id),
+				envelopeIds: oos ? [] : chunks.map((c) => c.id),
+			},
 		};
 	}
 

@@ -64,18 +64,31 @@ export interface Run {
 // Expected ranges + citations, verbatim from the research doc's
 // §Realistic score expectations table. Do not edit without editing that doc.
 const EXPECTED: Record<string, { range: string; source: string }> = {
-	"Retrieval quality (hit rate@8)": {
+	// Row labels NAME the pipeline stage each metric scores (fix round 2, issue
+	// 2). A retrieval number is meaningless without it: the same question has a
+	// different hit rate over the raw candidate pool, over the eligible
+	// post-filter pool, and over the envelope the model was actually shown.
+	"Retrieval quality — hit rate@8 [stage: envelope shown to the LLM]": {
 		range: "context recall ≥ 0.85 target",
 		source: "OpenAI evaluation best practices",
 	},
-	"Context recall@8": {
+	"Retrieval quality — MRR [stage: post-filter similarity-ranked pool]": {
+		range: "rank of the first gold chunk among production-eligible candidates",
+		source: "IR-book ch.8; OpenAI cookbook",
+	},
+	"Context recall@8 [stage: envelope shown to the LLM]": {
 		range: "≥ 0.85",
 		source: "OpenAI evaluation best practices",
 	},
-	"Context precision (CP@8)": {
+	"Context precision CP@8 [stage: envelope shown to the LLM, prompt order]": {
 		range: "> 0.70",
-		source: "OpenAI evaluation best practices",
+		source: "OpenAI evaluation best practices (RAGAS retrieved_contexts)",
 	},
+	"Trace/server envelope agreement (offline trace reproduces the served envelope)":
+		{
+			range: "1.00 expected — below it, the pool-stage metric describes a different retrieval",
+			source: "integrity check; deterministic",
+		},
 	Faithfulness: {
 		range: "0.85–0.90 good; 0.95–0.98 gate for citation-critical domains",
 		source: "qaskills; legal RAG case study 2026",
@@ -202,15 +215,38 @@ export function rowsFor(run: Run): Row[] {
 
 	switch (run.manifest.experiment) {
 		case "baseline": {
-			// Retrieval quality is computed from the TRUE similarity-ranked pool
-			// (run.ts trace), and is NULL — excluded, never 0 — for items where the
-			// route emitted no envelope (OOS / guard refusal). Issue 7.
+			// Each retrieval row NAMES the stage it scores (issue 2), and is NULL —
+			// excluded, never 0 — where that stage does not exist for the item (OOS /
+			// guard refusal emits no envelope and no eligible pool). Issue 7b.
 			const noEnvelope =
-				"OOS/guard refusal — route emitted no envelope, so retrieval quality is not measurable (never scored 0)";
-			add("Retrieval quality (hit rate@8)", meanDefined(it.map((i) => metric(i, "hit_rate_at_k"))), noEnvelope);
-			add("Retrieval quality (MRR)", meanDefined(it.map((i) => metric(i, "reciprocal_rank"))), noEnvelope);
-			add("Context recall@8", meanDefined(it.map((i) => metric(i, "context_recall_at_k"))), noEnvelope);
-			add("Context precision (CP@8)", meanDefined(it.map((i) => metric(i, "context_precision_at_k"))), noEnvelope);
+				"OOS/guard refusal — the route emitted NO envelope, so what-the-LLM-saw is not measurable (never scored 0); or the item has no gold chunk";
+			const noPool =
+				"OOS gate — no MIN_CHUNK_SIM-eligible candidate pool to rank (never scored 0); or the offline trace failed";
+			add(
+				"Retrieval quality — hit rate@8 [stage: envelope shown to the LLM]",
+				meanDefined(it.map((i) => metric(i, "hit_rate_at_k"))),
+				noEnvelope,
+			);
+			add(
+				"Retrieval quality — MRR [stage: post-filter similarity-ranked pool]",
+				meanDefined(it.map((i) => metric(i, "reciprocal_rank"))),
+				noPool,
+			);
+			add(
+				"Context recall@8 [stage: envelope shown to the LLM]",
+				meanDefined(it.map((i) => metric(i, "context_recall_at_k"))),
+				noEnvelope,
+			);
+			add(
+				"Context precision CP@8 [stage: envelope shown to the LLM, prompt order]",
+				meanDefined(it.map((i) => metric(i, "context_precision_at_k"))),
+				noEnvelope,
+			);
+			add(
+				"Trace/server envelope agreement (offline trace reproduces the served envelope)",
+				meanDefined(it.map((i) => metric(i, "trace_envelope_agrees"))),
+				"no envelope served, or no trace — nothing to compare",
+			);
 			add("Faithfulness", meanDefined(it.map((i) => metric(i, "faithfulness"))), "judge error, or answer made no verifiable claim");
 			add("Answer relevancy", meanDefined(it.map((i) => metric(i, "answer_relevancy"))), "judge error");
 			add(
@@ -259,19 +295,39 @@ export function rowsFor(run: Run): Row[] {
 			break;
 		}
 		case "ksweep": {
+			// Every k row scores the ENVELOPE the route would select at that k —
+			// stage-named (issue 2). OOS items are EXCLUDED at every k: the gate fires
+			// on the raw pool's top-1 and is k-independent, so the route builds no
+			// envelope at any k. Scoring them against the candidate pool the route
+			// refused to surface would print a hit rate for chunks nobody was shown —
+			// and would also vary the denominator across k, which alone would make the
+			// across-k comparison the sweep exists for ill-formed.
+			const oosExcluded =
+				"OOS gate — the route builds NO envelope at any k (k-independent), or the item has no gold chunk";
 			for (const k of [3, 5, 8, 10]) {
 				const at = (key: string) =>
 					meanDefined(
 						it.map((i) => {
-							const sweep = i.k_sweep as Record<string, Record<string, number>> | undefined;
+							const sweep = i.k_sweep as
+								| Record<string, Record<string, number | null>>
+								| undefined;
 							const v = sweep?.[`k${k}`]?.[key];
 							return typeof v === "number" ? v : null;
 						}),
 					);
-				add(`hit rate@${k}`, at("hit_rate"), "no k-sweep block on the item");
-				add(`context recall@${k}`, at("context_recall"), "no k-sweep block on the item");
-				add(`context precision@${k}`, at("context_precision"), "no k-sweep block on the item");
+				add(`hit rate@${k} [stage: envelope@${k}]`, at("hit_rate"), oosExcluded);
+				add(`context recall@${k} [stage: envelope@${k}]`, at("context_recall"), oosExcluded);
+				add(`context precision@${k} [stage: envelope@${k}]`, at("context_precision"), oosExcluded);
 			}
+			// MRR is k-INDEPENDENT — it ranks the post-filter candidate pool, which the
+			// envelope size does not touch. It used to be printed inside the per-k
+			// block over the k-truncated envelope, implying a k-sensitivity the metric
+			// does not have.
+			add(
+				"MRR [stage: post-filter similarity-ranked pool — k-independent]",
+				meanDefined(it.map((i) => metric(i, "reciprocal_rank"))),
+				oosExcluded,
+			);
 			break;
 		}
 		case "consistency": {
@@ -399,13 +455,38 @@ function main(): void {
 	}
 	lines.push("");
 	lines.push(
-		"Ranking note: the `baseline` rank-sensitive metrics (MRR, CP@8) are computed over the TRUE " +
-			"cosine-similarity ranking of the candidate pool, taken from `lib/retrieval.ts`'s " +
-			"`RetrievalTrace` — not over the `data-sources` frame, whose order is the " +
-			"diversity-reordered envelope and is not a ranking at all. The `ksweep` rows are " +
-			"positional over the ENVELOPE the route would select at each k (that selection IS what " +
-			"the sweep is about), so their positions reflect production's envelope order, including " +
-			"the doc-diversity pass.",
+		"**Stage note (read before any retrieval number).** The pipeline has three distinct " +
+			"retrieval stages and the same question scores differently at each, so every retrieval " +
+			"row above names the one it scores:",
+	);
+	lines.push("");
+	lines.push(
+		"- **raw candidate pool** — the unfiltered `match_regdoc_chunks` merge, in cosine order. " +
+			"Production NEVER shows this to the model. **No reported metric scores it**; it is logged " +
+			"per item for diagnosis only.",
+	);
+	lines.push(
+		"- **post-filter similarity-ranked pool** — the same list with `MIN_CHUNK_SIM` applied: the " +
+			"candidates production could actually surface. This is what **MRR** ranks. A rank metric " +
+			"needs a genuine ranking (the envelope is diversity-reordered and named-doc-boosted, so " +
+			"it is not one), but ranking chunks *below* the filter would credit the retriever with a " +
+			"rank the pipeline discards.",
+	);
+	lines.push(
+		"- **envelope** — what the route actually feeds the LLM, in prompt order. This is RAGAS's " +
+			"`retrieved_contexts`, and it is what **hit rate, context recall, and context precision** " +
+			"score. Its noise is the noise that causes generation errors, which is the whole reason " +
+			"context precision exists.",
+	);
+	lines.push("");
+	lines.push(
+		"On the OOS branch the route refuses and builds **no envelope and no eligible pool** — so " +
+			"both stages are empty and every retrieval row EXCLUDES those items (never scores them 0). " +
+			"In the `ksweep` the exclusion also keeps the denominator constant across k, without which " +
+			"comparing k values is not well-formed. The `Trace/server envelope agreement` row is the " +
+			"integrity check that the offline trace supplying the pool stage reproduces the envelope " +
+			"the server actually served; below 1.00, the MRR row is describing a different retrieval " +
+			"than the one that produced the answers.",
 	);
 	lines.push("");
 	lines.push("## Cost appendix");
