@@ -87,6 +87,11 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Raj visual-check on a second device class (regular iPhone / Android) — the outreach audience is 3 people on unknown phones.
 
 ### Phase 11 — Artifact mode + RAG eval framework (opened 2026-07-13)
+
+> 🔴 **Both blockers below gate every real number in the RAG evaluation report.** Full recipes in `docs/orchestration/manual-verification.md`.
+
+- [ ] **Un-pause the Supabase project** (`NPX-demo`, ref `ptepxophdneugvcziqny`). Confirmed via `supabase projects list` that it still exists and is linked — it is paused, not deleted (DNS returns NXDOMAIN, same signature as the 2026-05-14 pause). The CLI has no unpause command, so this needs the dashboard — or export `SUPABASE_ACCESS_TOKEN` in an agent session and the Management API restore endpoint can do it. Until then the eval golden set cannot be generated and the runner refuses to score placeholder data.
+- [ ] **Start the dev server** (`bun dev`, :3001) before the eval battery — the answer harness scores the REAL pipeline over HTTP, and agents are forbidden from starting the server themselves.
 - [ ] Raj live-verify Artifact mode in the browser once merged: toggle to Artifact, ask a complex regulatory question, confirm the generated HTML explainer renders in both light + dark app themes, diagrams display, download works (see `docs/orchestration/manual-verification.md` for the exact recipe).
 - [ ] Raj review the committed RAG evaluation report (scores per category + methodology) and decide whether any score warrants a follow-up hardening phase.
 
