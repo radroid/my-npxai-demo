@@ -308,7 +308,11 @@ check("vanished fingerprint (corpus text changed) = missing → run must abort",
 section("7. Committed datasets");
 
 const probes = readJsonl<OocProbe>(OOC_PROBES_PATH);
-check("OOC probe set has 15–25 probes (spec R4)", probes.length >= 15 && probes.length <= 25, probes.length);
+// Robustness expansion (rag/eval-and-improve): the OOC set was hardened from 23
+// to 37, adding the near-in-scope adversarial classes (in-corpus false premise,
+// fabricated numerics, version/temporal, plausible-absent). Bound widened from
+// the original spec-R4 15–25 to 30–60 to reflect that deliberate growth.
+check("OOC probe set has 30–60 probes (hardened R4)", probes.length >= 30 && probes.length <= 60, probes.length);
 check("every probe expects rejection", probes.every((p) => p.expected === "reject"));
 check("every probe has a unique id", new Set(probes.map((p) => p.probe_id)).size === probes.length);
 check(
@@ -326,7 +330,10 @@ if (isPlaceholderDataset(golden)) {
 	console.log("  note golden set is the committed PLACEHOLDER — regenerate with `bun run eval:rag:golden`");
 	check("placeholder golden set is detectable (the runner refuses to score it)", isPlaceholderDataset(golden));
 } else {
-	check("real golden set has 70–80 records (spec R3)", golden.length >= 70 && golden.length <= 80, golden.length);
+	// Sample bumped from ~76 to ~92 (rag/eval-and-improve) for tighter metric CIs
+	// once the numbers drive model-tuning A/Bs. Bound widened from spec-R3 70–80
+	// to 85–120 to reflect the larger set.
+	check("real golden set has 85–120 records (hardened R3)", golden.length >= 85 && golden.length <= 120, golden.length);
 	check("every record carries ≥ 1 gold chunk with a fingerprint", golden.every((g) => g.gold_chunks.length > 0 && g.gold_chunks.every((c) => !!c.text_sha256)));
 	check("question ids are unique", new Set(golden.map((g) => g.question_id)).size === golden.length);
 }
