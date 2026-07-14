@@ -25,7 +25,7 @@ Pick a station, unit, and shift; generate a turnover report in the structure exp
 | Frontend | Next.js 16 App Router + TypeScript + Tailwind + shadcn/ui | Aligns with the Senior Full Stack Developer stack. |
 | Chat UI | [assistant-ui](https://www.assistant-ui.com) (Thread, ThreadListSidebar, streaming, markdown) | Production-grade chat primitives; citations render as first-class elements. |
 | Backend | Next.js Route Handlers (`app/api/*`) | One repo, one deploy, no CORS, all TypeScript. |
-| LLM | OpenAI `text-embedding-3-small` (1536-dim) + `gpt-4o-mini` | Matches the AI Developer job posting; costs are negligible for demo traffic. |
+| LLM | OpenAI `text-embedding-3-large` (3072-dim, stored as `halfvec`) + `gpt-4o-mini` | Larger embedding measurably improves retrieval (hit@8 95.7%→96.7%, recall@8 82.6%→86.0%); `halfvec` keeps storage flat. Costs negligible for demo traffic. |
 | Vector store | Supabase `pgvector` | Functionally equivalent to Cosmos DB vector search. Free tier, persistent. |
 | Database | Supabase Postgres | Same instance — structured tables for simulated plant data and thread history. |
 | Deploy | Cloudflare Workers via `@opennextjs/cloudflare` | Near-zero cold starts, free tier, single-command deploy. |
@@ -38,7 +38,7 @@ Pick a station, unit, and shift; generate a turnover report in the structure exp
 
 ```
 User question
-  → OpenAI text-embedding-3-small (embed query)
+  → OpenAI text-embedding-3-large (embed query, 3072-dim)
   → Supabase pgvector similarity search (top 8-10 chunks)
   → rerank by relevance
   → system prompt: "You are a CNSC regulatory expert. Answer using
@@ -95,7 +95,7 @@ CREATE TABLE regdoc_chunks (
   chunk_index INTEGER NOT NULL,
   url TEXT,
   requirement_type TEXT,
-  embedding VECTOR(1536),
+  embedding HALFVEC(3072),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX ON regdoc_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
