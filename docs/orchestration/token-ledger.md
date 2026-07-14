@@ -27,6 +27,10 @@ Format: `| date | item | role | PR | verdict/outcome | approx tokens | notes |`
 | 2026-07-13 | item-1 | reviewer (workflow, MISFIRE) | 6 | verdict DISCARDED | 300k | args string-encoding bug → script reviewed its demo fallback claims, not PR #6; re-run with inlined claims |
 | 2026-07-13 | item-1 | reviewer (workflow, 31 agents) | 6 | APPROVE (all 6 claims) + SMELL HIT | 2,446k | run 2 died on Raj's monthly spend limit (19/30 refuters, fail-closed); run 3 resumed from cache; 30 non-blocking findings; smell probe caught unreachable limited-coverage callout |
 | 2026-07-13 | item-1 | fix | 6 | poolAvgSim fix + test harness | ~120k | fix agent died on spend limit post-edits pre-build; orchestrator finished gates+commit; lint/build/test:artifact green |
+| 2026-07-13 | item-1 | executor | 7 | PR open, 3 gates green | 121k | slice 1.2 frontend; 5 logged deviations; UI verification queued (dev server down) |
+| 2026-07-13 | item-1 | reviewer (workflow, VOID) | 7 | discarded | 1,564k | Fable 5 usage limit killed 29/30 refuters → fail-closed REVISE was dead-ballot noise, not findings |
+| 2026-07-14 | item-2 | executor (checkpoint + 2 dead predecessors) | 8 | PR open, 4 gates green | 187k | slice 2.1 eval framework; golden set BLOCKED (Supabase paused) → placeholder, runner refuses to score; $0.00 spent |
+| 2026-07-14 | item-1 | reviewer (workflow, TIERED) | 7 | REVISE — real findings | 1,894k | 30/30 ballots; model-tiered (2 opus lenses + smell probe, 3 sonnet lenses); 1 blocking UX defect (sidebar dead in artifact mode) + scroll-promise lie + CSS var coupling + zero frontend tests |
 
 ## Audit ledger (typed records from canon-bound gates)
 
