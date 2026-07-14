@@ -17,6 +17,7 @@
 		"evals:security": "bun run scripts/eval-security.ts",
 		"test:tiers": "bun run scripts/tier-tests.ts",
 		"test:artifact": "bun run scripts/test-artifact.ts",
+		"test:frontend": "bun run scripts/test-frontend.ts",
 		"test:rag-eval": "bun run scripts/test-rag-eval.ts",
 		"eval:rag": "bun run scripts/rag-eval/run.ts",
 		"eval:rag:golden": "bun run scripts/rag-eval/generate-golden.ts",
