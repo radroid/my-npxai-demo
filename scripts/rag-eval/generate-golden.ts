@@ -57,9 +57,12 @@ import {
 	toGoldChunkRef,
 } from "./supabase";
 
-// Target mix — 4 records per doc across 19 docs ≈ 76 (spec R3: 70–80).
-const TARGET_SINGLE = 44;
-const TARGET_MULTI = 14;
+// Target mix — larger sample for tighter metric confidence intervals. ~6 single
+// + ~1 multi per doc across 19 docs ≈ 86 synthetic + 10 hand ≈ 96 (was 76). A
+// bigger n narrows the ± on every reported percentage, which matters once the
+// numbers drive model-tuning A/Bs (a 3-point "improvement" on n=65 is noise).
+const TARGET_SINGLE = 64;
+const TARGET_MULTI = 22;
 const HAND_SUITE_PATH = "evals/knowledge-hub.jsonl";
 const PARAPHRASE_SUBSET = 20;
 const MIN_CHUNK_CHARS = 300;
@@ -292,6 +295,21 @@ async function main(): Promise<void> {
 	log(
 		`  rejected: ${rejectedJailbreak} jailbreak-marker, ${rejectedUnretrievable} un-retrievable; ${judgeErrors} judge errors`,
 	);
+	// Retrieval reachability — an HONESTY metric, surfaced rather than hidden. The
+	// realistic-phrasing prompt deliberately stops questions from echoing their
+	// gold chunk, so a NON-trivial un-retrievable rate is now EXPECTED and is a
+	// real signal about the pipeline (hard queries whose answer chunk the embedder
+	// ranks outside its top-20 pool), not just mislabeled data. A reachability that
+	// stays ~100% after the anti-echo change would mean the questions still leak the
+	// source wording. Report it so a reader can judge how "easy" the retained set is.
+	const synthAttempts = records.filter((r) => r.origin === "synthetic").length + rejectedUnretrievable;
+	if (synthAttempts > 0) {
+		const reach = (100 * (synthAttempts - rejectedUnretrievable)) / synthAttempts;
+		log(
+			`  retrieval reachability (synthetic): ${reach.toFixed(1)}% ` +
+				`(${synthAttempts - rejectedUnretrievable}/${synthAttempts} drafted questions had gold in the top-20 pool)`,
+		);
+	}
 
 	// --- Paraphrases (R5): stratified 20-question subset, 3 each -------------
 	const subset = stratifyGolden(records, PARAPHRASE_SUBSET);

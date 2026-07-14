@@ -32,6 +32,7 @@ import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { get_encoding } from "tiktoken";
+import { EMBEDDING_DIMENSIONS, OPENAI_MODELS } from "../lib/openai";
 
 const CHUNK_TARGET_TOKENS = 400;
 const CHUNK_OVERLAP_TOKENS = 60;
@@ -39,7 +40,10 @@ const CHUNK_MIN_TOKENS = 40; // skip tiny orphan chunks (ToC remnants, etc.)
 const CHUNK_HARD_MAX_TOKENS = 700; // safety cap
 const EMBED_BATCH_SIZE = 100;
 const INSERT_BATCH_SIZE = 500;
-const EMBEDDING_MODEL = "text-embedding-3-small";
+// Single source of truth: same model + dims the query path (lib/retrieval.ts)
+// and the halfvec(3072) corpus column use. Corpus and query embeddings MUST
+// share a space or cosine search is meaningless.
+const EMBEDDING_MODEL = OPENAI_MODELS.embedding;
 
 const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run");
@@ -249,6 +253,7 @@ async function embedBatch(client: OpenAI, texts: string[]): Promise<number[][]> 
 			const resp = await client.embeddings.create({
 				model: EMBEDDING_MODEL,
 				input: texts,
+				dimensions: EMBEDDING_DIMENSIONS,
 			});
 			return resp.data.map((d) => d.embedding);
 		} catch (err) {

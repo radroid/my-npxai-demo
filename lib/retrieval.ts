@@ -8,7 +8,7 @@
 import type OpenAI from "openai";
 import type { RetrievedChunk } from "./context-envelope";
 import { type GuardedHandlerArgs, recordOpenAICall } from "./guard";
-import { OPENAI_MODELS } from "./openai";
+import { EMBEDDING_DIMENSIONS, OPENAI_MODELS } from "./openai";
 
 // D.3 fallback thresholds. Calibrated 2026-04-17 against scripts/probe-sims.ts:
 // LOW_SIM_OOS=0.40 lets single-word corpus-relevant queries (Q20 "turnover" at
@@ -460,6 +460,10 @@ export async function retrieveChunks(
 		const embResp = await openai.embeddings.create({
 			model: OPENAI_MODELS.embedding,
 			input: embedInputs,
+			// FULL 3072 dims — must match the corpus embeddings written by
+			// scripts/ingest.ts and the halfvec(3072) column, or cosine search
+			// silently compares vectors from different spaces.
+			dimensions: EMBEDDING_DIMENSIONS,
 		});
 		embeddings = embResp.data.map((d) => d.embedding);
 		if (embeddings.length !== embedInputs.length) {
