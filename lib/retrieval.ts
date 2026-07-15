@@ -32,9 +32,13 @@ export const MIN_CHUNK_SIM = 0.35;
 // ranks above an unrelated-doc chunk at sim 0.70.
 export const NAMED_DOC_BOOST = 0.2;
 
-// Recognizes "REGDOC-X.X", "REGDOC-X.X.X", "REGDOC 2.5.2", "NSCA" in user
-// query text. Returns the canonical regdoc_id form.
-const QUERY_DOC_RE = /\b(?:REGDOC[\s-]?(\d+(?:\.\d+){1,3})|(NSCA))\b/gi;
+// Recognizes "REGDOC-X.X", "REGDOC-X.X.X", "REGDOC 2.5.2", "NSCA", and the
+// multi-volume form "REGDOC-2.11.1-VolII" in user query text. Returns the
+// canonical regdoc_id form. The -Vol suffix MUST be captured: without it a
+// query naming "REGDOC-2.11.1-VolII" would resolve to the base id
+// "REGDOC-2.11.1" (which is Volume I in the corpus) and boost the wrong volume.
+const QUERY_DOC_RE =
+	/\b(?:REGDOC[\s-]?(\d+(?:\.\d+){1,3}(?:-Vol[IVX]+)?)|(NSCA))\b/gi;
 
 // Concept → REGDOC map for queries that don't name the doc explicitly but
 // lean on a CNSC term of art. Used only as a hint for the query-expansion

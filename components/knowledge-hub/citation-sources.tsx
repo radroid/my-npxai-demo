@@ -36,9 +36,11 @@ export function findCitationMatch(
 	sources: CitationSource[],
 	label: string,
 ): CitationSource | null {
-	// label is "[REGDOC-X.X.X]" or "[REGDOC-X.X.X §Y.Z]"
+	// label is "[REGDOC-X.X.X]" or "[REGDOC-X.X.X §Y.Z]" (optionally -VolN)
 	const inner = label.replace(/^\[|\]$/g, "").trim();
-	const match = inner.match(/^(REGDOC-[\d.]+)(?:\s+§([\d.]+))?$/);
+	const match = inner.match(
+		/^(REGDOC-[\d.]+(?:-Vol[IVX]+)?)(?:\s+§([\d.]+))?$/,
+	);
 	if (!match) return null;
 	const regdocId = match[1];
 	const section = match[2] ?? null;

@@ -1,0 +1,73 @@
+{
+  "note": "Offline ksweep retrieval comparison (92 golden Qs, identical thresholds/expansions across runs). Generation-quality metrics NOT included \u2014 they require a dev server pointed at local (see docs/best-practices-corpus.md).",
+  "runs": {
+    "baseline_19docs": {
+      "docs": 19,
+      "chunks": 1945,
+      "metrics": {
+        "hit@3": 88.0,
+        "hit@5": 92.4,
+        "hit@8": 96.7,
+        "hit@10": 97.8,
+        "recall@8": 86.0,
+        "MRR": 80.8
+      },
+      "prompt_version": "2026-07-13.1"
+    },
+    "expanded_45docs_unfiltered": {
+      "docs": 45,
+      "chunks": 3569,
+      "metrics": {
+        "hit@3": 87.0,
+        "hit@5": 90.2,
+        "hit@8": 91.3,
+        "hit@10": 93.5,
+        "recall@8": 80.8,
+        "MRR": 77.9
+      },
+      "prompt_version": "2026-07-14.2"
+    },
+    "expanded_45docs_boilerplate_filtered": {
+      "docs": 45,
+      "chunks": 3394,
+      "metrics": {
+        "hit@3": 87.0,
+        "hit@5": 90.2,
+        "hit@8": 93.5,
+        "hit@10": 94.6,
+        "recall@8": 83.6,
+        "MRR": 78.1
+      },
+      "prompt_version": "2026-07-14.2",
+      "note": "drops near-identical front/back-matter sections from the 26 new docs (the \u00a71.3 collision fix)"
+    }
+  },
+  "degradation_analysis_filtered_vs_baseline": {
+    "questions_degraded_on_any_metric": [
+      "h006",
+      "m005",
+      "m008",
+      "m018",
+      "s006",
+      "s007",
+      "s008",
+      "s011",
+      "s012",
+      "s018",
+      "s020",
+      "s023"
+    ],
+    "questions_improved_on_any_metric": [],
+    "summary": "12 degraded, 0 improved (one-directional shift; boilerplate filter recovered ~half the hit@8 drop but a residual remains)"
+  },
+  "best_practices_probe": {
+    "set": "evals/best-practices-probes.jsonl",
+    "expected_doc_hit@8": "16/18",
+    "top1": "10/18",
+    "misses": [
+      "bp001 (retrieved sibling REGDOC-2.11.x)",
+      "bp018 (retrieved sibling REGDOC-2.2.3-VolIII)"
+    ],
+    "caveat": "isolation retrievability test only; on-the-nose title paraphrases; cannot detect the cross-doc competition the ksweep exposes; covers 18 of 26 new docs"
+  }
+}
