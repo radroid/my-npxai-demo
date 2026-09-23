@@ -107,6 +107,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 
 ### Phase 12 — Best-practices corpus expansion (opened 2026-07-15)
 - [ ] Review PR `feat/best-practices-corpus` (CNSC corpus expansion; **prod HELD by design**)
+- [ ] Confirm a small representative challenge set (realistic operator questions, acceptable answers/citations, and when the bot must abstain) for the pre-load evaluation
 - [ ] Run the supervised pre-load generation eval, then `bun run ingest --force` to load the expanded corpus to hosted (runbook in `docs/best-practices-corpus.md`)
 - [ ] Decide IAEA: email the Publishing Section for non-commercial permission, or keep the 16 guides reference-only
 - [ ] Decide whether to greenlight NRC integration (review the prompt security-boundary rewrite before it ships)
@@ -418,6 +419,8 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] ksweep no-regression measurement + honest writeup (`docs/best-practices-corpus.md`)
 - [x] Fix volume-suffixed-id citation regexes (`-Vol[IVX]`); lint + test:frontend/artifact/rag-eval green
 - [x] Repair the PR #15 Cloudflare build blockers: invoke the installed OpenNext CLI and type the manifest's reference-only IAEA source; `bun run build:cloudflare` passes (2026-09-22)
+- [x] Test shared REGDOC-series-reference consolidation on local Supabase; add a paired, per-stage RAG quick-test workbench and correct the over-broad §1.3 root-cause claim (2026-09-23; 41 chunks removed, no hit@8 recovery)
+- [ ] Audit the existing fetcher's title-based Preface/§1.3 removal on the 26 new docs; preserve document-specific evidence in a separately evaluated corpus variant before production load
 - [x] Adversarial review (licensing/fetcher/regex + eval-honesty lenses)
 - [!] NRC ingestion — blocked on human greenlight of the source-aware integration (C3/C4/C5; spec in `OVERNIGHT.md`)
 

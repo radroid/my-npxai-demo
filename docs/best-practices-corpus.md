@@ -28,9 +28,9 @@ fitness-for-duty (2.2.1, 2.2.3-VolI/III, 2.2.4-VolI/II), conduct & operations
 (2.1.2).
 
 Corpus grew **19 → 45 documents, ~1,945 → 3,394 chunks** (local, verified: 0
-NULL embeddings, atomic swap clean; 3,394 is after the boilerplate-section drop
-described in the eval section — 175 near-identical front/back-matter chunks
-removed).
+NULL embeddings, atomic swap clean; 3,394 is after the title-based
+front/back-matter drop described below — 175 chunks removed, not all proven
+duplicates).
 
 The full, license-annotated source list is committed at
 [`resources/best-practices-sources.json`](../resources/best-practices-sources.json)
@@ -52,7 +52,7 @@ The full, license-annotated source list is committed at
    Only GREEN-verdict, `ingest: true` rows are fetched; RED never; YELLOW only
    with `--allow-yellow`. A quality gate rejects garbled extractions (≥2 sections,
    ≥5 paragraphs, ≥1500 chars, alpha ratio ≥ 0.6).
-2. `scripts/ingest.ts` (unchanged) chunks → embeds (text-embedding-3-large@3072)
+2. `scripts/ingest.ts` chunks → embeds (text-embedding-3-large@3072)
    → atomic-swaps into `regdoc_chunks`. Run against **local** via inline env.
 
 ## Eval evidence
@@ -79,32 +79,36 @@ across runs (verified per-question), so this is a clean corpus-only comparison:
 | context recall@8 | 86.0% | 80.8% | 83.6% |
 | MRR | 80.8% | 77.9% | 78.1% |
 
-**This is a real, one-directional regression — not a measurement artifact.**
+**This is a real, one-directional retrieval regression — not a measurement artifact.**
 Dropping 26 new documents into the corpus lowered hit@8 by 5.4 points, and
 **zero of the 92 questions improved on any metric at any k** while ~15 degraded.
-A monotonic, zero-improvement shift is the signature of *distractor injection*,
-not neutral corpus growth. Two systematic causes (from per-question inspection of
-the displacing chunks):
+A monotonic, zero-improvement shift is consistent with *cross-document
+competition*, not neutral corpus growth. Two visible contributors from
+per-question inspection of the displacing chunks are:
 
-1. **"§1.3 / front-matter" boilerplate collision (the dominant cause).** Every
-   CNSC REGDOC opens with near-identical administrative sections — Preface, "1.3
-   Relevant legislation" (the same NSCA/regulation list verbatim), the
-   document-series blurb. Adding 26 of them created 26 near-duplicate low-signal
-   chunks that broad queries collapse onto, shoving substantive gold chunks past
-   `k`. ~10 of the 92 questions ended up with ≥4 of their top-8 being generic
-   "§1.3" intros.
-2. **REGDOC-2.14.1 (Packaging & Transport) is an over-broad distractor** that
-   intruded into the top-8 of several unrelated queries (radiation protection,
-   record-keeping), off-topic.
+1. **Administrative-section collisions.** Many REGDOCs contain a near-identical
+   *CNSC Regulatory Document Series* overview, and broad queries can retrieve
+   generic legal introductions instead of the requested substantive section.
+   The earlier label “26 near-identical §1.3 sections” was too broad: §1.3
+   *Relevant legislation* often contains document-specific obligations, and some
+   golden questions target them directly. Prefaces likewise are not all identical.
+   Their wholesale deletion is not a safe deduplication rule.
+2. **REGDOC-2.14.1 (Packaging & Transport) competes on broad questions.** Its
+   Volume I regulation/IAEA cross-reference matrix and Volume II transport
+   radiation-protection program contain terms shared with facility-wide worker
+   protection and record-keeping questions. Those chunks can take limited top-8
+   slots without answering the question's actual scope; they remain appropriate
+   for transport-specific questions.
 
-**Mitigation applied:** the fetcher now drops the near-identical front/back-matter
-sections from the new docs (`DROP_SECTION_TITLE_RE` in
+**Earlier mitigation (now requiring content audit):** the fetcher drops
+title-matched front/back-matter sections from the 26 new docs (`DROP_SECTION_TITLE_RE` in
 `scripts/fetch-best-practices.ts`). That recovered **~half** the hit@8 drop
-(91.3 → 93.5) and recall@8 (80.8 → 83.6), and removed 175 boilerplate chunks
+(91.3 → 93.5) and recall@8 (80.8 → 83.6), and removed 175 chunks
 (3,569 → 3,394). **But a residual regression remains: 12 questions still degrade
 vs baseline, 0 improve.** This residual is genuine cross-doc competition on broad
-queries plus the 2.14.1 distractor — it is NOT resolved, and is NOT just
-frozen-golden staleness.
+queries; the exact contribution of 2.14.1 and each administrative section is
+not yet established. The retrieval improvement does not establish that dropped
+document-specific material was safe to lose.
 
 ### 2. New content is retrievable — best-practices probe (a weak, isolation-only check)
 
@@ -143,12 +147,37 @@ load:
    the residual retrieval shift actually harms answers, or whether the model still
    answers correctly from the retained relevant chunks.
 2. If answers hold, load. If they degrade, address the residual first — candidates:
-   demote/dedupe the over-broad REGDOC-2.14.1 chunks, tune the envelope `k` or
-   `MIN_CHUNK_SIM`, or regenerate the golden set against the expanded corpus for a
-   fair re-measure — **each validated by the generation eval, never blind.**
+   inspect named-document routing, query expansion and the envelope `k`, or
+   try hybrid lexical/vector retrieval. A simple transport-score demotion has
+   already failed an offline counterfactual (below). Any candidate must pass
+   retrieval *and* generation evals, not just improve one example. Audit the
+   gold set for valid alternate supporting chunks rather than silently replacing
+   it to make the score rise.
 
 This is a supervised decision. The overnight run's job was to gather the data, make
 it loadable, and measure honestly — the measurement says "not yet."
+
+### Follow-up: shared-series-reference ablation (2026-09-23)
+
+An isolated local variant moved the exact-titled *CNSC Regulatory Document
+Series* sections out of searchable REGDOCs and into one provenance-preserving
+reference JSON ([checked-in copy](../resources/cnsc-series-reference.json)).
+It covered **41 sections across 45 documents**, with **27
+distinct source wordings**. It left every *remaining* Preface and §1.3 section
+untouched; the existing fetcher had already dropped some from the 26 new docs,
+so this experiment does **not** prove that the earlier broad drop was safe.
+The reference is deliberately not indexed as another generic chunk.
+The corpus fell **3,394 → 3,353 chunks**.
+
+Paired offline ksweeps on the **91 comparable questions** (h003 excluded because
+one of its 31 broad gold chunks was the intentionally removed overview) found:
+hit@8 **93.4% → 93.4%**, context recall@8 **84.3% → 84.3%**, MRR **77.8% →
+78.0%**. No question changed hit@8; transport chunks still occupied **8
+top-eight slots** across the same queries. This is a negative result for the
+specific common-only cleanup as a retrieval fix, not proof that corpus hygiene
+has no value. A simulated transport-score demotion also recovered no hit@8
+misses, so neither change warrants a production retrieval-policy change yet.
+Commands and stage-by-stage test guidance: [RAG evaluation workbench](rag-evaluation-workbench.md).
 
 ## Runbook (supervised production load)
 

@@ -27,6 +27,8 @@
 		"eval:rag": "bun run scripts/rag-eval/run.ts",
 		"eval:rag:golden": "bun run scripts/rag-eval/generate-golden.ts",
 		"eval:rag:report": "bun run scripts/rag-eval/report.ts",
+		"eval:rag:compare": "bun run scripts/rag-eval/compare-ksweep.ts",
+		"eval:rag:prepare-series": "bun run scripts/rag-eval/prepare-shared-series.ts",
 		"fetch:bp": "bun run scripts/fetch-best-practices.ts",
 		"probe:bp": "bun run scripts/rag-eval/probe-best-practices.ts",
 		"build:cloudflare": "opennextjs-cloudflare build",

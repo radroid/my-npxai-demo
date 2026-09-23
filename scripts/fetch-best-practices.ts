@@ -189,13 +189,12 @@ function flattenFlow(node: any, out: FlowEvent[]): void {
 	}
 }
 
-// Administrative front-/back-matter sections that are near-IDENTICAL across
-// every CNSC REGDOC (the same NSCA/regulation list, the same document-series
-// blurb, the same preface). Ingesting them from 26 new docs injects 26 copies
-// of low-signal boilerplate that broad queries collapse onto, measurably
-// displacing substantive gold chunks (see docs/best-practices-corpus.md, the
-// "§1.3 collision" root cause). We drop them so only the substantive technical
-// sections enter the corpus. Titles/numbers are matched conservatively.
+// This is the original Phase 12 front/back-matter filter for the 26 new docs.
+// Later audit found Preface and Relevant legislation can contain document-
+// specific evidence; they are NOT proven to be universal duplicates. Keep the
+// current corpus reproducible, but do not broaden this rule or treat it as a
+// safe permanent policy before a preservation/answer-quality evaluation.
+// See docs/rag-evaluation-workbench.md.
 const DROP_SECTION_TITLE_RE =
 	/^(preface|table of contents|foreword|about this document(?:ary series)?|relevant legislation|related (?:documents|information)|additional information|references|glossary(?: of terms)?|abbreviations(?: and acronyms)?)\b/i;
 // "1.3 Relevant legislation" also arrives as section_number 1.3 with that title;

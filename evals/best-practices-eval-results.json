@@ -39,7 +39,7 @@
         "MRR": 78.1
       },
       "prompt_version": "2026-07-14.2",
-      "note": "drops near-identical front/back-matter sections from the 26 new docs (the \u00a71.3 collision fix)"
+      "note": "drops administrative front/back-matter sections from the 26 new docs; later audit found §1.3 and Preface may contain document-specific material, so their wholesale removal should not be generalized"
     }
   },
   "degradation_analysis_filtered_vs_baseline": {
@@ -58,7 +58,7 @@
       "s023"
     ],
     "questions_improved_on_any_metric": [],
-    "summary": "12 degraded, 0 improved (one-directional shift; boilerplate filter recovered ~half the hit@8 drop but a residual remains)"
+    "summary": "12 degraded, 0 improved (one-directional shift; front/back-matter filter recovered ~half the hit@8 drop but a residual remains; section-level root causes require further validation)"
   },
   "best_practices_probe": {
     "set": "evals/best-practices-probes.jsonl",
