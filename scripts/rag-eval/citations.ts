@@ -14,14 +14,14 @@ export interface Citation {
 // parenthetical sub-letters (NSCA §48(1)(b)). The § glyph is occasionally
 // dropped by the model. Mirrors scripts/eval-kb.ts CITATION_RE/SECTION_RE.
 export const CITATION_RE =
-	/\[(?:REGDOC-\d+(?:\.\d+){1,3}|NSCA)(?:\s+§?[A-Za-z0-9.()]+(?:\s[A-Za-z0-9.()]+)?)?\]/g;
+	/\[(?:REGDOC-\d+(?:\.\d+){1,3}(?:-Vol[IVX]+)?|NSCA)(?:\s+§?[A-Za-z0-9.()]+(?:\s[A-Za-z0-9.()]+)?)?\]/g;
 export const SECTION_RE = /§([A-Za-z0-9.()]+(?:\s[A-Za-z0-9.()]+)?)/;
 
 export function extractCitations(text: string): Citation[] {
 	const out: Citation[] = [];
 	for (const match of text.matchAll(CITATION_RE)) {
 		const full = match[0];
-		const regdocMatch = full.match(/REGDOC-\d+(?:\.\d+){1,3}|NSCA/);
+		const regdocMatch = full.match(/REGDOC-\d+(?:\.\d+){1,3}(?:-Vol[IVX]+)?|NSCA/);
 		if (!regdocMatch) continue;
 		const regdoc = regdocMatch[0];
 		const secMatch = full.match(SECTION_RE);

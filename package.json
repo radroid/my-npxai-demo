@@ -27,9 +27,13 @@
 		"eval:rag": "bun run scripts/rag-eval/run.ts",
 		"eval:rag:golden": "bun run scripts/rag-eval/generate-golden.ts",
 		"eval:rag:report": "bun run scripts/rag-eval/report.ts",
-		"build:cloudflare": "bunx opennextjs-cloudflare build",
-		"preview:cloudflare": "bunx opennextjs-cloudflare preview",
-		"deploy:cloudflare": "bunx opennextjs-cloudflare deploy"
+		"eval:rag:compare": "bun run scripts/rag-eval/compare-ksweep.ts",
+		"eval:rag:prepare-series": "bun run scripts/rag-eval/prepare-shared-series.ts",
+		"fetch:bp": "bun run scripts/fetch-best-practices.ts",
+		"probe:bp": "bun run scripts/rag-eval/probe-best-practices.ts",
+		"build:cloudflare": "opennextjs-cloudflare build",
+		"preview:cloudflare": "opennextjs-cloudflare preview",
+		"deploy:cloudflare": "opennextjs-cloudflare deploy"
 	},
 	"dependencies": {
 		"@ai-sdk/openai": "^3.0.63",
@@ -53,6 +57,7 @@
 		"motion": "^12.38.0",
 		"next": "^16.2.6",
 		"next-themes": "^0.4.6",
+		"node-html-parser": "^9.0.0",
 		"openai": "^6.37.0",
 		"radix-ui": "^1.4.3",
 		"react": "^19.2.6",
@@ -62,6 +67,7 @@
 		"tiktoken": "^1.0.22",
 		"tw-animate-css": "^1.4.0",
 		"tw-shimmer": "^0.4.11",
+		"unpdf": "^1.6.2",
 		"zod": "^4.4.3",
 		"zustand": "^5.0.13"
 	},

@@ -24,11 +24,12 @@
 //   bun run ingest                # full run
 //   bun run ingest --dry-run      # chunk + print stats, no API or DB writes
 //   bun run ingest --only=REGDOC-2.3.4   # restrict to one doc (debug)
+//   bun run ingest --source-dir=/tmp/rag-series --dry-run # inspect a corpus variant
 //   bun run ingest --force        # allow running against a non-local URL
 //                                 # (same as ALLOW_REMOTE_INGEST=1)
 
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { get_encoding } from "tiktoken";
@@ -48,6 +49,10 @@ const EMBEDDING_MODEL = OPENAI_MODELS.embedding;
 const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run");
 const ONLY = argv.find((a) => a.startsWith("--only="))?.split("=")[1];
+const SOURCE_DIR = resolve(
+	argv.find((a) => a.startsWith("--source-dir="))?.slice("--source-dir=".length) ??
+		"scraped_regdocs",
+);
 const FORCE_REMOTE = argv.includes("--force") || process.env.ALLOW_REMOTE_INGEST === "1";
 
 // Anything that isn't loopback is treated as "probably hosted" — a re-ingest
@@ -296,7 +301,7 @@ async function main() {
 		process.exit(1);
 	}
 
-	const dir = join(process.cwd(), "scraped_regdocs");
+	const dir = SOURCE_DIR;
 	const entries = await readdir(dir);
 	let files = entries.filter((f) => f.endsWith(".json") && !f.startsWith("_"));
 	if (ONLY) {

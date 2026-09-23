@@ -72,8 +72,10 @@ const useCopyToClipboard = ({
 
 // Matches Appendix D.5 citation regex. Used to find inline [REGDOC-X.X.X]
 // or [REGDOC-X.X.X §Y.Z] patterns in the streamed markdown and render them
-// as pill chips instead of plain text.
-const CITATION_RE = /\[REGDOC-\d+(?:\.\d+){1,3}(?:\s+§[\d.]+)?\]/g;
+// as pill chips instead of plain text. The optional -Vol[IVX] suffix covers
+// multi-volume REGDOCs (e.g. REGDOC-2.11.1-VolII, REGDOC-2.7.2-VolI).
+const CITATION_RE =
+	/\[REGDOC-\d+(?:\.\d+){1,3}(?:-Vol[IVX]+)?(?:\s+§[A-Za-z0-9.()]+)?\]/g;
 
 function CitationChip({ label }: { label: string }) {
 	const sources = useCitationSources();

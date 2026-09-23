@@ -1,0 +1,374 @@
+{
+  "title": "CNSC Regulatory Document Series — shared administrative reference",
+  "note": "Distinct source wordings consolidated from the corpus. All Preface and relevant-legislation text present in the input remains untouched; the upstream fetcher had already filtered some new-document sections. This reference is not indexed for RAG retrieval.",
+  "sectionsRemoved": 41,
+  "variants": [
+    {
+      "sha256": "1227fd259bd7cced095832b32f2139b49a5baef471fd760a18b199331cb89ec2",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\n1.0 Regulated facilities and activities\n\nSeries\n\n1.1 Reactor facilities\n\n1.2 Class IB facilities\n\n1.3 Uranium mines and mills\n\n1.4 Class II facilities\n\n1.5 Certification of prescribed equipment\n\n1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries\n\n2.1 Management system\n\n2.2 Human performance management\n\n2.3 Operating performance\n\n2.4 Safety analysis\n\n2.5 Physical design\n\n2.6 Fitness for service\n\n2.7 Radiation protection\n\n2.8 Conventional health and safety\n\n2.9 Environmental protection\n\n2.10 Emergency management and fire protection\n\n2.11 Waste management\n\n2.12 Security\n\n2.13 Safeguards and non-proliferation\n\n2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries\n\n3.1 Reporting requirements\n\n3.2 Public and Indigenous engagement\n\n3.3 Financial guarantees\n\n3.4 Commission proceedings\n\n3.5 CNSC processes and practices\n\n3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-1.6.2",
+          "title": "REGDOC-1.6.2, Radiation Protection Programs for Nuclear Substances and Radiation Devices Licences",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc1-6-2/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.2.1",
+          "title": "REGDOC-2.2.1, Human Performance, Version 2",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-2-1-v2/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.4.4",
+          "title": "REGDOC-2.4.4, Safety Analysis for Class IB Nuclear Facilities",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-4-4/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.4.5",
+          "title": "REGDOC-2.4.5, Nuclear Fuel Safety and Qualification",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-4-5/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.9.2",
+          "title": "REGDOC-2.9.2, Environmental Protection: Controlling Releases to the Environment",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-9-2/"
+        }
+      ]
+    },
+    {
+      "sha256": "afeba21079478e5317d7072b45c0a9cf1eb91542e3dc96defb71740957d6d633",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Indigenous engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.11.2",
+          "title": "REGDOC-2.11.2, Decommissioning",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-11-2/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.2.3-VolIII",
+          "title": "REGDOC-2.2.3, Personnel Certification, Volume III: Certification of Reactor Facility Workers, Version 2",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-2-3-v3-version-2/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.2.4-VolII",
+          "title": "REGDOC-2.2.4, Fitness for Duty, Volume II: Managing Alcohol and Drug Use, Version 3",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-2-4-v2-version3/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.4.2",
+          "title": "REGDOC-2.4.2, Probabilistic Safety Assessment (PSA) for Reactor Facilities, Version 2",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-4-2-v2/"
+        }
+      ]
+    },
+    {
+      "sha256": "ca7f7c86df50d08c83c9fff01ec36a2ecc5eef49f0a60dea051ea8268053a8ec",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.1.2",
+          "title": "REGDOC-2.1.2, Safety Culture",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-1-2/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.6.1",
+          "title": "REGDOC-2.6.1, Reliability Programs for Nuclear Power Plants",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-6-1/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.6.2",
+          "title": "REGDOC-2.6.2, Maintenance Programs for Nuclear Power Plants",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-6-2/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.7.3",
+          "title": "REGDOC-2.7.3, Radiation Protection Guidelines for Safe Handling of Decedents",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-7-3/"
+        }
+      ]
+    },
+    {
+      "sha256": "87440a98122e91686c5d3599c779b8271cfa627f7b53151bdcdb888d896861d8",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\nRegulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Indigenous engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.11.1",
+          "title": "Waste Management, Volume I: Management of Radioactive Waste",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-11-1-vol1/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.7.1",
+          "title": "Radiation Protection",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-7-1/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.9.1",
+          "title": "Environmental Protection: Environmental Principles, Assessments and Protection Measures, Version 1.2",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-9-1-vol1-2/"
+        }
+      ]
+    },
+    {
+      "sha256": "2961ef956ea17a2b713eccd4c82770af2f142ee6e13a4434ca10f8b24a346619",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC).In addition tothe Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with otherregulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC’s catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC’s website.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.14.1-VolI",
+          "title": "REGDOC-2.14.1, Information Incorporated by Reference in Canada's Packaging and Transport of Nuclear Substances Regulations, 2015, Volume I, Version 2",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-14-1-v2-2020/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.14.1-VolII",
+          "title": "REGDOC-2.14.1, Packaging and Transport, Volume II: Radiation Protection Program Design for the Transport of Nuclear Substances",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-14-1-v2/"
+        }
+      ]
+    },
+    {
+      "sha256": "2b2a0a8996dc63340be9cae9051e8e7ce9a51df24937572a7a3d78d828b5b107",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, there may also be requirements to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\nRegulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 Information dissemination\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website at nuclearsafety.gc.ca/eng/acts-and-regulations/regulatory-documents/ .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.3.2",
+          "title": "Accident Management",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-3-2/"
+        },
+        {
+          "regdoc_id": "REGDOC-2.5.2",
+          "title": "Design of Reactor Facilities: Nuclear Power Plants",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-5-2/"
+        }
+      ]
+    },
+    {
+      "sha256": "2798e2335e49270087f4092c68f2747df20879ec1cacb8a0fca561e1bc04c612",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\nRegulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 Information dissemination\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's Web site at nuclearsafety.gc.ca/regulatory-documents .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.6.3",
+          "title": "Aging Management",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-6-3/"
+        }
+      ]
+    },
+    {
+      "sha256": "289a69880762fc5222cac2e7e0410f59edd98bebfee467f3981cebed84414518",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with otherregulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.4.3",
+          "title": "REGDOC-2.4.3, Nuclear Criticality Safety, Version 1.1",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-4-3-v1-1/"
+        }
+      ]
+    },
+    {
+      "sha256": "2bda70298e14fd186fdc6684e1fce92c31183bbd98e3553eb6747d1a3e3a0ab7",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be requirements to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.2.4-VolI",
+          "title": "REGDOC-2.2.4, Fitness for Duty: Managing Worker Fatigue",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-2-4/"
+        }
+      ]
+    },
+    {
+      "sha256": "2eda215ff26c865025300ae9314b6cf19a34a1dfefe91b2e9b91819435a22039",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, there may also be requirements to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\nRegulated facilities and activities 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 Information dissemination\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, on the CNSC website",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.4.1",
+          "title": "Deterministic Safety Analysis",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-4-1/"
+        }
+      ]
+    },
+    {
+      "sha256": "37c58a23a24893778df1670d982d29e464591b91a92083eefcbdc9e97a5d3acf",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\nRegulated facilities and activities Reactor facilities Class IB facilities Uranium mines and mills Class II facilities Certification of prescribed equipment Nuclear substances and radiation devices\n\nSafety and control areas Management system Human performance management Operating performance Safety analysis Physical design Fitness for service Radiation protection Conventional health and safety Environmental protection Emergency management and fire protection Waste management Security Safeguards and non-proliferation Packaging and transport\n\nOther regulatory areas Reporting requirements Public and Aboriginal engagement Financial guarantees Commission proceedings Information dissemination\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.2.2",
+          "title": "Personnel Training",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-2-2/"
+        }
+      ]
+    },
+    {
+      "sha256": "3b0bf885b760f90c145d5e7a9dc783037632644eb608a2428d24aa2b84d7822f",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the NSCA and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Indigenous engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.11",
+          "title": "REGDOC-2.11, Framework for Radioactive Waste Management and Decommissioning in Canada, Version 2",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-11-v2/"
+        }
+      ]
+    },
+    {
+      "sha256": "4428737dc53e2abdeb4112e311b11727d0098e0281d3fd4ad6509ff853cf3c9e",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\n1.0 Regulated facilities and activities\n\nSeries\n\n1.1 Reactor facilities\n\n1.2 Class IB facilities\n\n1.3 Uranium mines and mills\n\n1.4 Class II facilities\n\n1.5 Certification of prescribed equipment\n\n1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries\n\n2.1 Management system\n\n2.2 Human performance management\n\n2.3 Operating performance\n\n2.4 Safety analysis\n\n2.5 Physical design\n\n2.6 Fitness for service\n\n2.7 Radiation protection\n\n2.8 Conventional health and safety\n\n2.9 Environmental protection\n\n2.10 Emergency management and fire protection\n\n2.11 Waste management\n\n2.12 Security\n\n2.13 Safeguards and non‑proliferation\n\n2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries\n\n3.1 Reporting requirements\n\n3.2 Public and Indigenous engagement\n\n3.3 Financial guarantees\n\n3.4 Commission proceedings\n\n3.5 CNSC processes and practices\n\n3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.7.2-VolI",
+          "title": "REGDOC-2.7.2, Dosimetry, Volume I: Ascertaining Occupational Dose",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-7-2-vol-i/"
+        }
+      ]
+    },
+    {
+      "sha256": "50dc37f32877e925aba7d38398beba7f86dfc3b4fc2b1a82315dafea5813c27c",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with otherregulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\nRegulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-1.1.1",
+          "title": "Site Evaluation and Site Preparation for New Reactor Facilities, Version 1.3",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc1-1-1-v1-3/"
+        }
+      ]
+    },
+    {
+      "sha256": "55af6aa30fe4aad19a8a351f24996a845e179a95550186bfe9b200ed2a6454b6",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\nRegulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC’s website .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.2.5",
+          "title": "Minimum Staff Complement",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-2-5/"
+        }
+      ]
+    },
+    {
+      "sha256": "56a8f623826e0f8adb11356d0bd2178f2329a97bda9d6c4004a2808ecd25e846",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\nRegulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.8.1",
+          "title": "Conventional Health and Safety",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-8-1/"
+        }
+      ]
+    },
+    {
+      "sha256": "58c586e9533b2ef4126527fdc4dc9dfd41cc6bfbd01e7408874f7b4245ec1a0a",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC’s catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-six series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries\n\n1.1 Reactor facilities\n\n1.2 Class IB facilities\n\n1.3 Uranium mines and mills\n\n1.4 Class II facilities\n\n1.5 Certification of prescribed equipment\n\n1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries\n\n2.1 Management system\n\n2.2 Human performance management\n\n2.3 Operating performance\n\n2.4 Safety analysis\n\n2.5 Physical design\n\n2.6 Fitness for service\n\n2.7 Radiation protection\n\n2.8 Conventional health and safety\n\n2.9 Environmental protection\n\n2.10 Emergency management and fire protection\n\n2.11 Waste management\n\n2.12 Security\n\n2.13 Safeguards and non‑proliferation\n\n2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries\n\n3.1 Reporting requirements\n\n3.2 Public and Indigenous engagement\n\n3.3 Financial guarantees\n\n3.4 Commission proceedings\n\n3.5 CNSC processes and practices\n\n3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC’s website.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.2.3-VolI",
+          "title": "REGDOC-2.2.3, Personnel Certification, Volume I: Exposure Device Operators, Version 1.1",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-2-3-edo-v1-1/"
+        }
+      ]
+    },
+    {
+      "sha256": "699a390f656610a12b275f5e1ad8f7fbc8e153d02f98822eecebcbea71b28282",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\nRegulated facilities and activities\n\nSeries\n\nReactor facilities\n\nClass IB facilities\n\nUranium mines and mills\n\nClass II facilities\n\nCertification of prescribed equipment\n\nNuclear substances and radiation devices\n\nSafety and control areas\n\nSeries\n\nManagement system\n\nHuman performance management\n\nOperating performance\n\nSafety analysis\n\nPhysical design\n\nFitness for service\n\nRadiation protection\n\nConventional health and safety\n\nEnvironmental protection\n\nEmergency management and fire protection\n\nWaste management\n\nSecurity\n\nSafeguards and non-proliferation\n\nPackaging and transport\n\nOther regulatory areas\n\nSeries\n\nReporting requirements\n\nPublic and Indigenous engagement\n\nFinancial guarantees\n\nCommission proceedings\n\nCNSC processes and practices\n\nGlossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-3.1.1",
+          "title": "Reporting Requirements for Nuclear Power Plants, version 3",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc3-1-1-v3/"
+        }
+      ]
+    },
+    {
+      "sha256": "756309c6ab6e9fc4bc5f114d9aeb4207e238533fc8b3b1422758344482540e57",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\nRegulated facilities and activities\n\nSeries\n\nReactor facilities\n\nClass IB facilities\n\nUranium mines and mills\n\nClass II facilities\n\nCertification of prescribed equipment\n\nNuclear substances and radiation devices\n\nSafety and control areas\n\nSeries\n\nManagement system\n\nHuman performance management\n\nOperating performance\n\nSafety analysis\n\nPhysical design\n\nFitness for service\n\nRadiation protection\n\nConventional health and safety\n\nEnvironmental protection\n\nEmergency management and fire protection\n\nWaste management\n\nSecurity\n\nSafeguards and non‑proliferation\n\nPackaging and transport\n\nOther regulatory areas\n\nSeries\n\nReporting requirements\n\nPublic and Indigenous engagement\n\nFinancial guarantees\n\nCommission proceedings\n\nCNSC processes and practices\n\nGlossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-3.5.3",
+          "title": "Regulatory Fundamentals, Version 3",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc3-5-3-v3/"
+        }
+      ]
+    },
+    {
+      "sha256": "98f305486cce19ae2196441be48f216471dd55d62076f69ba17929184ea0aa4d",
+      "text": "CNSC regulatory documents are classified under the following categories and series:\n\nRegulated facilities and activities\n\nSeries\n\nReactor facilities\n\nClass IB facilities\n\nUranium mines and mills\n\nClass II facilities\n\nCertification of prescribed equipment\n\nNuclear substances and radiation devices\n\nSafety and control areas\n\nSeries\n\nManagement system\n\nHuman performance management\n\nOperating performance\n\nSafety analysis\n\nPhysical design\n\nFitness for service\n\nRadiation protection\n\nConventional health and safety\n\nEnvironmental protection\n\nEmergency management and fire protection\n\nWaste management\n\nSecurity\n\nSafeguards and non-proliferation\n\nPackaging and transport\n\nOther regulatory areas\n\nSeries\n\nReporting requirements\n\nPublic and Indigenous engagement\n\nFinancial guarantees\n\nCommission proceedings\n\nCNSC processes and practices\n\nGlossary of CNSC terminology\n\nNote : The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit www.cnsc-ccsn.gc.ca for the latest list of regulatory documents.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.3.4",
+          "title": "Operations Programs for Reactor Facilities",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-3-4/"
+        }
+      ]
+    },
+    {
+      "sha256": "a82925058336b643e81263b460eb7534dc3e32d048abe6fab0f216043c954a1e",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, there may also be requirements to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\nRegulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.1.1",
+          "title": "Management System",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/consultation/comment/regdoc2-1-1/"
+        }
+      ]
+    },
+    {
+      "sha256": "aed4f37c10cfd3e02335e9027d037a1ae6c53500624d484fe23bd5db1528f852",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC’s catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries\n\n1.1 Reactor facilities\n\n1.2 Class IB facilities\n\n1.3 Uranium mines and mills\n\n1.4 Class II facilities\n\n1.5 Certification of prescribed equipment\n\n1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries\n\n2.1 Management system\n\n2.2 Human performance management\n\n2.3 Operating performance\n\n2.4 Safety analysis\n\n2.5 Physical design\n\n2.6 Fitness for service\n\n2.7 Radiation protection\n\n2.8 Conventional health and safety\n\n2.9 Environmental protection\n\n2.10 Emergency management and fire protection\n\n2.11 Waste management\n\n2.12 Security\n\n2.13 Safeguards and non-proliferation\n\n2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries\n\n3.1 Reporting requirements\n\n3.2 Public and Indigenous engagement\n\n3.3 Financial guarantees\n\n3.4 Commission proceedings\n\n3.5 CNSC processes and practices\n\n3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's Web site.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.7.2-VolII",
+          "title": "REGDOC-2.7.2, Dosimetry, Volume II: Technical and Management System Requirements for Dosimetry Services",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-7-2-v2/"
+        }
+      ]
+    },
+    {
+      "sha256": "cd7d51ed05ed7ca331fda5e5b14ca097a12675229776d030920b48671f5acc7a",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the CNSC. In addition to the Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with other regulatory instruments such as regulatory documents or standards.\n\nCNSC regulatory documents are classified under the following categories and series:\n\n1.0 Regulated facilities and activities\n\nSeries\n\n1.1 Reactor facilities\n\n1.2 Class IB facilities\n\n1.3 Uranium mines and mills\n\n1.4 Class II facilities\n\n1.5 Certification of prescribed equipment\n\n1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries\n\n2.1 Management system\n\n2.2 Human performance management\n\n2.3 Operating performance\n\n2.4 Safety analysis\n\n2.5 Physical design\n\n2.6 Fitness for service\n\n2.7 Radiation protection\n\n2.8 Conventional health and safety\n\n2.9 Environmental protection\n\n2.10 Emergency management and fire protection\n\n2.11 Waste management\n\n2.12 Security\n\n2.13 Safeguards and non-proliferation\n\n2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries\n\n3.1 Reporting requirements\n\n3.2 Public and Aboriginal engagement\n\n3.3 Financial guarantees\n\n3.4 Commission proceedings\n\n3.5 CNSC processes and practices\n\n3.6 Glossary of CNSC terminology\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. Visit the CNSC’s website for the latest list of regulatory documents.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.11.1-VolIII",
+          "title": "REGDOC-2.11.1, Waste Management, Volume III: Safety Case for the Disposal of Radioactive Waste, Version 2",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-11-1-vol3-ver2/"
+        }
+      ]
+    },
+    {
+      "sha256": "df5010a9f1e1d4aed24dc46bbb6a0a40250ae77ad8127ea6869c5dc495e2763a",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, there may also be requirements to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 Information dissemination\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's website.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.3.3",
+          "title": "REGDOC-2.3.3, Periodic Safety Reviews",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-3-3/"
+        }
+      ]
+    },
+    {
+      "sha256": "e0f3ecc64b07978ea225b3c3ff08f41530a71cb755365ecdeabb5920b3287f62",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC).In addition tothe Nuclear Safety and Control Act and associated regulations, these facilities and activities may also be required to comply with otherregulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC’s catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certification of prescribed equipment 1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 CNSC processes and practices 3.6 Glossaire de termes de la CCSN\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC’s website.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.11.1-VolII",
+          "title": "REGDOC-2.11.1, Waste Management, Volume II: Management of Uranium Mine Waste Rock and Mill Tailings",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-11-1-v2/"
+        }
+      ]
+    },
+    {
+      "sha256": "f032eeedd30bd2e03e0825a4caa2fd5ed12e4cdcfe7005800ace8e3579fb9ebf",
+      "text": "Facilities and activities within the nuclear sector in Canada are regulated by the Canadian Nuclear Safety Commission (CNSC). In addition to the Nuclear Safety and Control Act and associated regulations, there may also be requirements to comply with other regulatory instruments such as regulatory documents or standards.\n\nEffective April 2013, the CNSC's catalogue of existing and planned regulatory documents has been organized under three key categories and twenty-five series, as set out below. Regulatory documents produced by the CNSC fall under one of the following series:\n\n1.0 Regulated facilities and activities\n\nSeries\n\n1.1 Reactor facilities\n\n1.2 Class IB facilities\n\n1.3 Uranium mines and mills\n\n1.4 Class II facilities\n\n1.5 Certification of prescribed equipment\n\n1.6 Nuclear substances and radiation devices\n\n2.0 Safety and control areas\n\nSeries\n\n2.1 Management system\n\n2.2 Human performance management\n\n2.3 Operating performance\n\n2.4 Safety analysis\n\n2.5 Physical design\n\n2.6 Fitness for service\n\n2.7 Radiation protection\n\n2.8 Conventional health and safety\n\n2.9 Environmental protection\n\n2.10 Emergency management and fire protection\n\n2.11 Waste management\n\n2.12 Security\n\n2.13 Safeguards and non-proliferation\n\n2.14 Packaging and transport\n\n3.0 Other regulatory areas\n\nSeries\n\n3.1 Reporting requirements\n\n3.2 Public and aboriginal engagement\n\n3.3 Financial guarantees\n\n3.4 Commission proceedings\n\n3.5 Information dissemination\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's Web site at nuclearsafety.gc.ca/regulatorydocuments.",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.12.2",
+          "title": "REGDOC-2.12.2, Site Access Security Clearance",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-12-2/"
+        }
+      ]
+    },
+    {
+      "sha256": "f59ded43f6aab215275b82d3c88dbf07657848e4a862541c1b725e194ffb878c",
+      "text": "Regulated facilities and activities\n\nSeries 1.1 Reactor facilities 1.2 Class IB facilities 1.3 Uranium mines and mills 1.4 Class II facilities 1.5 Certificatiosn of prescribed equipment 1.6 Nuclear substances and radiation devices\n\nSafety and control areas\n\nSeries 2.1 Management system 2.2 Human performance management 2.3 Operating performance 2.4 Safety analysis 2.5 Physical design 2.6 Fitness for service 2.7 Radiation protection/li> 2.8 Conventional health and safety 2.9 Environmental protection 2.10 Emergency management and fire protection 2.11 Waste management 2.12 Security 2.13 Safeguards and non-proliferation 2.14 Packaging and transport\n\nOther regulatory areas\n\nSeries 3.1 Reporting requirements 3.2 Public and Aboriginal engagement 3.3 Financial guarantees 3.4 Commission proceedings 3.5 Information dissemination\n\nNote: The regulatory document series may be adjusted periodically by the CNSC. Each regulatory document series listed above may contain multiple regulatory documents. For the latest list of regulatory documents, visit the CNSC's Web site at nuclearsafety.gc.ca/regulatory-documents .",
+      "sources": [
+        {
+          "regdoc_id": "REGDOC-2.10.1",
+          "title": "Nuclear Emergency Preparedness and Response",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/acts-and-regulations/regulatory-documents/published/html/regdoc2-10-1/"
+        }
+      ]
+    }
+  ]
+}

@@ -141,6 +141,7 @@ const SERVER_BACKED: Experiment[] = [
 interface Args {
 	experiment: Experiment;
 	only: string[] | null;
+	exclude: string[] | null;
 	limit: number | null;
 }
 
@@ -148,6 +149,7 @@ function parseArgs(): Args {
 	const argv = process.argv.slice(2);
 	let experiment: string | undefined;
 	let only: string[] | null = null;
+	let exclude: string[] | null = null;
 	let limit: number | null = null;
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
@@ -155,6 +157,8 @@ function parseArgs(): Args {
 		else if (a.startsWith("--experiment=")) experiment = a.split("=")[1];
 		else if (a === "--only") only = (argv[++i] ?? "").split(",").filter(Boolean);
 		else if (a.startsWith("--only=")) only = a.split("=")[1].split(",").filter(Boolean);
+		else if (a === "--exclude") exclude = (argv[++i] ?? "").split(",").filter(Boolean);
+		else if (a.startsWith("--exclude=")) exclude = a.split("=")[1].split(",").filter(Boolean);
 		else if (a === "--limit") limit = Number(argv[++i]);
 		else if (a.startsWith("--limit=")) limit = Number(a.split("=")[1]);
 	}
@@ -166,7 +170,7 @@ function parseArgs(): Args {
 	if (limit !== null && (!Number.isFinite(limit) || limit <= 0)) {
 		throw new Error("--limit must be a positive integer");
 	}
-	return { experiment: experiment as Experiment, only, limit };
+	return { experiment: experiment as Experiment, only, exclude, limit };
 }
 
 // ---------------------------------------------------------------------------
@@ -423,6 +427,13 @@ async function main(): Promise<void> {
 					"produce scores from placeholder data.",
 			);
 		}
+		// A focused run verifies only its selected records. This allows a corpus
+		// ablation to test unaffected questions while still failing loudly if a
+		// selected question lost a gold fingerprint.
+		if (args.only) golden = golden.filter((g) => args.only?.includes(g.question_id));
+		if (args.exclude) golden = golden.filter((g) => !args.exclude?.includes(g.question_id));
+		if (args.limit) golden = golden.slice(0, args.limit);
+		if (golden.length === 0) throw new Error("No golden records match the selection");
 		const corpusAll = await fetchAllChunks(supabase);
 		const fp = await verifyGoldenAgainstDb(golden, corpusAll);
 		console.log(
@@ -437,8 +448,6 @@ async function main(): Promise<void> {
 			);
 		}
 		golden = fp.verified;
-		if (args.only) golden = golden.filter((g) => args.only?.includes(g.question_id));
-		if (args.limit) golden = golden.slice(0, args.limit);
 		console.log(`preflight: ${golden.length} golden records selected`);
 	}
 

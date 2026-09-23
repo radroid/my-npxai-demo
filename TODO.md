@@ -105,6 +105,13 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] 3 PM — Apply to Senior Full Stack Developer role
 - [ ] Next day — LinkedIn DM to Margaret McBeath
 
+### Phase 12 — Best-practices corpus expansion (opened 2026-07-15)
+- [ ] Review PR `feat/best-practices-corpus` (CNSC corpus expansion; **prod HELD by design**)
+- [ ] Confirm a small representative challenge set (realistic operator questions, acceptable answers/citations, and when the bot must abstain) for the pre-load evaluation
+- [ ] Run the supervised pre-load generation eval, then `bun run ingest --force` to load the expanded corpus to hosted (runbook in `docs/best-practices-corpus.md`)
+- [ ] Decide IAEA: email the Publishing Section for non-commercial permission, or keep the 16 guides reference-only
+- [ ] Decide whether to greenlight NRC integration (review the prompt security-boundary rewrite before it ships)
+
 ---
 
 ## 🤖 For Agents
@@ -403,6 +410,19 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] pre-item · **Fix `handle_new_user` search_path** — `20260714000000_fix_handle_new_user_search_path.sql`, restated as `SET search_path = public, pg_temp` to match every other SECURITY DEFINER function added since 2026-04-17. `CREATE OR REPLACE` in the owner-allowlist migration silently dropped the original `SET search_path = public`, so every **new** signup 500'd with `relation "profiles" does not exist`. Surfaced only by replaying the chain into a clean local DB (2026-07-14). Applying to hosted needs `migration repair --status applied` on the five reconstructed foundational migrations first — see `supabase/LOCAL.md` § Migrations — plain `db push` aborts and `--include-all` would replay live schema changes against hosted.
 - [x] pre-item · **Fail loud on partial ingest** — `scripts/ingest.ts` now asserts the post-insert row count in `regdoc_chunks` matches the number of rows it intended to insert and exits non-zero with a clear message on mismatch, instead of printing `✅ Ingestion complete` over a table the non-transactional wipe-then-insert left half-populated by a timed-out batch (2026-07-14).
 - [ ] Build the **keep-alive Worker** (`npxai-keepalive`) — daily Cloudflare Cron Trigger pinging the hosted REST endpoint so the free project stops auto-pausing. Spec + `wrangler.jsonc` + handler in `supabase/LOCAL.md`. Free tier pauses after ~7 days idle; a *weekly* cron races that boundary, so the cron is daily. Blocked on the human item below (needs the project un-paused and the hosted anon key as a Worker secret).
+
+### Phase 12 — Best-practices corpus expansion (opened 2026-07-15, overnight)
+- [x] Research + license-verify sources (CNSC 26 / NRC 15 / IAEA 16); build `resources/best-practices-sources.json`
+- [x] Write `scripts/fetch-best-practices.ts` (CNSC Gatsby page-data + PDF/unpdf); both handlers validated on real docs
+- [x] Fetch + local-ingest 26 CNSC docs (19→45 docs, 3,569 chunks, 0 null embeddings)
+- [x] Best-practices probe set + runner (`evals/best-practices-probes.jsonl`; 16/18 expected-doc hit@8)
+- [x] ksweep no-regression measurement + honest writeup (`docs/best-practices-corpus.md`)
+- [x] Fix volume-suffixed-id citation regexes (`-Vol[IVX]`); lint + test:frontend/artifact/rag-eval green
+- [x] Repair the PR #15 Cloudflare build blockers: invoke the installed OpenNext CLI and type the manifest's reference-only IAEA source; `bun run build:cloudflare` passes (2026-09-22)
+- [x] Test shared REGDOC-series-reference consolidation on local Supabase; add a paired, per-stage RAG quick-test workbench and correct the over-broad §1.3 root-cause claim (2026-09-23; 41 chunks removed, no hit@8 recovery)
+- [ ] Audit the existing fetcher's title-based Preface/§1.3 removal on the 26 new docs; preserve document-specific evidence in a separately evaluated corpus variant before production load
+- [x] Adversarial review (licensing/fetcher/regex + eval-honesty lenses)
+- [!] NRC ingestion — blocked on human greenlight of the source-aware integration (C3/C4/C5; spec in `OVERNIGHT.md`)
 
 ---
 
