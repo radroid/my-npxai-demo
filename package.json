@@ -29,9 +29,9 @@
 		"eval:rag:report": "bun run scripts/rag-eval/report.ts",
 		"fetch:bp": "bun run scripts/fetch-best-practices.ts",
 		"probe:bp": "bun run scripts/rag-eval/probe-best-practices.ts",
-		"build:cloudflare": "bunx opennextjs-cloudflare build",
-		"preview:cloudflare": "bunx opennextjs-cloudflare preview",
-		"deploy:cloudflare": "bunx opennextjs-cloudflare deploy"
+		"build:cloudflare": "opennextjs-cloudflare build",
+		"preview:cloudflare": "opennextjs-cloudflare preview",
+		"deploy:cloudflare": "opennextjs-cloudflare deploy"
 	},
 	"dependencies": {
 		"@ai-sdk/openai": "^3.0.63",

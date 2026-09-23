@@ -57,7 +57,8 @@ const MANIFEST_PATH =
 	"resources/best-practices-sources.json";
 
 type Verdict = "GREEN" | "YELLOW" | "RED";
-type SourceKind = "cnsc" | "pdf";
+type SourceKind = "cnsc" | "pdf" | "iaea-reference";
+type FetchableSourceKind = Exclude<SourceKind, "iaea-reference">;
 
 interface ManifestSource {
 	id: string; // becomes regdoc_id, e.g. "REGDOC-2.11.1-vol1", "IAEA-SSG-14", "NRC-RG-8.13"
@@ -66,9 +67,20 @@ interface ManifestSource {
 	source: SourceKind;
 	license: string;
 	verdict: Verdict;
+	ingest?: boolean;
 	publisher?: string;
 	sca?: string[];
 	topics?: string[];
+}
+
+interface FetchableManifestSource extends ManifestSource {
+	source: FetchableSourceKind;
+}
+
+function isFetchableSource(
+	source: ManifestSource,
+): source is FetchableManifestSource {
+	return source.ingest !== false && source.source !== "iaea-reference";
 }
 
 type ReqType = "informational" | "guidance" | "requirement";
@@ -476,24 +488,23 @@ async function main() {
 		: join(REPO_ROOT, MANIFEST_PATH);
 	const manifestRaw = await readFile(manifestFull, "utf-8");
 	const manifest = JSON.parse(manifestRaw) as { sources: ManifestSource[] };
-	let sources = manifest.sources ?? [];
+	let selectedSources = manifest.sources ?? [];
 
-	if (ONLY) sources = sources.filter((s) => s.id === ONLY);
+	if (ONLY) selectedSources = selectedSources.filter((s) => s.id === ONLY);
 	if (PUBLISHER)
-		sources = sources.filter((s) => (s.publisher ?? "").includes(PUBLISHER));
+		selectedSources = selectedSources.filter((s) =>
+			(s.publisher ?? "").includes(PUBLISHER),
+		);
 	if (SOURCE_FILTER)
-		sources = sources.filter((s) => s.source === SOURCE_FILTER);
+		selectedSources = selectedSources.filter((s) => s.source === SOURCE_FILTER);
 	// Reference-only rows (e.g. IAEA bibliography) are never fetched into the corpus.
-	// biome-ignore lint/suspicious/noExplicitAny: manifest rows carry an optional ingest flag
-	sources = sources.filter(
-		(s) => (s as any).ingest !== false && s.source !== "iaea-reference",
-	);
+	const fetchableSources = selectedSources.filter(isFetchableSource);
 	// Never fetch RED; YELLOW only with --allow-yellow.
-	const skippedRed = sources.filter((s) => s.verdict === "RED");
+	const skippedRed = fetchableSources.filter((s) => s.verdict === "RED");
 	const skippedYellow = ALLOW_YELLOW
 		? []
-		: sources.filter((s) => s.verdict === "YELLOW");
-	sources = sources.filter(
+		: fetchableSources.filter((s) => s.verdict === "YELLOW");
+	const sources = fetchableSources.filter(
 		(s) => s.verdict === "GREEN" || (ALLOW_YELLOW && s.verdict === "YELLOW"),
 	);
 

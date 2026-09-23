@@ -417,6 +417,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Best-practices probe set + runner (`evals/best-practices-probes.jsonl`; 16/18 expected-doc hit@8)
 - [x] ksweep no-regression measurement + honest writeup (`docs/best-practices-corpus.md`)
 - [x] Fix volume-suffixed-id citation regexes (`-Vol[IVX]`); lint + test:frontend/artifact/rag-eval green
+- [x] Repair the PR #15 Cloudflare build blockers: invoke the installed OpenNext CLI and type the manifest's reference-only IAEA source; `bun run build:cloudflare` passes (2026-09-22)
 - [x] Adversarial review (licensing/fetcher/regex + eval-honesty lenses)
 - [!] NRC ingestion — blocked on human greenlight of the source-aware integration (C3/C4/C5; spec in `OVERNIGHT.md`)
 
