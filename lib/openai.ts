@@ -35,15 +35,16 @@ export function getArtifactModel(): string {
 // v2 answers carry legal-force and cross-jurisdiction discipline that the
 // default model follows unreliably (docs/phase-12-sources.md §4).
 //
-// Allowlisted: the spend guard admits requests by TOKENS, not dollars, so a
-// typo'd or premium model id would change cost per admission silently (or
-// fail every request). Anything else falls back to the default, logged once.
+// Allowlisted: the spend guard (lib/guard.ts) admits requests by TOKENS,
+// with caps sized for gpt-4o-mini, so only models priced at or below
+// gpt-4.1-mini (about 2.7× gpt-4o-mini per token) are accepted — a typo'd or
+// premium id would otherwise change the cost per admission silently, or fail
+// every request. Anything else falls back to the default, logged once. A
+// pricier model needs the guard's caps re-sized first.
 export const SOURCE_CHAT_MODELS = [
 	"gpt-4o-mini",
 	"gpt-4.1-nano",
 	"gpt-4.1-mini",
-	"gpt-4.1",
-	"gpt-4o",
 ] as const;
 let warnedSourceModel: string | null = null;
 export function getSourceChatModel(): string {

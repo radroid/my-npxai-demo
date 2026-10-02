@@ -308,7 +308,8 @@ function buildExpansions(
 	// it (a crafted or very long multi-document query): each document's
 	// BROAD expansion first — documents the question names before ones a
 	// concept hint inferred — then focused ones round-robin in the same
-	// order. Past MAX_EXPANSIONS named documents, the last-named get none.
+	// order (detection order: CNSC REGDOCs, then other collections' ids).
+	// Past MAX_EXPANSIONS named documents, the last-detected get none.
 	if (out.length <= MAX_EXPANSIONS) return out;
 	const order = [
 		...perDoc.filter((d) => d.named),
@@ -778,10 +779,11 @@ export async function embedTexts(
 }
 
 // See RetrievalOptions.source.bindingRefs. Pure; a no-op on the legacy path
-// (no binding rows are ever fetched there). Never displaces a chunk of a
-// document the question names (named and diversity picks are all from
-// those): a full envelope gives up its lowest-ranked OTHER chunk, or is
-// left alone.
+// (no binding rows are ever fetched there). Never displaces the top chunk of
+// a document the question names (the named and diversity picks): a full
+// envelope gives up its lowest-ranked other chunk — possibly a named
+// document's second or later chunk, so "what does RG 8.29 say…" can still
+// carry the Part 20 provision the guide explains.
 export function withBindingPresence(
 	envelope: RetrievedChunk[],
 	bindingRows: readonly RetrievedChunk[],
@@ -803,9 +805,17 @@ export function withBindingPresence(
 	)
 		return envelope;
 	if (envelope.length < size) return [...envelope, best];
+	const protectedIdx = new Set<number>();
+	const seenDocs = new Set<string>();
+	envelope.forEach((c, i) => {
+		if (!isMentioned(c.regdoc_id, mentionedDocs) || seenDocs.has(c.regdoc_id))
+			return;
+		seenDocs.add(c.regdoc_id);
+		protectedIdx.add(i);
+	});
 	let drop = -1;
 	for (let i = envelope.length - 1; i >= 0; i--) {
-		if (!isMentioned(envelope[i].regdoc_id, mentionedDocs)) {
+		if (!protectedIdx.has(i)) {
 			drop = i;
 			break;
 		}

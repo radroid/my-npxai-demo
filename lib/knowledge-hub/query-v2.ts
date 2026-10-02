@@ -341,7 +341,8 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 			const clean = !outputGuardTripped && !streamFailed;
 			const note = clean ? authorityNote(authority) : null;
 			if (note) emit(note);
-			const units = clean ? unitsNote(accumulated) : null;
+			const units =
+				clean && scope.kind === "compare" ? unitsNote(accumulated) : null;
 			if (units) emit(units);
 			writer.write({ type: "text-end", id: msgId });
 

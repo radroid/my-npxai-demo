@@ -216,7 +216,9 @@ async function main() {
 			console.error(
 				cachedCnsc
 					? `✗ ${id}: CNSC TEXT-HASH MISMATCH on the cached page-data — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. No download happened, so this usually means the CNSC parser changed (adapters/cnsc-html.ts): review the extracted-text diff, then rerun with --repin-cnsc.`
-					: `✗ ${id}: CHECKSUM DRIFT — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. The download is in ${path}.unverified (the cached copy is unchanged). Re-check edition and rights, then update the entry by hand.`,
+					: fromCache
+						? `✗ ${id}: CHECKSUM MISMATCH on the cached copy — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. Nothing was downloaded: the cached file changed, or the pin is wrong. Re-check it before publishing.`
+						: `✗ ${id}: CHECKSUM DRIFT — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. The download is in ${path}.unverified (the cached copy is unchanged). Re-check edition and rights, then update the entry by hand.`,
 			);
 		} else {
 			await keep(true);

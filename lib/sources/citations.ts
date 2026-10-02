@@ -193,13 +193,17 @@ const OBLIGATION_RE =
 // … not a requirement") is the right answer, not a violation.
 // Scoped to the clause: "The NRC does not believe that additional
 // reductions … are required" is a negation 60+ characters wide.
-// Only the negated obligation itself counts ("not required", "does not
-// require", "is not a requirement", "no obligation") — a "not" elsewhere in
-// the sentence ("is not limited to X, and licensees must Y") does not. The
-// one wide form is a disbelief verb: "The NRC does not believe that
-// additional reductions … are required".
+// The negated obligation itself, a few words apart at most ("not
+// required", "does not by itself require", "is not a mandatory document",
+// "are not, however, required", "no such obligation") — checked per clause
+// (CLAUSE_SPLIT_RE), so "they need not test them" cannot excuse "licensees
+// must brief workers" in the same sentence. The one wide form is a
+// disbelief verb: "The NRC does not believe that additional reductions …
+// are required".
 const NEGATED_OBLIGATION_RE =
-	/\b(?:not|never|no longer)\s+(?:(?:legally|strictly|explicitly|specifically|generally|currently|necessarily)\s+)?(?:requir\w*|mandatory|obligat\w*|binding)\b|n['’]t\s+(?:(?:legally|strictly|explicitly|necessarily)\s+)?(?:requir\w*|mandatory|obligat\w*|binding)\b|\bno\s+(?:legal\s+|regulatory\s+)?(?:requirements?|obligations?|mandate)\b|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding|not (?:a |an )?(?:legal |regulatory )?requirements?)\b/i;
+	/\b(?:not|never|no longer),?\s+(?:\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|n['’]t,?\s+(?:\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|\bno\s+(?:\w+\s+){0,2}?(?:requirements?|obligations?|mandates?|duty|duties)\b|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/i;
+const CLAUSE_SPLIT_RE =
+	/\s*[;:]\s*|,\s*(?=(?:and|but|while|whereas|although)\b)|\s+[—–]\s+/;
 // "the required safety functions" — an adjective, not an obligation.
 const ADJECTIVAL_REQUIRED_RE = /\bthe required\b/gi;
 
@@ -255,11 +259,14 @@ export function lintAuthority(
 		/(?<=[.!?](?:\s*\[\[[^\]\n]*\]\])*)\s+(?!\[\[|\[S\d)|\n+/,
 	)) {
 		const sentence = raw.trim();
-		if (
-			!OBLIGATION_RE.test(sentence.replace(ADJECTIVAL_REQUIRED_RE, "")) ||
-			NEGATED_OBLIGATION_RE.test(sentence)
-		)
-			continue;
+		const asserts = sentence
+			.replace(ADJECTIVAL_REQUIRED_RE, "")
+			.split(CLAUSE_SPLIT_RE)
+			.some(
+				(clause) =>
+					OBLIGATION_RE.test(clause) && !NEGATED_OBLIGATION_RE.test(clause),
+			);
+		if (!asserts) continue;
 		const cited = extractSnippetIds(sentence)
 			.map((id) => sources.find((s) => s.sid === id))
 			.filter((s) => s !== undefined);
@@ -288,17 +295,20 @@ export function authorityNote(flags: AuthorityFlag[]): string | null {
 	return `\n\n_Legal-force note: the passages cited from ${refs.join("; ")} are guidance, not legal requirements. Where this answer says "required" or "must" citing only ${many ? "them" : "it"}, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._`;
 }
 
-// The notes above and below, as appended to an answer — for graders that
-// must judge the model's own text ("must"/"required" and mSv values in a
-// note would otherwise satisfy a must_contain check).
-const APPENDED_NOTE_RE = /\n*_(?:Legal-force|Units) note: [^\n]*_(?=\n|$)/g;
+// The notes above and below, as appended to the END of an answer — for
+// graders that must judge the model's own text ("must"/"required" and mSv
+// values in a note would otherwise satisfy a must_contain check). Anchored
+// to the end, so a look-alike line the model wrote mid-answer stays.
+const APPENDED_NOTE_RE = /(?:\n\n_(?:Legal-force|Units) note: [^\n]*_)+$/;
 
 export function stripAppendedNotes(text: string): string {
 	return text.replace(APPENDED_NOTE_RE, "");
 }
 
+// A verdict between values — not "exceed" / "greater than", which dose
+// text uses for thresholds ("likely to exceed 0.1 rem (1 mSv)").
 const COMPARATIVE_RE =
-	/\b(?:higher|lower|stricter|more stringent|less stringent|more restrictive|less restrictive|greater|exceeds?)\b/i;
+	/\b(?:higher|lower|stricter|more stringent|less stringent|more restrictive|less restrictive)\b/i;
 const REM_VALUE_RE = /\b(\d+(?:\.\d+)?)\s*rems?\b/gi;
 const SI_VALUE_RE = /\b\d+(?:\.\d+)?\s*m?Sv\b/;
 
@@ -308,7 +318,8 @@ const SI_VALUE_RE = /\b\d+(?:\.\d+)?\s*m?Sv\b/;
  * the exact mSv equivalent of every rem value it quoted. gpt-4o-mini
  * repeatedly called a 50 mSv limit "higher" than 15 rem (= 150 mSv) despite
  * the prompt's one-unit rule; the note makes any such claim checkable at a
- * glance.
+ * glance. Comparison answers only (query-v2): within one regime the values
+ * share a source and a unit system.
  */
 export function unitsNote(text: string): string | null {
 	if (!COMPARATIVE_RE.test(text) || !SI_VALUE_RE.test(text)) return null;

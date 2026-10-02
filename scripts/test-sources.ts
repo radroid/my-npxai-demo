@@ -1365,12 +1365,12 @@ check(
 		named,
 	);
 	check(
-		"binding presence never displaces a named document's chunk: it gives up the lowest-ranked other one",
+		"binding presence never displaces a named document's top chunk: it gives up the lowest-ranked other one",
 		JSON.stringify(keepNamed.map((c) => c.id)) === JSON.stringify([1, 3, 4, 9]),
 		keepNamed.map((c) => c.id),
 	);
 	check(
-		"binding presence leaves an envelope of named documents alone",
+		"binding presence leaves an envelope of distinct named documents alone",
 		withBindingPresence(
 			env4,
 			[g(9, 0.55, "binding")],
@@ -1379,6 +1379,25 @@ check(
 			4,
 			new Set(["D1", "D2", "D3", "D4"]),
 		).every((c, i) => c.id === env4[i].id),
+	);
+	// A named guide filling the envelope: its top chunk stays, its lowest-
+	// ranked extra chunk gives way to the regulation.
+	const guideOnly = [1, 2, 3, 4].map((id) => ({
+		...g(id, 0.7 - id / 100, "nonbinding"),
+		regdoc_id: "RG 8.29",
+	})) as RetrievedChunk[];
+	const withRule = withBindingPresence(
+		guideOnly,
+		[g(9, 0.6, "binding")],
+		0.69,
+		t,
+		4,
+		new Set(["RG 8.29"]),
+	);
+	check(
+		"binding presence: a named guide's extra chunks can give way to the binding rule",
+		JSON.stringify(withRule.map((c) => c.id)) === JSON.stringify([1, 2, 3, 9]),
+		withRule.map((c) => c.id),
 	);
 	check(
 		"binding presence applies to NRC only (binding + nonbinding, no mixed-force documents)",
@@ -1532,7 +1551,11 @@ check(
 		const withNotes = `${answer}${note}${unitsNote("CNSC 50 mSv is higher than 15 rem.")}`;
 		check(
 			"graders strip the appended legal-force and units notes back to the model's own text",
-			stripAppendedNotes(withNotes) === answer && withNotes !== answer,
+			stripAppendedNotes(withNotes) === answer &&
+				withNotes !== answer &&
+				stripAppendedNotes(
+					`_Units note: quoted by the model._\n\n${answer}`,
+				) === `_Units note: quoted by the model._\n\n${answer}`,
 			stripAppendedNotes(withNotes),
 		);
 	}
@@ -1551,6 +1574,9 @@ check(
 		"units note: absent without a comparative, without SI units, or without rem",
 		unitsNote("Limits: 5 rem (50 mSv) and 15 rem.") === null &&
 			unitsNote("The limit of 5 rem is higher than 2 rem.") === null &&
+			unitsNote(
+				"Monitoring applies if the dose is likely to exceed 0.1 rem (1 mSv), greater than 10% of the limit.",
+			) === null &&
 			unitsNote("50 mSv is higher than 20 mSv.") === null,
 	);
 	{
@@ -1568,7 +1594,9 @@ check(
 					at('writer.write({ type: "text-end", id: msgId });') &&
 				/const clean = !outputGuardTripped && !streamFailed;/.test(q) &&
 				/clean \? authorityNote\(authority\) : null/.test(q) &&
-				/clean \? unitsNote\(accumulated\) : null/.test(q) &&
+				/clean && scope\.kind === "compare" \? unitsNote\(accumulated\) : null/.test(
+					q.replace(/\s+/g, " "),
+				) &&
 				at("if (units) emit(units);") <
 					at('writer.write({ type: "text-end", id: msgId });'),
 		);
@@ -1689,6 +1717,184 @@ check(
 			CNSC_ONLY,
 			"single:cnsc",
 		],
+		// Answered (round-4 review): places, trade, other-than, incidental IAEA.
+		[
+			"Can I export tritium to a customer in Korea?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What rules apply to exports to a customer in Korea?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		["Do I need an export licence for China?", AUTO, CNSC_ONLY, "single:cnsc"],
+		[
+			"Do I need an export permit for uranium destined for China?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What is required for exporting nuclear items to the Republic of Korea?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can I import a Co-60 source from a supplier in France?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		["Can we use a cask certified in Germany?", AUTO, CNSC_ONLY, "single:cnsc"],
+		[
+			"Can we buy radioisotopes from reactors in Russia?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Is an APR1400 already operating in Korea licensable here?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Do sources need to be escorted across Australia?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What did the Chernobyl accident in Ukraine change for emergency planning?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Are transfers between Canada and Korea subject to safeguards?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What does the nuclear cooperation agreement between Canada and China cover?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Do both France-made and Korea-made casks need CNSC certification?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does the CNSC allow exports to countries other than the United States?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does REGDOC-2.12.3 apply to sources other than those of IAEA Category 1?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What is the difference between CNSC requirements for sources from France and China?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the post-Fukushima requirements for emergency power?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What is the difference between Category 1 and 2 sources in the IAEA categorisation?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What is the difference between Category 1 and 2 sources in the IAEA categorisation?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		// Declined (round-4 review): the US, joined pairs, comparatives, IAEA ids.
+		[
+			"How do CNSC dose limits differ from the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How do CNSC dose limits differ from those in the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"What is the difference between CNSC and US dose limits?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Do both Canada and the US require a PSA?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Is the CNSC approach similar to the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How does Canada's approach to SMR licensing differ from the US approach?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"CNSC and US dose limits: what is the difference?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Is the CNSC stricter than the NRC?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Which is stricter, CNSC or Finland?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"What is the difference between REGDOC-2.5.2 and SSR-2/1?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"Is the CNSC limit lower than GSR Part 3?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
 		// Declined: a country as the question's subject.
 		[
 			"What is the dose limit for workers in Finland?",
@@ -1764,6 +1970,13 @@ check(
 			AUTO,
 			ALL,
 			"notice:not_indexed",
+		],
+		["Is the CNSC stricter than the NRC?", AUTO, ALL, "compare:cnsc+nrc"],
+		[
+			"Does REGDOC-2.5.2 cover both CANDU and US-designed reactors?",
+			AUTO,
+			ALL,
+			"single:cnsc",
 		],
 		[
 			"What is the difference between CNSC and STUK requirements?",
@@ -1868,14 +2081,34 @@ check(
 			src4,
 		).length === 1,
 	);
+	const negated = [
+		"Licensees are not required to submit the plan [[S2]].",
+		"The guide doesn't require a second review [[S2]].",
+		"There is no legal requirement to do so [[S2]].",
+		"A licensee need not repeat the survey and the guide is not binding [[S2]].",
+		"RG 8.29 does not impose any obligation on licensees [[S2]].",
+		"It is not a mandatory document [[S2]].",
+		"These reviews are not, however, required [[S2]].",
+		"A second survey is not always required [[S2]].",
+		"There is no such obligation in the guide [[S2]].",
+		"The guide is not in itself mandatory [[S2]].",
+		"The guide does not by itself require anything [[S2]].",
+	];
 	check(
-		"lint: the negated obligation itself is not a violation",
-		[
-			"Licensees are not required to submit the plan [[S2]].",
-			"The guide doesn't require a second review [[S2]].",
-			"There is no legal requirement to do so [[S2]].",
-			"A licensee need not repeat the survey and the guide is not binding [[S2]].",
-		].every((x) => lintAuthority(x, src4).length === 0),
+		"lint: the negated obligation itself (a few words apart) is not a violation",
+		negated.every((x) => lintAuthority(x, src4).length === 0),
+		negated.filter((x) => lintAuthority(x, src4).length > 0),
+	);
+	check(
+		"lint: a negation in one clause does not excuse an obligation in another",
+		lintAuthority(
+			"Licensees must brief workers; they need not test them [[S2]].",
+			src4,
+		).length === 1 &&
+			lintAuthority(
+				"Licensees must not exceed the limit, but the guide does not require reports [[S2]].",
+				src4,
+			).length === 1,
 	);
 	const aerbEnv = buildSourceEnvelope({
 		chunks: [],
