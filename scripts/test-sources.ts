@@ -2054,6 +2054,26 @@ check(
 			CNSC_ONLY,
 			"single:cnsc",
 		],
+		// Answered (round-9 review): the partner's rules as an attribute of
+		// the item or shipment.
+		[
+			"My US supplier says the item is subject to US export controls; do I need an import licence?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does a package shipped under US transport rules need re-labelling at the border?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Do I need a CNSC import licence if the supplier has US export licensing?",
+			AUTO,
+			ALL,
+			"single:cnsc",
+		],
 		// Answered (round-8 review): a transport far end or origin.
 		[
 			"What are CNSC requirements for transporting sources between Canada and the US?",
@@ -2226,6 +2246,37 @@ check(
 			AUTO,
 			CNSC_ONLY,
 			"notice:reference_only",
+		],
+		// Declined or compared (round-9 review): transport itself compared.
+		[
+			"How do exports differ between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Compare transport in Canada to the US.",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How does transport differ between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Compare transport security to the UK.",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		[
+			"Compare a transport package certified in the US with one certified in Canada.",
+			AUTO,
+			ALL,
+			"compare:cnsc+nrc",
 		],
 		// Declined or compared (round-8 review): the US/UK's own transport or
 		// trade rules, and both ends compared.
@@ -2603,6 +2654,9 @@ check(
 		"The guide places no additional obligations on licensees [[S2]].",
 		"A second review shall not be required [[S2]].",
 		// The negated word's object and coordinates (round-8 review).
+		"The document is not legally binding, nor does it impose duties and obligations [[S2]].",
+		"The CNSC does not prohibit or require this method [[S2]].",
+		"Use of the method is not required or prohibited [[S2]].",
 		"NRC Regulatory Guide 8.10 does not impose legal obligations on US licensees [[S2]].",
 		"The guide does not create legally binding obligations [[S2]].",
 		"Use of RG 8.29 is not required or mandatory for licensees [[S2]].",
@@ -2623,6 +2677,8 @@ check(
 		"This is not just recommended but required [[S2]].",
 		"Licensees must confirm that no open regulatory requirements remain [[S2]].",
 		// A negation excuses only what it negates (round-7 review).
+		"Persons who are not licensed are prohibited from possessing a sealed source [[S2]].",
+		"Devices not certified are prohibited from use [[S2]].",
 		"Licensees are required to keep records, though not required to submit them [[S2]].",
 		"The guide does not require it but the licence must reference it [[S2]].",
 		"Licensees must perform an ALARA review with no new requirements beyond Part 20 [[S2]].",

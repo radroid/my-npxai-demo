@@ -223,11 +223,16 @@ const NEG_WORDS =
 const NEG_NOUNS =
 	"requirements?|obligations?|mandates?|duty|duties|prohibitions?";
 const NEG_GAP = "(?:(?!but\\b)\\w+,?\\s+){0,3}?";
-const NEG_TAIL = `(?:\\s+(?:(?!but\\b)[\\w-]+\\s+){0,3}?(?:${NEG_NOUNS})\\b)?(?:,?\\s+(?:or|nor)\\s+(?:(?!but\\b)[\\w-]+\\s+){0,2}?(?:${NEG_WORDS}|${NEG_NOUNS})\\b|\\s+and\\s+(?:${NEG_NOUNS})\\b)*`;
+// "Prohibit" only right after the negation or its auxiliary ("does not
+// prohibit", "nor does it prohibit"): "persons not licensed are
+// prohibited" states a prohibition.
+const NEG_HEAD = `${NEG_GAP}(?:requir\\w*|mandatory|obligat\\w*|binding|enforceable|impos\\w*)|(?:(?:does|do|did|is|are|was|were|it|they|this|explicitly|specifically|expressly|itself|by)\\s+){0,3}?prohibit\\w*`;
+const NEG_OBJECT = `(?:\\s+(?:(?!but\\b)[\\w-]+\\s+){0,3}?(?:${NEG_NOUNS})\\b)?(?:,?\\s+(?:and|or|nor)\\s+(?:${NEG_NOUNS})\\b)*`;
+const NEG_TAIL = `${NEG_OBJECT}(?:,?\\s+(?:or|nor)\\s+(?:(?!but\\b)[\\w-]+\\s+){0,2}?(?:${NEG_WORDS}|${NEG_NOUNS})\\b${NEG_OBJECT})*`;
 const NEGATED_OBLIGATION_RE = new RegExp(
 	[
-		`(?<!\\b(?:must|shall)\\s)\\b(?:not|never|no longer|neither|nor),?\\s+${NEG_GAP}(?:${NEG_WORDS})\\b${NEG_TAIL}`,
-		`n['’]t,?\\s+${NEG_GAP}(?:${NEG_WORDS})\\b${NEG_TAIL}`,
+		`(?<!\\b(?:must|shall)\\s)\\b(?:not|never|no longer|neither|nor),?\\s+(?:${NEG_HEAD})\\b${NEG_TAIL}`,
+		`n['’]t,?\\s+(?:${NEG_HEAD})\\b${NEG_TAIL}`,
 		`\\bno\\s+(?:(?:legal|legally|regulatory|such|specific|explicit|formal|binding|enforceable|additional|new|further|other)\\s+){0,2}(?:${NEG_NOUNS})\\b${NEG_TAIL}`,
 		`\\b(?:must|shall)\\s+not\\s+be\\s+(?:\\w+\\s+)?(?:requir\\w*|mandatory|obligat\\w*)\\b${NEG_TAIL}`,
 		"\\bnot\\s+(?:believe|consider|think)\\b[^.;:]{0,120}\\b(?:requires?|required|necessary)\\b",

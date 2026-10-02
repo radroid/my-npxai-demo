@@ -231,7 +231,11 @@ const TRANSPORT_RE = /\btransport\w*/i;
 const RULE_NOUNS =
 	"requirements?|regulations?|rules|controls?|licensing|limits?|standards?|laws?|regimes?|frameworks?|polic(?:y|ies)|approach(?:es)?";
 // Topic words between a country and a rule noun: "US transport
-// requirements", "UK export controls", "US dose limits".
+// requirements", "UK export controls", "US dose limits" — the country's
+// own rules, unless they only describe the item or shipment ("subject to
+// US export controls", "shipped under US transport rules").
+const ATTRIBUTE_FRAMES =
+	"subject\\s+to|(?:ship(?:s|ped|ping)?|sent|moved|approved|certified|licensed|transported|packaged|exported|imported|made|built)\\s+under|meets?|meeting|follows?|following|bound\\s+by|covered\\s+by|compl(?:y|ies|iant)\\s+with|with|ha(?:s|ve|ving)|holds?|holding";
 const TOPIC_WORDS =
 	"transport\\w*|import\\w*|export\\w*|shipping|packag\\w*|licens\\w*|safety|security|radiation|dose|nuclear|safeguards|emergency|waste|federal";
 // A country as the SUBJECT of the question — its own rules: "Finland's",
@@ -245,7 +249,7 @@ const TOPIC_WORDS =
 function countrySubjectRe(countries: string): RegExp {
 	const c = `(?:${countries})(?![\\w-])`;
 	return new RegExp(
-		`\\b${c}(?:['’]s\\b|\\s+(?:${ADJACENT_RULE_WORDS})\\b|\\s+(?:(?:${TOPIC_WORDS})\\s+){1,2}(?:${RULE_NOUNS})\\b)|\\b(?:${GOVERNING_RULE_WORDS})\\b(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?!;:]){0,40}?(?<!\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed)\\s)\\b(?:in|for|of|within)\\s+(?:the\\s+)?(?:Republic\\s+of\\s+)?\\b${c}`,
+		`\\b${c}(?:['’]s\\b|\\s+(?:${ADJACENT_RULE_WORDS})\\b)|(?<!\\b(?:${ATTRIBUTE_FRAMES})\\s+(?:the\\s+)?)\\b${c}\\s+(?:(?:${TOPIC_WORDS})\\s+){1,2}(?:${RULE_NOUNS})\\b|\\b(?:${GOVERNING_RULE_WORDS})\\b(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?!;:]){0,40}?(?<!\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed)\\s)\\b(?:in|for|of|within)\\s+(?:the\\s+)?(?:Republic\\s+of\\s+)?\\b${c}`,
 		"i",
 	);
 }
@@ -291,7 +295,7 @@ const INDEXED_COUNTRY_TRADED = Object.fromEntries(
 // US site and a Canadian site" — compares two regimes; a destination
 // alone does not.
 const CANADA_FAR_END_RE =
-	/\b(?:to|from|into|via|through|across|out\s+of)\s+(?:the\s+)?Canada\b(?!-)|\bCanadian\s+(?:sites?|facilit(?:y|ies))\b|\b(?:sites?|facilit(?:y|ies))\s+in\s+Canada\b/i;
+	/\b(?:to|from|into|via|through|across|out\s+of)\s+(?:the\s+)?Canada\b(?!-)|\bCanadian\s+(?:sites?|facilit(?:y|ies))\b|\b(?:sites?|facilit(?:y|ies))\s+in\s+Canada\b|\b(?:built|made|manufactured|fabricated|produced|designed|certified|licensed|approved)\s+in\s+Canada\b/i;
 
 // The names that put a collection's regime into a comparison slot (below).
 // `regulators` always count. `countries` count in a "between/both/compare
@@ -399,7 +403,7 @@ function slotSources(
 	// For countries: not a pair a trade word governs ("shipments between
 	// Canada and the US", "for shipments to the US and France").
 	const notTraded = tradeGuard
-		? `(?<!\\b(?:${TRADE_CORE}|transport\\w*)(?:\\s+(?!(?:${RULE_NOUNS})\\b)[\\w-]+){0,2}\\s+(?:(?:to|from|into|via|for)\\s+)?(?:the\\s+)?)`
+		? `(?<!\\b(?:${TRADE_CORE}|(?:for|of)\\s+transport\\w*)(?:\\s+(?!(?:${RULE_NOUNS}|${COMPARISON_WORDS})\\b)[\\w-]+){0,2}\\s+(?:(?:to|from|into|via|for)\\s+)?(?:the\\s+)?)`
 		: "";
 	const pairLead = `${notTraded}\\b(?:[Bb]etween|[Bb]oth|[Cc]ompar(?:e[ds]?|ing))\\s+`;
 	const gap = `(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?;:]){0,60}?`;
