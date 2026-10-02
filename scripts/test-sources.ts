@@ -2005,6 +2005,147 @@ check(
 			CNSC_ONLY,
 			"notice:not_enabled",
 		],
+		// Answered (round-6 review): CNSC's own IAEA schemes, governed trade pairs.
+		[
+			"What does the PTNSR say about IAEA Type B packages?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the IAEA Additional Protocol declarations a licensee must make?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the IAEA D-values used for source categories?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can a Type A package contain more than the IAEA A2 value?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are IAEA seals and how must licensees protect them?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"How should a licensee prepare for an IAEA inspection?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"How does Canada implement the IAEA guidance on import and export of radioactive sources?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Are there special requirements for transporting sources between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		// Declined (round-6 review): comparisons that mention trade, IAEA subject.
+		[
+			"What did the IAEA conclude about the Fukushima accident?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"How does REGDOC-2.5.2 differ from IAEA SSR-2/1?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"What is the difference between the CNSC and IAEA approaches?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		["What is INFCIRC/225?", AUTO, CNSC_ONLY, "notice:reference_only"],
+		[
+			"Summarize IAEA Nuclear Security Series No. 14.",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"Do both Canada and the US require transport security plans?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Is 5 TBq of Ir-192 higher than the IAEA D-value?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Is a licence required for both Canada and US legs of the shipment?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"How do transport requirements differ between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Compare Canadian and UK transport regulations for radioactive material.",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"What are the differences between Canadian and US export controls?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How do Canada and Korea differ on export controls?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"Compare transport security for Category 1 sources in Canada and France.",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"How do dose limits compare with the IAEA?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		[
+			"What are the IAEA dose limits for workers?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"What are the clearance levels in the IAEA basic safety standards?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
 		// Declined (round-4 review): the US, joined pairs, comparatives, IAEA ids.
 		[
 			"How do CNSC dose limits differ from the US?",
@@ -2150,6 +2291,12 @@ check(
 		],
 		["Is the CNSC stricter than the NRC?", AUTO, ALL, "compare:cnsc+nrc"],
 		[
+			"How do import licensing requirements in Canada differ from the US?",
+			AUTO,
+			ALL,
+			"compare:cnsc+nrc",
+		],
+		[
 			"CNSC or NRC — whose dose limits are lower?",
 			AUTO,
 			ALL,
@@ -2282,6 +2429,8 @@ check(
 		"There is no such obligation in the guide [[S2]].",
 		"The guide is not in itself mandatory [[S2]].",
 		"The guide does not by itself require anything [[S2]].",
+		"The guide places no additional obligations on licensees [[S2]].",
+		"A second review shall not be required [[S2]].",
 	];
 	check(
 		"lint: the negated obligation itself (a few words apart) is not a violation",

@@ -212,7 +212,7 @@ const OBLIGATION_RE =
 // disbelief verb: "The NRC does not believe that additional reductions …
 // are required".
 const NEGATED_OBLIGATION_RE =
-	/(?<!\b(?:must|shall)\s)\b(?:not|never|no longer),?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|n['’]t,?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|\bno\s+(?:(?:legal|regulatory|such|specific|explicit|formal|binding)\s+)?(?:requirements?|obligations?|mandates?|duty|duties)\b|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/i;
+	/(?<!\b(?:must|shall)\s)\b(?:not|never|no longer),?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|n['’]t,?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|\bno\s+(?:(?:legal|regulatory|such|specific|explicit|formal|binding|additional|new|further|other)\s+)?(?:requirements?|obligations?|mandates?|duty|duties)\b|\b(?:must|shall)\s+not\s+be\s+(?:\w+\s+)?(?:requir\w*|mandatory|obligat\w*)|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/i;
 const CLAUSE_SPLIT_RE =
 	/\s*[;:]\s*|,\s*(?=(?:and|but|while|whereas|although)\b)|\s+[—–]\s+/;
 // "the required safety functions" — an adjective, not an obligation.

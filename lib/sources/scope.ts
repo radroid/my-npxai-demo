@@ -82,9 +82,9 @@ export type ResolvedScope =
 // makes an explicit comparison) or INCIDENTAL (a cue at most):
 //   res          — regime mentions: a regulator, its documents;
 //   countries    — the regulator's country: a regime unless the question is
-//                  about trade or movement and the country is not its
-//                  subject ("import a source from a US supplier", "export
-//                  to a customer in Japan");
+//                  about trade or movement, compares nothing, and the
+//                  country is not its subject ("import a source from a US
+//                  supplier", "export to a customer in Japan");
 //   incidental   — always incidental: an event ("post-Fukushima");
 //   incidentalPhrases — phrases removed before `res` is tested: CNSC's own
 //                  use of an IAEA scheme ("IAEA Category 1", "IAEA
@@ -106,8 +106,9 @@ const MENTION_RULES: Array<{
 			/\bNSCA\b/i,
 			/Nuclear Safety and Control Act/i,
 			/Canadian Nuclear Safety Commission/i,
+			// CNSC is the default collection: "Canada" is always its regime.
+			/\bCanad(?:a|ian)\b(?!-)/i,
 		],
-		countries: [/\bCanad(?:a|ian)\b(?!-)/i],
 	},
 	{
 		collection: "nrc",
@@ -162,17 +163,26 @@ const MENTION_RULES: Array<{
 	},
 	{
 		collection: "iaea",
+		// The IAEA as the SUBJECT: a safety standard named, or the IAEA's own
+		// requirements, limits, recommendations or position. Any other
+		// mention is CNSC's own use of an IAEA scheme — transport packages
+		// and certificates (the PTNSR adopts the IAEA Regulations),
+		// safeguards (Additional Protocol, seals, cameras), source categories
+		// and D-values — and is incidental.
 		res: [
-			/\bIAEA\b/i,
-			/\bInternational Atomic Energy Agency\b/i,
 			/\b(?:SSR|GSR|SSG|GSG|NS-G)[-\s]?\d/i,
 			/\bGSR\s+Part\s+\d/i,
 			/\bSF-1\b/i,
-			/\bINFCIRC\b/i,
 			/\bIRRS\b/i,
+			/\bINFCIRC\b/i,
+			/\b(?:Nuclear Security Series|Safety (?:Standards|Reports?) Series)\b/i,
+			/\b(?:IAEA|International Atomic Energy Agency)(?:['’]s\b|\s+(?:[\w-]+\s+){0,2}?(?:requirements?|limits?|standards?|recommendations?|recommends?|requires?|approach|position|view|guidance|principles?|definitions?|defines?|says?|states?|expects?|Code of Conduct)\b)/i,
+			/\b(?:does|do|did|would)\s+(?:the\s+)?IAEA\b/i,
+			/\baccording to (?:the\s+)?IAEA\b/i,
 		],
-		// Any other IAEA mention ("IAEA dose limits", "the IAEA approach to
-		// SMRs", "the IAEA Code of Conduct") is the question's subject.
+		incidental: [/\bIAEA\b/i, /\bInternational Atomic Energy Agency\b/i],
+		// Stripped before `res` is tested: "the IAEA safeguards requirements"
+		// is a CNSC safeguards question.
 		incidentalPhrases: [
 			/\b(?:the\s+)?IAEA\s+(?:source\s+)?(?:categor\w*|Category\s+\d|scheme|classification)/gi,
 			/\b(?:the\s+)?IAEA\s+(?:safeguards?|inspect\w*)/gi,
@@ -204,8 +214,9 @@ const GOVERNING_RULE_WORDS =
 // origin, not the regime ("requirements for exporting to a customer in
 // Korea", "sources from France and China"). TRADE_RE (without "from",
 // which also introduces comparisons) marks a trade QUESTION.
+// ("transport" is not among them: it is a regulatory topic — the PTNSR.)
 const TRADE_CORE =
-	"export\\w*|import\\w*|ship\\w*|transport\\w*|transfer\\w*|supplier\\w*|customer\\w*|vendor\\w*|client\\w*|buyer\\w*|destin\\w*|cross-border|border";
+	"export\\w*|import\\w*|ship\\w*|transfer\\w*|supplier\\w*|customer\\w*|vendor\\w*|client\\w*|buyer\\w*|destin\\w*|cross-border|border";
 const TRADE_WORDS = `${TRADE_CORE}|bound|from`;
 const TRADE_RE = new RegExp(`\\b(?:${TRADE_CORE})\\b`, "i");
 // A country as the SUBJECT of the question — its own rules: "Finland's",
@@ -287,7 +298,9 @@ const REGIME_NAMES: Record<CollectionId, RegimeNames> = {
 	},
 	iaea: {
 		regulators:
-			"IAEA(?!\\s+(?:source\\s+)?(?:categor|Category|scheme|classification|safeguards))|International Atomic Energy Agency|(?:SSR|GSR|SSG|GSG|NS-G)[-\\s]?\\d+(?:[./-]\\d+)*|GSR\\s+Part\\s+\\d+|SF-1",
+			// "IAEA" alone or before a regime noun — not "the IAEA A2 value",
+			// "the IAEA D-value", "IAEA Category 1" (CNSC's own quantities).
+			"(?:IAEA|International Atomic Energy Agency)(?=\\s*(?:[?.,;:!)]|$)|\\s+(?:on|in|for|and|or|does|do|did|BSS|(?:basic\\s+)?safety\\s+standards?|standards?|requirements?|requires?|limits?|recommendations?|recommends?|guidance|approach(?:es)?|position|says?)\\b|['’]s)|(?:IAEA\\s+)?(?:(?:SSR|GSR|SSG|GSG|NS-G)[-\\s]?\\d+(?:[./-]\\d+)*|GSR\\s+Part\\s+\\d+|SF-1)",
 	},
 };
 const UNINDEXED_NAMES: RegimeNames = {
@@ -306,13 +319,12 @@ const PAIR_VERB_RE = new RegExp(
 	"i",
 );
 // A pair or joined pair of COUNTRIES compares only with a comparison word
-// or a rules verb after the pair, and never in a trade question ("CNSC
-// requirements for transporting sources between Canada and the US").
+// or a rules verb at the pair ("transfers between Canada and Korea" does
+// not; the slot itself skips pairs a trade word governs).
 const countryPairContext = (q: string) =>
-	!TRADE_RE.test(q) && (COMPARISON_CONTEXT_RE.test(q) || PAIR_VERB_RE.test(q));
+	COMPARISON_CONTEXT_RE.test(q) || (PAIR_VERB_RE.test(q) && !TRADE_RE.test(q));
 const joinedContext = (q: string) => COMPARISON_CONTEXT_RE.test(q);
-const countryJoinedContext = (q: string) =>
-	!TRADE_RE.test(q) && COMPARISON_CONTEXT_RE.test(q);
+const countryJoinedContext = joinedContext;
 // Any regime, indexed or not, as the OTHER side of an "X and R" pair.
 const ANY_REGIME =
 	"CNSC|Canadian Nuclear Safety Commission|Canada|Canadian|REGDOC[-\\s]?\\d[\\d.]*|NRC|United States|U\\.S\\.|US|ONR|UK|United Kingdom|EU|Euratom|European Union|AERB|India|NRA|Japan|IAEA";
@@ -333,15 +345,23 @@ const ANY_REGIME =
 // [Xx] classes so the same source compiles case-sensitively for acronyms.
 const LEAD =
 	"(?:[Tt]he\\s+|[Tt]hose\\s+(?:in|of)\\s+(?:the\\s+)?|[Tt]hat\\s+of\\s+(?:the\\s+)?|in\\s+(?:the\\s+)?)?";
-function slotSources(names: string): {
+function slotSources(
+	names: string,
+	tradeGuard: boolean,
+): {
 	pair: string;
 	joined: string;
 	direct: string;
 } {
 	const r = `\\b(?:${names})(?:['’]s)?(?![A-Za-z0-9-])`;
-	const pairLead = "\\b(?:[Bb]etween|[Bb]oth|[Cc]ompar(?:e[ds]?|ing))\\s+";
+	// For countries: not a pair a trade word governs ("shipments between
+	// Canada and the US", "for shipments to the US and France").
+	const notTraded = tradeGuard
+		? `(?<!\\b(?:${TRADE_CORE})(?:\\s+[\\w-]+){0,2}\\s+(?:(?:to|from|into|via|for)\\s+)?(?:the\\s+)?)`
+		: "";
+	const pairLead = `${notTraded}\\b(?:[Bb]etween|[Bb]oth|[Cc]ompar(?:e[ds]?|ing))\\s+`;
 	const gap = `(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?;:]){0,60}?`;
-	const x = `\\b(?:${ANY_REGIME})(?:['’]s)?(?![A-Za-z0-9-])`;
+	const x = `${notTraded}\\b(?:${ANY_REGIME})(?:['’]s)?(?![A-Za-z0-9-])`;
 	return {
 		pair: [
 			`${pairLead}${gap}\\band\\s+${LEAD}${r}`,
@@ -366,7 +386,7 @@ function slotMatcher(n: RegimeNames): (query: string) => boolean {
 		[];
 	const add = (names: string | undefined, flags: string, country: boolean) => {
 		if (!names) return;
-		const src = slotSources(names);
+		const src = slotSources(names, country);
 		res.push({ re: new RegExp(src.direct, flags), context: null });
 		res.push({
 			re: new RegExp(src.pair, flags),
@@ -435,7 +455,11 @@ export interface Mentions {
 export function detectMentions(query: string): Mentions {
 	const collections: CollectionId[] = [];
 	const nonEvent: CollectionId[] = [];
-	const trade = TRADE_RE.test(query);
+	// A trade question that compares nothing: its countries are partners.
+	const trade =
+		TRADE_RE.test(query) &&
+		!COMPARISON_CONTEXT_RE.test(query) &&
+		!EXPLICIT_COMPARE_RE.test(query);
 	for (const rule of MENTION_RULES) {
 		const stripped = (rule.incidentalPhrases ?? []).reduce(
 			(q, re) => q.replace(re, " "),
@@ -533,7 +557,15 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 		}
 		// An event ("after Fukushima") is a subject, not another regime: a
 		// CNSC-pinned question about post-Fukushima requirements stays here.
-		const others = mentions.nonEvent.filter((id) => id !== pinned);
+		// Another regime as the subject, or in a comparison slot even when
+		// only incidentally named ("How do dose limits compare with the
+		// IAEA?").
+		const others = [
+			...new Set([
+				...mentions.nonEvent,
+				...slottedCollections(query, mentions.collections),
+			]),
+		].filter((id) => id !== pinned);
 		const namesPinned = mentions.collections.includes(pinned);
 		if (!namesPinned && (others.length > 0 || mentions.unindexedRegime)) {
 			const suggestions = others.filter(
