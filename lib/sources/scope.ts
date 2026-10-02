@@ -78,16 +78,25 @@ export type ResolvedScope =
 // "American" (ASME codes cited by CNSC) and "European" (the EPR design) all
 // appear in ordinary single-regulator questions.
 //
-// `incidental` mentions name a collection without making it the question's
-// regime: an event ("pre- and post-Fukushima requirements") or a bare
-// "IAEA" ("Category 2 in the IAEA categorisation", which CNSC adopts). They
-// count as a mention (cues, a searchable collection's routing) but never
-// block the default collection, decline a pin, or make an explicit
-// comparison; a comparison SLOT ("differ from the IAEA") still does.
+// A mention is either the question's REGIME (routes Auto, declines a pin,
+// makes an explicit comparison) or INCIDENTAL (a cue at most):
+//   res          — regime mentions: a regulator, its documents;
+//   countries    — the regulator's country: a regime unless the question is
+//                  about trade or movement and the country is not its
+//                  subject ("import a source from a US supplier", "export
+//                  to a customer in Japan");
+//   incidental   — always incidental: an event ("post-Fukushima");
+//   incidentalPhrases — phrases removed before `res` is tested: CNSC's own
+//                  use of an IAEA scheme ("IAEA Category 1", "IAEA
+//                  safeguards", "report to the IAEA").
+// A comparison SLOT ("differ from the IAEA", "lower than the US") makes any
+// mention a regime.
 const MENTION_RULES: Array<{
 	collection: CollectionId;
 	res: RegExp[];
+	countries?: RegExp[];
 	incidental?: RegExp[];
+	incidentalPhrases?: RegExp[];
 }> = [
 	{
 		collection: "cnsc",
@@ -97,8 +106,8 @@ const MENTION_RULES: Array<{
 			/\bNSCA\b/i,
 			/Nuclear Safety and Control Act/i,
 			/Canadian Nuclear Safety Commission/i,
-			/\bCanad(?:a|ian)\b/i,
 		],
+		countries: [/\bCanad(?:a|ian)\b(?!-)/i],
 	},
 	{
 		collection: "nrc",
@@ -109,12 +118,9 @@ const MENTION_RULES: Array<{
 			/\bNUREG\b/i,
 			/\bRegulatory Guides? \d/i,
 			/\bRG\s?\d{1,2}\.\d{1,3}\b/,
-			/\bUnited States\b/i,
-			// Not in a compound: "US-designed reactors" is a design, not a
-			// regime.
-			/\bU\.S\.(?:A\.)?(?!-)/,
-			/\bUSA?\b(?!-)/,
 		],
+		// Not in a compound: "US-designed reactors" is a design.
+		countries: [/\bUnited States\b/i, /\bU\.S\.(?:A\.)?(?!-)/, /\bUSA?\b(?!-)/],
 	},
 	{
 		collection: "onr",
@@ -124,10 +130,8 @@ const MENTION_RULES: Array<{
 			/\bSafety Assessment Principles\b/i,
 			/\bSAPs\b/,
 			/\bNS-TAST-GD-\d+/i,
-			/\bUnited Kingdom\b/i,
-			/\bUK\b/,
-			/\bGreat Britain\b/i,
 		],
+		countries: [/\bUnited Kingdom\b/i, /\bUK\b(?!-)/, /\bGreat Britain\b/i],
 	},
 	{
 		collection: "eu",
@@ -142,7 +146,8 @@ const MENTION_RULES: Array<{
 	},
 	{
 		collection: "aerb",
-		res: [/\bAERB\b/i, /\bAtomic Energy Regulatory Board\b/i, /\bIndia\b/i],
+		res: [/\bAERB\b/i, /\bAtomic Energy Regulatory Board\b/i],
+		countries: [/\bIndia\b(?!-)/i],
 	},
 	{
 		collection: "fukushima",
@@ -152,24 +157,27 @@ const MENTION_RULES: Array<{
 			/\bNAIIC\b/i,
 			/\bNRA\b/,
 			/\bNuclear Regulation Authority\b/i,
-			/\bJapan(?:ese)?\b/i,
 		],
+		countries: [/\bJapan(?:ese)?\b(?!-)/i],
 	},
 	{
 		collection: "iaea",
-		// The IAEA as the subject: a standard named, or the body saying,
-		// requiring or recommending something.
 		res: [
+			/\bIAEA\b/i,
+			/\bInternational Atomic Energy Agency\b/i,
 			/\b(?:SSR|GSR|SSG|GSG|NS-G)[-\s]?\d/i,
 			/\bGSR\s+Part\s+\d/i,
 			/\bSF-1\b/i,
 			/\bINFCIRC\b/i,
 			/\bIRRS\b/i,
-			/\b(?:IAEA|International Atomic Energy Agency)(?:['’]s|\s+(?:safety\s+)?(?:requires?|requirements?|says?|said|states?|recommends?|recommendations?|standards?|guidance|guides?|defines?|definitions?|position|view|expects?|limits?|rules))\b/i,
-			/\b(?:does|do|did|would)\s+(?:the\s+)?IAEA\b/i,
-			/\baccording to (?:the\s+)?IAEA\b/i,
 		],
-		incidental: [/\bIAEA\b/i, /\bInternational Atomic Energy Agency\b/i],
+		// Any other IAEA mention ("IAEA dose limits", "the IAEA approach to
+		// SMRs", "the IAEA Code of Conduct") is the question's subject.
+		incidentalPhrases: [
+			/\b(?:the\s+)?IAEA\s+(?:source\s+)?(?:categor\w*|Category\s+\d|scheme|classification)/gi,
+			/\b(?:the\s+)?IAEA\s+(?:safeguards?|inspect\w*)/gi,
+			/\b(?:safeguards?|inspect\w*|report\w*|submit\w*|notif\w*|declar\w*|agreements?)\b[^.?!]{0,40}?\b(?:to|with|by)\s+the\s+IAEA\b/gi,
+		],
 	},
 ];
 
@@ -182,7 +190,7 @@ const UNINDEXED_ACRONYMS =
 const UNINDEXED_REGULATOR_RE = new RegExp(`\\b(?:${UNINDEXED_ACRONYMS})\\b`);
 const COUNTRIES =
 	"Russia|France|China|Korea|Finland|Sweden|Germany|Switzerland|Spain|Belgium|Ukraine|South Africa|Pakistan|UAE|Australia|Argentina|Brazil";
-const UNINDEXED_COUNTRY_RE = new RegExp(`\\b(?:${COUNTRIES})\\b`, "i");
+const UNINDEXED_COUNTRY_RE = new RegExp(`\\b(?:${COUNTRIES})\\b(?!-)`, "i");
 
 // Words that make a phrase about a jurisdiction's RULES: right after the
 // country ("France requires", "Spain requirements"), or governing it
@@ -191,12 +199,15 @@ const UNINDEXED_COUNTRY_RE = new RegExp(`\\b(?:${COUNTRIES})\\b`, "i");
 const ADJACENT_RULE_WORDS =
 	"requirements?|regulations?|regulators?|rules|limits?|standards?|laws?|requires?|regulates?|mandates?|allows?|permits?|prohibits?";
 const GOVERNING_RULE_WORDS =
-	"requirements?|regulations?|regulated|rules|limits?|standards?|laws?|legal|required|mandatory|allowed|permitted|prohibited|banned";
+	"requirements?|regulat\\w*|licensing|rules|limits?|standards?|laws?|legal|required|mandatory|allowed|permitted|prohibited|banned";
 // Trade and movement words: a country after them is a destination or an
 // origin, not the regime ("requirements for exporting to a customer in
-// Korea", "sources from France and China").
-const TRADE_WORDS =
-	"export\\w*|import\\w*|ship\\w*|transport\\w*|transfer\\w*|supplier\\w*|customer\\w*|vendor\\w*|client\\w*|buyer\\w*|destin\\w*|bound|from";
+// Korea", "sources from France and China"). TRADE_RE (without "from",
+// which also introduces comparisons) marks a trade QUESTION.
+const TRADE_CORE =
+	"export\\w*|import\\w*|ship\\w*|transport\\w*|transfer\\w*|supplier\\w*|customer\\w*|vendor\\w*|client\\w*|buyer\\w*|destin\\w*|cross-border|border";
+const TRADE_WORDS = `${TRADE_CORE}|bound|from`;
+const TRADE_RE = new RegExp(`\\b(?:${TRADE_CORE})\\b`, "i");
 // A country as the SUBJECT of the question — its own rules: "Finland's",
 // "France requires", "Spain requirements" (adjacent), or a rules word
 // governing the place: "regulated in Sweden", "mandatory in Finland", "the
@@ -205,10 +216,29 @@ const TRADE_WORDS =
 // APR1400 operating in Korea", "the Chernobyl accident in Ukraine", "a
 // pump manufactured in China" are ordinary questions for the indexed
 // regulator (with the UNINDEXED REGULATOR cue).
-const COUNTRY_AS_SUBJECT_RE = new RegExp(
-	`\\b(?:${COUNTRIES})(?:['’]s\\b|\\s+(?:${ADJACENT_RULE_WORDS})\\b)|\\b(?:${GOVERNING_RULE_WORDS})\\b(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?!;:]){0,40}?(?<!\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed|operating|operated)\\s)\\b(?:in|for|of|within)\\s+(?:the\\s+)?(?:Republic\\s+of\\s+)?(?:${COUNTRIES})\\b`,
-	"i",
-);
+function countrySubjectRe(countries: string): RegExp {
+	const c = `(?:${countries})(?![\\w-])`;
+	return new RegExp(
+		`\\b${c}(?:['’]s\\b|\\s+(?:${ADJACENT_RULE_WORDS})\\b)|\\b(?:${GOVERNING_RULE_WORDS})\\b(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?!;:]){0,40}?(?<!\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed)\\s)\\b(?:in|for|of|within)\\s+(?:the\\s+)?(?:Republic\\s+of\\s+)?\\b${c}`,
+		"i",
+	);
+}
+const COUNTRY_AS_SUBJECT_RE = countrySubjectRe(COUNTRIES);
+// The same test for an indexed regulator's country (MENTION_RULES
+// `countries`): is "the US" the subject, or a trade partner?
+const INDEXED_COUNTRY_NAMES: Partial<Record<CollectionId, string>> = {
+	cnsc: "Canada|Canadian",
+	nrc: "United States|U\\.S\\.A?\\.?|USA?",
+	onr: "United Kingdom|UK|Great Britain",
+	aerb: "India",
+	fukushima: "Japan|Japanese",
+};
+const INDEXED_COUNTRY_SUBJECT = Object.fromEntries(
+	Object.entries(INDEXED_COUNTRY_NAMES).map(([id, names]) => [
+		id,
+		countrySubjectRe(names as string),
+	]),
+) as Partial<Record<CollectionId, RegExp>>;
 
 // The names that put a collection's regime into a comparison slot (below).
 // `regulators` always count. `countries` count in a "between/both/compare
@@ -229,7 +259,7 @@ const REGIME_NAMES: Record<CollectionId, RegimeNames> = {
 	},
 	nrc: {
 		regulators:
-			"NRC|Nuclear Regulatory Commission|10\\s*C\\.?F\\.?R\\.?|NUREG[-\\s]?\\d+|Regulatory Guides?\\s+\\d+(?:\\.\\d+)?",
+			"(?:U\\.?S\\.?\\s+)?NRC|Nuclear Regulatory Commission|10\\s*C\\.?F\\.?R\\.?|NUREG[-\\s]?\\d+|Regulatory Guides?\\s+\\d+(?:\\.\\d+)?",
 		regulatorsCs: "RG\\s?\\d{1,2}(?:\\.\\d{1,3})?",
 		countries: "United States|U\\.S\\.A?\\.?",
 		countriesCs: "USA?",
@@ -257,7 +287,7 @@ const REGIME_NAMES: Record<CollectionId, RegimeNames> = {
 	},
 	iaea: {
 		regulators:
-			"IAEA|International Atomic Energy Agency|(?:SSR|GSR|SSG|GSG|NS-G)[-\\s]?\\d+(?:[./-]\\d+)*|GSR\\s+Part\\s+\\d+|SF-1",
+			"IAEA(?!\\s+(?:source\\s+)?(?:categor|Category|scheme|classification|safeguards))|International Atomic Energy Agency|(?:SSR|GSR|SSG|GSG|NS-G)[-\\s]?\\d+(?:[./-]\\d+)*|GSR\\s+Part\\s+\\d+|SF-1",
 	},
 };
 const UNINDEXED_NAMES: RegimeNames = {
@@ -269,16 +299,26 @@ const UNINDEXED_NAMES: RegimeNames = {
 const COMPARISON_WORDS =
 	"differ\\w*|similar\\w*|compar\\w*|contrast\\w*|versus|vs|stricter|stronger|weaker|higher|lower|more (?:stringent|conservative|prescriptive|restrictive)|less (?:stringent|conservative|prescriptive|restrictive)";
 const COMPARISON_CONTEXT_RE = new RegExp(`\\b(?:${COMPARISON_WORDS})\\b`, "i");
-const PAIR_CONTEXT_RE = new RegExp(
-	`\\b(?:${COMPARISON_WORDS}|${ADJACENT_RULE_WORDS}|${GOVERNING_RULE_WORDS})\\b`,
+// "…both Canada and the US require…" (a rules verb right after a pair) or
+// "required in both Canada and the UK" (a rules word right before it).
+const PAIR_VERB_RE = new RegExp(
+	`\\band\\s+(?:the\\s+)?\\S+(?:\\s+\\S+)?\\s+(?:require|mandate|allow|permit|prohibit|regulate|set|limit)s?\\b|\\b(?:${GOVERNING_RULE_WORDS})\\s+(?:in|for|by|under)\\s+both\\b`,
 	"i",
 );
+// A pair or joined pair of COUNTRIES compares only with a comparison word
+// or a rules verb after the pair, and never in a trade question ("CNSC
+// requirements for transporting sources between Canada and the US").
+const countryPairContext = (q: string) =>
+	!TRADE_RE.test(q) && (COMPARISON_CONTEXT_RE.test(q) || PAIR_VERB_RE.test(q));
+const joinedContext = (q: string) => COMPARISON_CONTEXT_RE.test(q);
+const countryJoinedContext = (q: string) =>
+	!TRADE_RE.test(q) && COMPARISON_CONTEXT_RE.test(q);
 // Any regime, indexed or not, as the OTHER side of an "X and R" pair.
 const ANY_REGIME =
 	"CNSC|Canadian Nuclear Safety Commission|Canada|Canadian|REGDOC[-\\s]?\\d[\\d.]*|NRC|United States|U\\.S\\.|US|ONR|UK|United Kingdom|EU|Euratom|European Union|AERB|India|NRA|Japan|IAEA";
 
-// A regime R in a comparison slot, with "the", "those in/of" or "that of"
-// allowed before it:
+// A regime R in a comparison slot, with "the", "those in/of", "that of" or
+// "in (the)" allowed before it:
 //   pair:   "between X and R", "between R and X", "both X and R",
 //           "compare X and R" — not across a trade word ("between sources
 //           from France and China");
@@ -292,7 +332,7 @@ const ANY_REGIME =
 // has no regime in a slot, so it is an ordinary question. Written with
 // [Xx] classes so the same source compiles case-sensitively for acronyms.
 const LEAD =
-	"(?:[Tt]he\\s+|[Tt]hose\\s+(?:in|of)\\s+(?:the\\s+)?|[Tt]hat\\s+of\\s+(?:the\\s+)?)?";
+	"(?:[Tt]he\\s+|[Tt]hose\\s+(?:in|of)\\s+(?:the\\s+)?|[Tt]hat\\s+of\\s+(?:the\\s+)?|in\\s+(?:the\\s+)?)?";
 function slotSources(names: string): {
 	pair: string;
 	joined: string;
@@ -322,18 +362,19 @@ function slotSources(names: string): {
 }
 
 function slotMatcher(n: RegimeNames): (query: string) => boolean {
-	const res: Array<{ re: RegExp; context: RegExp | null }> = [];
+	const res: Array<{ re: RegExp; context: ((q: string) => boolean) | null }> =
+		[];
 	const add = (names: string | undefined, flags: string, country: boolean) => {
 		if (!names) return;
 		const src = slotSources(names);
 		res.push({ re: new RegExp(src.direct, flags), context: null });
 		res.push({
 			re: new RegExp(src.pair, flags),
-			context: country ? PAIR_CONTEXT_RE : null,
+			context: country ? countryPairContext : null,
 		});
 		res.push({
 			re: new RegExp(src.joined, flags),
-			context: COMPARISON_CONTEXT_RE,
+			context: country ? countryJoinedContext : joinedContext,
 		});
 	};
 	add(n.regulators, "i", false);
@@ -342,7 +383,7 @@ function slotMatcher(n: RegimeNames): (query: string) => boolean {
 	add(n.countriesCs, "", true);
 	return (query) =>
 		res.some(
-			({ re, context }) => re.test(query) && (!context || context.test(query)),
+			({ re, context }) => re.test(query) && (!context || context(query)),
 		);
 }
 
@@ -365,7 +406,7 @@ export function slotsUnindexed(query: string): boolean {
 }
 
 const COMPARE_RE =
-	/\b(?:compare[ds]?|comparing|comparison|versus|vs\.?|differ(?:s|ent|ence|ences)?|contrast(?:s|ing)?|similar(?:ity|ities)?|both|between|stricter|(?:more|less) (?:stringent|conservative|prescriptive|restrictive))\b/i;
+	/\b(?:compare[ds]?|comparing|comparison|versus|vs\.?|differ(?:s|ent|ence|ences)?|contrast(?:s|ing)?|similar(?:ity|ities)?|both|between|stricter|higher|lower|(?:more|less) (?:stringent|conservative|prescriptive|restrictive))\b/i;
 // The looser cue words above ("difference", "both", "between", "similar")
 // are everyday words in single-regulator questions ("the difference between
 // Category 1 and 2", "an AP1000 built in China"). They are enough to compare
@@ -394,11 +435,26 @@ export interface Mentions {
 export function detectMentions(query: string): Mentions {
 	const collections: CollectionId[] = [];
 	const nonEvent: CollectionId[] = [];
+	const trade = TRADE_RE.test(query);
 	for (const rule of MENTION_RULES) {
-		const named = rule.res.some((re) => re.test(query));
-		if (named || rule.incidental?.some((re) => re.test(query)))
+		const stripped = (rule.incidentalPhrases ?? []).reduce(
+			(q, re) => q.replace(re, " "),
+			query,
+		);
+		const country = rule.countries?.some((re) => re.test(query)) === true;
+		const regime =
+			rule.res.some((re) => re.test(stripped)) ||
+			(country &&
+				(!trade ||
+					INDEXED_COUNTRY_SUBJECT[rule.collection]?.test(query) === true));
+		if (
+			regime ||
+			country ||
+			rule.res.some((re) => re.test(query)) ||
+			rule.incidental?.some((re) => re.test(query))
+		)
 			collections.push(rule.collection);
-		if (named) nonEvent.push(rule.collection);
+		if (regime) nonEvent.push(rule.collection);
 	}
 	const regulator = UNINDEXED_REGULATOR_RE.test(query);
 	return {
@@ -450,9 +506,6 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 	const historical = request.historical === true;
 	const mentions = detectMentions(query);
 	const isEnabled = (id: CollectionId) => enabled.includes(id);
-	const searchableMentions = mentions.collections.filter(
-		(id) => COLLECTIONS[id].searchable,
-	);
 
 	// Nothing to search at all (misconfigured deployment) — decline rather
 	// than resolve to an undefined collection. config.ts also keeps the app
@@ -502,11 +555,57 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 	}
 
 	// ---- Auto ----
-	const indexed = searchableMentions.filter(isEnabled);
+	// Routing goes by REGIME mentions: "import a source from a US supplier"
+	// is a CNSC question, not an NRC one.
+	const indexed = mentions.nonEvent.filter(
+		(id) => COLLECTIONS[id].searchable && isEnabled(id),
+	);
+	// A comparison against a regime we cannot search must say so, not
+	// quietly answer one side of it — checked first, whatever else is named:
+	//   • a slot ("differ from the IAEA", "between the NRC and ASN", "both
+	//     the NRC and the IAEA", "lower than the NRC's") — even for an
+	//     incidental mention, and even when nothing indexed is named;
+	//   • an explicit "compare"/"versus" naming the regime.
+	// A loose word alone ("difference", "both", "between") is not enough:
+	// "the difference between Category 1 and 2 in the IAEA categorisation",
+	// "pre- and post-Fukushima", "both CANDU and US-designed reactors" and
+	// "transfers between Canada and Korea" are ordinary questions; the
+	// envelope's cues cover the incidental mention.
+	const unsearchable = mentions.collections.filter(
+		(id) => !isEnabled(id) || !COLLECTIONS[id].searchable,
+	);
+	const comparing = hasComparisonIntent(query);
+	const explicit = hasExplicitComparison(query);
+	const unsearchableNamed = unsearchable.filter((id) =>
+		mentions.nonEvent.includes(id),
+	);
+	const slotted = slottedCollections(query, unsearchable);
+	if ((explicit && unsearchableNamed.length > 0) || slotted.length > 0) {
+		const against = slotted.length > 0 ? slotted : unsearchableNamed;
+		return {
+			kind: "notice",
+			reason: against.includes("iaea") ? "reference_only" : "not_enabled",
+			message: `I can't compare against ${listLabels(against)} — those sources are not searchable here, so that comparison is ${SCOPE_NOTICE_MARKER}. ${availableSentence(enabled)}`,
+			suggestions: indexed.length > 0 ? indexed : enabled.slice(0, 3),
+		};
+	}
+	// "Compare CNSC and Finland …": the other side has no collection at all.
+	if (
+		mentions.notIndexed &&
+		(slotsUnindexed(query) || (explicit && mentions.unindexedRegime))
+	) {
+		return {
+			kind: "notice",
+			reason: "not_indexed",
+			message: `I can't compare against that regulator — its documents are not indexed, so that comparison is ${SCOPE_NOTICE_MARKER}. ${availableSentence(enabled)}`,
+			suggestions: indexed.length > 0 ? indexed : enabled.slice(0, 3),
+		};
+	}
 
 	if (indexed.length === 0) {
-		// A country in passing ("shipments to France") is an ordinary
-		// question for the default collection; a regime named is not.
+		// A country in passing ("shipments to France"), an event or CNSC's
+		// own use of an IAEA scheme is an ordinary question for the default
+		// collection; a regime named as the subject is not.
 		if (mentions.nonEvent.length === 0 && !mentions.unindexedRegime) {
 			const fallback = isEnabled(defaultCollection)
 				? defaultCollection
@@ -542,51 +641,6 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 			reason: "not_indexed",
 			message: `That regulator's documents are not indexed, so this is ${SCOPE_NOTICE_MARKER}. ${availableSentence(enabled)}`,
 			suggestions: enabled.slice(0, 3),
-		};
-	}
-
-	// A comparison against a regime we cannot search must say so, not
-	// quietly answer one side of it.
-	//   • explicit ("compare", "versus"): any non-event mention of an
-	//     unsearchable collection, or any unindexed country/regulator;
-	//   • otherwise only when the unsearchable regime sits in a comparison
-	//     slot ("differ from the IAEA", "between the NRC and ASN", "both the
-	//     NRC and the IAEA", "lower than the NRC's") — a loose word alone
-	//     ("difference", "both", "between") is not enough.
-	// "The difference between Category 1 and 2 in the IAEA categorization",
-	// "pre- and post-Fukushima", "both CANDU and US-designed reactors" and
-	// "a vendor from Korea" are ordinary questions; the envelope's cues
-	// cover the incidental mention.
-	const unsearchable = mentions.collections.filter(
-		(id) => !isEnabled(id) || !COLLECTIONS[id].searchable,
-	);
-	const comparing = hasComparisonIntent(query);
-	const explicit = hasExplicitComparison(query);
-	const unsearchableNamed = unsearchable.filter((id) =>
-		mentions.nonEvent.includes(id),
-	);
-	// The slots are comparisons in themselves ("lower than the NRC's"), and
-	// make even an incidental mention a regime ("differ from the IAEA").
-	const slotted = slottedCollections(query, unsearchable);
-	if ((explicit && unsearchableNamed.length > 0) || slotted.length > 0) {
-		const against = slotted.length > 0 ? slotted : unsearchableNamed;
-		return {
-			kind: "notice",
-			reason: against.includes("iaea") ? "reference_only" : "not_enabled",
-			message: `I can't compare against ${listLabels(against)} — those sources are not searchable here, so that comparison is ${SCOPE_NOTICE_MARKER}. ${availableSentence(enabled)}`,
-			suggestions: indexed,
-		};
-	}
-	// "Compare CNSC and Finland …": the other side has no collection at all.
-	if (
-		mentions.notIndexed &&
-		(slotsUnindexed(query) || (explicit && mentions.unindexedRegime))
-	) {
-		return {
-			kind: "notice",
-			reason: "not_indexed",
-			message: `I can't compare against that regulator — its documents are not indexed, so that comparison is ${SCOPE_NOTICE_MARKER}. ${availableSentence(enabled)}`,
-			suggestions: indexed,
 		};
 	}
 

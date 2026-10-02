@@ -192,9 +192,18 @@ export function unsearchedMentions(
 ): CollectionId[] {
 	const searched =
 		scope.kind === "single" ? [scope.collection] : scope.collections;
-	// Regimes only: "after Fukushima" is a subject, not a regulator the
-	// answer must disclaim (scope.ts MENTION_RULES events).
-	return detectMentions(query).nonEvent.filter((id) => !searched.includes(id));
+	// Regimes, plus — outside a pin — an incidental mention of a collection
+	// with no stored text ("the IAEA categorisation", "after Fukushima"),
+	// which gets the conditional REFERENCE ONLY cue. A pin's "the other
+	// regime was not searched" cue is for regimes only.
+	const m = detectMentions(query);
+	const withText = new Set(collectionsWithText());
+	const pinned = scope.kind === "single" && scope.via === "pinned";
+	return m.collections.filter(
+		(id) =>
+			!searched.includes(id) &&
+			(m.nonEvent.includes(id) || (!pinned && !withText.has(id))),
+	);
 }
 
 /**

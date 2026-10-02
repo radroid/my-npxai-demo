@@ -25,6 +25,14 @@ import {
 export const SNIPPET_CITATION_RE =
 	/\[\[\s*(S\d{1,2}(?:\s*[,;]\s*S\d{1,2})*)\s*\]\]|\[(S\d{1,2})\]/g;
 
+// A double-bracket token that is neither a snippet-id group nor a legacy
+// "[REGDOC-…]" citation — the model's slips ("[[8 CFR 20.1201]]", "[[8]]").
+// It looks like a citation but was never verified, so it counts — and
+// renders — as unverified, never as plain text that passes for one. Same
+// grammar in components/assistant-ui/markdown-text.tsx.
+export const MALFORMED_CITATION_RE =
+	/\[\[(?!\s*(?:S\d{1,2}\s*(?:[,;]\s*S\d{1,2}\s*)*\]\]|REGDOC))([^[\]\n<>]{1,80})\]\]/g;
+
 /** Every snippet id cited in `text`, in order, duplicates kept. */
 export function extractSnippetIds(text: string): string[] {
 	const out: string[] = [];
@@ -172,7 +180,10 @@ export function scoreSnippetCitations(
 	text: string,
 	sources: Pick<SourceRecord, "sid">[],
 ): SnippetCitationScore {
-	const ids = extractSnippetIds(text);
+	const malformed = [...text.matchAll(MALFORMED_CITATION_RE)].map((m) =>
+		m[1].trim(),
+	);
+	const ids = [...extractSnippetIds(text), ...malformed];
 	const unresolved = ids.filter((id) => resolveSnippetId(id, sources) < 0);
 	return {
 		total: ids.length,
@@ -201,7 +212,7 @@ const OBLIGATION_RE =
 // disbelief verb: "The NRC does not believe that additional reductions …
 // are required".
 const NEGATED_OBLIGATION_RE =
-	/\b(?:not|never|no longer),?\s+(?:\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|n['’]t,?\s+(?:\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|\bno\s+(?:\w+\s+){0,2}?(?:requirements?|obligations?|mandates?|duty|duties)\b|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/i;
+	/(?<!\b(?:must|shall)\s)\b(?:not|never|no longer),?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|n['’]t,?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|\bno\s+(?:(?:legal|regulatory|such|specific|explicit|formal|binding)\s+)?(?:requirements?|obligations?|mandates?|duty|duties)\b|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/i;
 const CLAUSE_SPLIT_RE =
 	/\s*[;:]\s*|,\s*(?=(?:and|but|while|whereas|although)\b)|\s+[—–]\s+/;
 // "the required safety functions" — an adjective, not an obligation.
@@ -299,16 +310,17 @@ export function authorityNote(flags: AuthorityFlag[]): string | null {
 // graders that must judge the model's own text ("must"/"required" and mSv
 // values in a note would otherwise satisfy a must_contain check). Anchored
 // to the end, so a look-alike line the model wrote mid-answer stays.
-const APPENDED_NOTE_RE = /(?:\n\n_(?:Legal-force|Units) note: [^\n]*_)+$/;
+const APPENDED_NOTE_RE = /(?:\n\n_(?:Legal-force|Units) note: [^\n]*_)+\s*$/;
 
 export function stripAppendedNotes(text: string): string {
 	return text.replace(APPENDED_NOTE_RE, "");
 }
 
-// A verdict between values — not "exceed" / "greater than", which dose
-// text uses for thresholds ("likely to exceed 0.1 rem (1 mSv)").
+// A verdict between values. Comparison answers only (query-v2), so a
+// threshold's "exceed" in one regime's section costs at most a redundant
+// note.
 const COMPARATIVE_RE =
-	/\b(?:higher|lower|stricter|more stringent|less stringent|more restrictive|less restrictive)\b/i;
+	/\b(?:higher|lower|stricter|more stringent|less stringent|more restrictive|less restrictive|greater|exceeds?)\b/i;
 const REM_VALUE_RE = /\b(\d+(?:\.\d+)?)\s*rems?\b/gi;
 const SI_VALUE_RE = /\b\d+(?:\.\d+)?\s*m?Sv\b/;
 
@@ -392,15 +404,24 @@ export function renderArtifactCitations(
 	const html = segments
 		.map((segment) => {
 			const inSvg = segment.startsWith("<svg");
-			return segment.replace(SNIPPET_CITATION_RE, (_m, group, single) => {
-				const r = citationsToText(group ?? single ?? "", sources);
-				unresolved += r.unresolved;
-				const text = escapeHtml(r.text);
-				if (inSvg) return text;
-				const cls =
-					r.unresolved > 0 ? "art-cite art-cite-unresolved" : "art-cite";
-				return `<cite class="${cls}">${text}</cite>`;
-			});
+			return segment
+				.replace(SNIPPET_CITATION_RE, (_m, group, single) => {
+					const r = citationsToText(group ?? single ?? "", sources);
+					unresolved += r.unresolved;
+					const text = escapeHtml(r.text);
+					if (inSvg) return text;
+					const cls =
+						r.unresolved > 0 ? "art-cite art-cite-unresolved" : "art-cite";
+					return `<cite class="${cls}">${text}</cite>`;
+				})
+				.replace(MALFORMED_CITATION_RE, (_m, inner: string) => {
+					// `inner` is sanitized fragment text with no tags (<, > excluded).
+					unresolved += 1;
+					const text = `${inner.trim()}; unverified citation`;
+					return inSvg
+						? text
+						: `<cite class="art-cite art-cite-unresolved">${text}</cite>`;
+				});
 		})
 		.join("");
 	return { html, unresolved };

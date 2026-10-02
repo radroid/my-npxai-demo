@@ -84,8 +84,12 @@ const CITATION_RE = /\[REGDOC-\d+(?:\.\d+){1,3}(?:\s+§[\d.]+)?\]/g;
 // SNIPPET_CITATION_RE ([[S1]], [[S1, S3]], and the [S1] slip).
 const SNIPPET_RE =
 	/\[\[\s*(S\d{1,2}(?:\s*[,;]\s*S\d{1,2})*)\s*\]\]|\[(S\d{1,2})\]/g;
+// Any other [[…]] (lib/sources/citations.ts MALFORMED_CITATION_RE): a
+// citation-looking slip such as "[[8 CFR 20.1201]]" renders as unverified.
+const MALFORMED_RE =
+	/\[\[(?!\s*(?:S\d{1,2}\s*(?:[,;]\s*S\d{1,2}\s*)*\]\]|REGDOC))([^[\]\n<>]{1,80})\]\]/g;
 const ANY_CITATION_RE = new RegExp(
-	`${SNIPPET_RE.source}|${CITATION_RE.source}`,
+	`${SNIPPET_RE.source}|${MALFORMED_RE.source}|${CITATION_RE.source}`,
 	"g",
 );
 
@@ -218,6 +222,10 @@ function renderWithCitations(children: ReactNode): ReactNode {
 					.map((x) => x.trim())
 					.filter(Boolean);
 				out.push(<SnippetCitation key={key} ids={ids} raw={m[0]} />);
+			} else if (m[3] !== undefined) {
+				// Never an id the server handed out: "unverified" on a v2
+				// message, the text as written on a legacy one.
+				out.push(<SnippetCitation key={key} ids={[m[3].trim()]} raw={m[0]} />);
 			} else {
 				out.push(<CitationChip key={key} label={m[0]} />);
 			}

@@ -55,6 +55,7 @@ import {
 	authorityNote,
 	extractSnippetIds,
 	lintAuthority,
+	MALFORMED_CITATION_RE,
 	renderArtifactCitations,
 	type SourceRecord,
 	scoreSnippetCitations,
@@ -1552,6 +1553,7 @@ check(
 		check(
 			"graders strip the appended legal-force and units notes back to the model's own text",
 			stripAppendedNotes(withNotes) === answer &&
+				stripAppendedNotes(`${withNotes}\n`) === answer &&
 				withNotes !== answer &&
 				stripAppendedNotes(
 					`_Units note: quoted by the model._\n\n${answer}`,
@@ -1571,12 +1573,17 @@ check(
 		un,
 	);
 	check(
+		"units note: a 'greater than' verdict across units gets the equivalents",
+		(
+			unitsNote(
+				"The NRC annual limit (5 rem) is greater than the CNSC limit of 50 mSv.",
+			) ?? ""
+		).includes("5 rem = 50 mSv"),
+	);
+	check(
 		"units note: absent without a comparative, without SI units, or without rem",
 		unitsNote("Limits: 5 rem (50 mSv) and 15 rem.") === null &&
 			unitsNote("The limit of 5 rem is higher than 2 rem.") === null &&
-			unitsNote(
-				"Monitoring applies if the dose is likely to exceed 0.1 rem (1 mSv), greater than 10% of the limit.",
-			) === null &&
 			unitsNote("50 mSv is higher than 20 mSv.") === null,
 	);
 	{
@@ -1828,6 +1835,176 @@ check(
 			CNSC_ONLY,
 			"single:cnsc",
 		],
+		// Answered (round-5 review): trade with indexed countries, IAEA scheme ids.
+		[
+			"Do Canadian export requirements differ for shipments to the US and France?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What is the difference in licensing for shipments between Canada and Korea?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are CNSC requirements for transporting sources between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What licences are required for cross-border shipments between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Are permits required for shipments between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Do both CNSC and US DOT rules apply to cross-border shipments?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the requirements for transfers between Canada and Korea?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can I import an Ir-192 source from a US supplier?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can I export tritium to a customer in Japan?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can I export tritium to a customer in Japan?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the requirements for exporting heavy water to India?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Is 30 TBq of Co-60 more than the IAEA Category 1 threshold?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What is the difference between IAEA Category 1 and Category 2 under REGDOC-2.12.3?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		// Declined (round-5 review): IAEA as subject, Auto slots, governing words.
+		[
+			"How do the export rules differ from the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Are CNSC dose limits lower than in the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"What is the IAEA dose limit for workers?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"What are the IAEA security requirements for Category 1 sources?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"What is the IAEA approach to SMRs?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		[
+			"What is the IAEA Code of Conduct on the Safety and Security of Radioactive Sources?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"How do dose limits compare with the IAEA?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"Are these dose limits lower than the IAEA?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"How do worker dose limits differ from France?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"What is the licensing process in Finland?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"Who regulates nuclear power in Germany?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"What is the nuclear regulator in France?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		[
+			"What are the requirements for reactors operating in Finland?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"Do both the CNSC and the US NRC accept CSA N285?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Is a PSA required in both Canada and the UK?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
 		// Declined (round-4 review): the US, joined pairs, comparatives, IAEA ids.
 		[
 			"How do CNSC dose limits differ from the US?",
@@ -1973,6 +2150,18 @@ check(
 		],
 		["Is the CNSC stricter than the NRC?", AUTO, ALL, "compare:cnsc+nrc"],
 		[
+			"CNSC or NRC — whose dose limits are lower?",
+			AUTO,
+			ALL,
+			"compare:cnsc+nrc",
+		],
+		[
+			"Can I import a Co-60 source from a supplier in the United States?",
+			AUTO,
+			ALL,
+			"single:cnsc",
+		],
+		[
 			"Does REGDOC-2.5.2 cover both CANDU and US-designed reactors?",
 			AUTO,
 			ALL,
@@ -2099,6 +2288,19 @@ check(
 		negated.every((x) => lintAuthority(x, src4).length === 0),
 		negated.filter((x) => lintAuthority(x, src4).length > 0),
 	);
+	const upgrades = [
+		"Operators must not bypass mandatory safety interlocks [[S2]].",
+		"Workers must never disable required alarms [[S2]].",
+		"Licensees must not operate without required approvals [[S2]].",
+		"Dose monitoring is not merely recommended but mandatory [[S2]].",
+		"This is not just recommended but required [[S2]].",
+		"Licensees must confirm that no open regulatory requirements remain [[S2]].",
+	];
+	check(
+		"lint: prohibitions and 'not merely X but required' upgrades on a guide are flagged",
+		upgrades.every((x) => lintAuthority(x, src4).length === 1),
+		upgrades.filter((x) => lintAuthority(x, src4).length === 0),
+	);
 	check(
 		"lint: a negation in one clause does not excuse an obligation in another",
 		lintAuthority(
@@ -2131,12 +2333,12 @@ check(
 		aerbEnv,
 	);
 	check(
-		"an event ('after Fukushima') is not an unsearched regime to disclaim",
+		"an event ('after Fukushima') is never a pinned 'other regime'; outside a pin it gets only the conditional REFERENCE ONLY cue",
 		unsearchedMentions(
 			{
 				kind: "single",
 				collection: "cnsc",
-				via: "auto_detected",
+				via: "pinned",
 				historical: false,
 			},
 			"What did REGDOC-2.3.2 change after Fukushima?",
@@ -2149,9 +2351,62 @@ check(
 						via: "auto_detected",
 						historical: false,
 					},
+					"What did REGDOC-2.3.2 change after Fukushima?",
+				),
+			) === '["fukushima"]' &&
+			JSON.stringify(
+				unsearchedMentions(
+					{
+						kind: "single",
+						collection: "cnsc",
+						via: "auto_detected",
+						historical: false,
+					},
 					"What did REGDOC-2.3.2 change after the NAIIC report?",
 				),
 			) === '["fukushima"]',
+	);
+}
+
+// A citation-looking slip is unverified, never plain text that passes for one.
+{
+	const srcs = [{ sid: "S8" }];
+	const sc = scoreSnippetCitations(
+		"Limit 5 rem [[8 CFR 20.1201]] and [[S8]] and [[8]].",
+		srcs,
+	);
+	check(
+		"malformed [[…]] citations count as unresolved; [[S8]] and legacy [REGDOC-…] are untouched",
+		sc.total === 3 &&
+			sc.valid === 1 &&
+			JSON.stringify(sc.unresolved) === '["8 CFR 20.1201","8"]' &&
+			[
+				..."See [REGDOC-2.3.4 §4.2] and [[S1, S2]].".matchAll(
+					MALFORMED_CITATION_RE,
+				),
+			].length === 0,
+		sc,
+	);
+	const md = readFileSync(
+		new URL("../components/assistant-ui/markdown-text.tsx", import.meta.url),
+		"utf8",
+	);
+	check(
+		"the chat renderer uses the same malformed-citation grammar and renders it through SnippetCitation",
+		md.includes(MALFORMED_CITATION_RE.source) &&
+			/m\[3\] !== undefined[\s\S]{0,240}<SnippetCitation/.test(md),
+	);
+	const art = renderArtifactCitations(
+		"<p>x [[8 CFR 20.1201]] y</p>",
+		[] as SourceRecord[],
+	);
+	check(
+		"artifact: a malformed citation renders as an unverified cite",
+		art.unresolved === 1 &&
+			art.html.includes(
+				'<cite class="art-cite art-cite-unresolved">8 CFR 20.1201; unverified citation</cite>',
+			),
+		art,
 	);
 }
 
