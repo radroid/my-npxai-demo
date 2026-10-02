@@ -31,6 +31,7 @@ import {
 	buildNoticePayload,
 	cacheScopeMaterial,
 	retrieveForScope,
+	unsearchedMentions,
 } from "../lib/knowledge-hub/scoped-retrieval";
 import { getSourceChatModel, OPENAI_MODELS } from "../lib/openai";
 import {
@@ -57,7 +58,9 @@ import {
 	renderArtifactCitations,
 	type SourceRecord,
 	scoreSnippetCitations,
+	stripAppendedNotes,
 	toSourceRecords,
+	unitsNote,
 } from "../lib/sources/citations";
 import {
 	getEnabledCollections,
@@ -1349,6 +1352,35 @@ check(
 			withBindingPresence(env4, [g(9, 0.3, "binding")], 0.45, t, 4)[3].id === 4,
 	);
 	check(
+		"binding presence: not below the OOS gate even when close to a weak top match",
+		withBindingPresence(env4, [g(9, 0.42, "binding")], 0.5, t, 4)[3].id === 4,
+	);
+	const named = new Set(["D3", "D4"]);
+	const keepNamed = withBindingPresence(
+		env4,
+		[g(9, 0.55, "binding")],
+		0.62,
+		t,
+		4,
+		named,
+	);
+	check(
+		"binding presence never displaces a named document's chunk: it gives up the lowest-ranked other one",
+		JSON.stringify(keepNamed.map((c) => c.id)) === JSON.stringify([1, 3, 4, 9]),
+		keepNamed.map((c) => c.id),
+	);
+	check(
+		"binding presence leaves an envelope of named documents alone",
+		withBindingPresence(
+			env4,
+			[g(9, 0.55, "binding")],
+			0.62,
+			t,
+			4,
+			new Set(["D1", "D2", "D3", "D4"]),
+		).every((c, i) => c.id === env4[i].id),
+	);
+	check(
 		"binding presence applies to NRC only (binding + nonbinding, no mixed-force documents)",
 		bindingPresenceRefs("nrc", false).length > 0 &&
 			bindingPresenceRefs("nrc", false).every((x) => x.startsWith("10 CFR")) &&
@@ -1366,11 +1398,24 @@ check(
 	const def = getSourceChatModel();
 	process.env.KH_V2_CHAT_MODEL = "gpt-4.1-mini";
 	const over = getSourceChatModel();
+	process.env.KH_V2_CHAT_MODEL = "o1-pro";
+	const warn = console.warn;
+	let warned = 0;
+	console.warn = () => {
+		warned += 1;
+	};
+	const rejected = getSourceChatModel();
+	getSourceChatModel();
+	console.warn = warn;
 	if (saved === undefined) delete process.env.KH_V2_CHAT_MODEL;
 	else process.env.KH_V2_CHAT_MODEL = saved;
 	check(
 		"v2 chat model defaults to OPENAI_MODELS.chat and KH_V2_CHAT_MODEL overrides it",
 		def === OPENAI_MODELS.chat && over === "gpt-4.1-mini",
+	);
+	check(
+		"a KH_V2_CHAT_MODEL outside the allowlist falls back to the default, warned once",
+		rejected === OPENAI_MODELS.chat && warned === 1,
 	);
 	const q = readFileSync(
 		new URL("../lib/knowledge-hub/query-v2.ts", import.meta.url),
@@ -1379,8 +1424,9 @@ check(
 	const key = q.slice(q.indexOf("async function cacheKeyV2"));
 	check(
 		"the v2 answer-cache key includes the chat model (a model switch never serves old answers)",
-		/getSourceChatModel\(\)/.test(key.slice(0, key.indexOf("crypto.subtle"))) &&
-			/model: model|\bmodel,\n/.test(q),
+		/^\s*model,$/m.test(key.slice(0, key.indexOf("crypto.subtle"))) &&
+			/cacheKeyV2\(query, scope, enabled, model\)/.test(q) &&
+			/const model = getSourceChatModel\(\)/.test(q),
 	);
 }
 
@@ -1481,6 +1527,33 @@ check(
 	);
 	check("no flags → no note", authorityNote([]) === null);
 	{
+		const answer =
+			"Licensees must instruct workers [[S3]].\n\n- The NRC limit is 15 rem [[S2]].";
+		const withNotes = `${answer}${note}${unitsNote("CNSC 50 mSv is higher than 15 rem.")}`;
+		check(
+			"graders strip the appended legal-force and units notes back to the model's own text",
+			stripAppendedNotes(withNotes) === answer && withNotes !== answer,
+			stripAppendedNotes(withNotes),
+		);
+	}
+	const un = unitsNote(
+		"The CNSC allows a higher lens limit (50 mSv) than the NRC (15 rems or 0.15 Sv). Skin: 50 rem vs 500 mSv.",
+	);
+	check(
+		"units note: rem + Sv + a comparative → exact mSv equivalents for every rem value",
+		un !== null &&
+			un.includes("15 rem = 150 mSv") &&
+			un.includes("50 rem = 500 mSv") &&
+			extractSnippetIds(un).length === 0,
+		un,
+	);
+	check(
+		"units note: absent without a comparative, without SI units, or without rem",
+		unitsNote("Limits: 5 rem (50 mSv) and 15 rem.") === null &&
+			unitsNote("The limit of 5 rem is higher than 2 rem.") === null &&
+			unitsNote("50 mSv is higher than 20 mSv.") === null,
+	);
+	{
 		const q = readFileSync(
 			new URL("../lib/knowledge-hub/query-v2.ts", import.meta.url),
 			"utf8",
@@ -1493,7 +1566,11 @@ check(
 				at("if (note) emit(note);") > 0 &&
 				at("if (note) emit(note);") <
 					at('writer.write({ type: "text-end", id: msgId });') &&
-				/outputGuardTripped \|\| streamFailed \? null : authorityNote/.test(q),
+				/const clean = !outputGuardTripped && !streamFailed;/.test(q) &&
+				/clean \? authorityNote\(authority\) : null/.test(q) &&
+				/clean \? unitsNote\(accumulated\) : null/.test(q) &&
+				at("if (units) emit(units);") <
+					at('writer.write({ type: "text-end", id: msgId });'),
 		);
 		check(
 			"the cache stub check measures the model's answer, taken before the note",
@@ -1516,6 +1593,332 @@ check(
 			"RG 8.29 is nonbinding and is not required [[S3]]. It explains the requirements of Part 20 [[S3]]. Licensees must comply.",
 			src,
 		).length === 0,
+	);
+}
+
+// Fix round 4 (adversarial review of 300202a): one table for both reviewers'
+// examples, so neither direction (over-declining incidental mentions,
+// under-declining a regime in a comparison slot) can regress again.
+{
+	const CNSC_ONLY: Parameters<typeof resolveScope>[0]["enabled"] = ["cnsc"];
+	const PIN_CNSC = { mode: "pinned", collection: "cnsc" } as const;
+	const AUTO = { mode: "auto" } as const;
+	for (const [q, request, enabled, want] of [
+		// Answered: events, document ids and countries in passing.
+		[
+			"What is the difference between pre- and post-Fukushima requirements for emergency power under REGDOC-2.3.2?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Under REGDOC-2.12.3, what is the difference between Category 1 and 2 sources in the IAEA categorization?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does REGDOC-2.5.2 treat both design basis and beyond-design-basis accidents, as lessons from Fukushima Daiichi showed?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does REGDOC-2.5.2 cover both CANDU and US-designed reactors?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Is licensing different for a cask vendor from Korea under CNSC rules?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What CNSC security levels apply to sources shipped from France under transport regulations?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does REGDOC-2.12.3 differ for sources shipped to China under export rules?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the security levels for sources shipped from France under transport regulations?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does the CNSC accept a pressure vessel manufactured in China?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What QA records are needed for a pump manufactured in China?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can we install a pressure vessel fabricated in Korea?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does the NRC require both a PSAR and an FSAR for an AP1000 being built in China?",
+			AUTO,
+			ALL,
+			"single:nrc",
+		],
+		[
+			"Compare CNSC emergency power requirements before and after Fukushima",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What emergency power upgrades followed Fukushima?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		// Declined: a country as the question's subject.
+		[
+			"What is the dose limit for workers in Finland?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		["Is a PSA mandatory in Finland?", AUTO, CNSC_ONLY, "notice:not_indexed"],
+		[
+			"How is spent fuel regulated in Sweden?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		["Does Germany allow new reactors?", AUTO, CNSC_ONLY, "notice:not_indexed"],
+		[
+			"What dose limit applies to workers in Finland?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		// Declined: an unsearchable regime in a comparison slot.
+		[
+			"How do CNSC dose limits differ from Finland?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"How do CNSC dose limits differ from those in Finland?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"Are CNSC dose limits lower than the U.S. NRC's?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How do CNSC requirements differ from Japan's NRA?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How does REGDOC-2.7.1 differ from the IAEA on dose limits?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"Compare CNSC and IAEA requirements on defence in depth",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"How does the NRC differ from the IAEA on dose limits?",
+			AUTO,
+			ALL,
+			"notice:reference_only",
+		],
+		[
+			"What do both the NRC and the IAEA require for emergency plans?",
+			AUTO,
+			ALL,
+			"notice:reference_only",
+		],
+		[
+			"Between the NRC and ASN, which has stricter rules?",
+			AUTO,
+			ALL,
+			"notice:not_indexed",
+		],
+		[
+			"What is the difference between CNSC and STUK requirements?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+		[
+			"How do CNSC requirements differ from Finland's?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_indexed",
+		],
+	] as const) {
+		const got = r(q, request, [...enabled]);
+		check(
+			`scope r4: "${q.slice(0, 56)}…" (${request.mode}, ${enabled.join("+")}) → ${want}`,
+			is(got, want),
+			scopeKey(got),
+		);
+	}
+}
+
+// Fix round 4: lint, cues and events.
+{
+	const hinted = embeddingInputsFor(
+		"Graded approach, action level, ALARA and waste management: how do 10 CFR 20.1201, 10 CFR 20.1301 and RG 8.29 apply?",
+		["cnsc", "nrc"],
+	).slice(1);
+	check(
+		"over the cap, documents the question NAMES keep their expansions ahead of concept-hint documents",
+		hinted.length === MAX_EXPANSIONS &&
+			["10 CFR 20.1201", "10 CFR 20.1301", "RG 8.29"].every((d) =>
+				hinted.some((x) => x.startsWith(`${d} Graded`)),
+			),
+		hinted.map((x) => x.slice(0, 20)),
+	);
+	const L = (
+		sid: string,
+		legal_force: "binding" | "nonbinding" | "mixed",
+		requirement_type: "requirement" | "guidance",
+		obligation_language?: boolean,
+	) => ({
+		sid,
+		chip: sid,
+		ref: `D-${sid}`,
+		legal_force,
+		requirement_type,
+		...(obligation_language === undefined ? {} : { obligation_language }),
+	});
+	const src4 = [
+		L("S1", "binding", "requirement"),
+		L("S2", "nonbinding", "guidance"),
+		L("S3", "mixed", "guidance", true),
+		L("S4", "mixed", "guidance", false),
+	];
+	check(
+		"lint: a REGDOC guidance section whose own text states the duty may be cited for it",
+		lintAuthority("Licensees must report the event [[S3]].", src4).length ===
+			0 &&
+			lintAuthority("Licensees must report the event [[S4]].", src4).length ===
+				1,
+	);
+	const recs = toSourceRecords([
+		{
+			id: 1,
+			regdoc_id: "REGDOC-2.2.5",
+			section_number: "3",
+			section_title: null,
+			chunk_text: "The NSCA requires licensees to keep records.",
+			url: null,
+			requirement_type: "guidance",
+			similarity: 0.7,
+		},
+		{
+			id: 2,
+			regdoc_id: "REGDOC-2.2.5",
+			section_number: "4",
+			section_title: null,
+			chunk_text: "Measures should deliver the required safety functions.",
+			url: null,
+			requirement_type: "guidance",
+			similarity: 0.6,
+		},
+	] as RetrievedChunk[]);
+	check(
+		"toSourceRecords: obligation_language from the FULL chunk text ('the required X' is an adjective)",
+		recs[0].obligation_language === true &&
+			recs[1].obligation_language === false,
+	);
+	check(
+		"lint: a citation after the full stop belongs to that sentence, not the next one",
+		lintAuthority(
+			"Licensees must monitor doses. [[S2]] The rule sets the limits [[S1]].",
+			src4,
+		).length === 1,
+	);
+	check(
+		"lint: a 'not' elsewhere in the sentence does not excuse an obligation",
+		lintAuthority(
+			"This is not limited to reactors, and licensees must report every event [[S2]].",
+			src4,
+		).length === 1,
+	);
+	check(
+		"lint: the negated obligation itself is not a violation",
+		[
+			"Licensees are not required to submit the plan [[S2]].",
+			"The guide doesn't require a second review [[S2]].",
+			"There is no legal requirement to do so [[S2]].",
+			"A licensee need not repeat the survey and the guide is not binding [[S2]].",
+		].every((x) => lintAuthority(x, src4).length === 0),
+	);
+	const aerbEnv = buildSourceEnvelope({
+		chunks: [],
+		query: "q",
+		scope: {
+			kind: "single",
+			collection: "cnsc",
+			via: "auto_detected",
+			historical: false,
+		},
+		unsearchedMentions: ["aerb", "nrc"],
+	});
+	check(
+		"cues split on stored text: AERB (catalogued, no text) → REFERENCE ONLY; NRC (text) → NOT SEARCHED, no attribution",
+		/REFERENCE ONLY: AERB/.test(aerbEnv) &&
+			/NOT SEARCHED: NRC[^\n]*never attribute a statement to it/.test(
+				aerbEnv,
+			) &&
+			!/NOT SEARCHED: AERB/.test(aerbEnv),
+		aerbEnv,
+	);
+	check(
+		"an event ('after Fukushima') is not an unsearched regime to disclaim",
+		unsearchedMentions(
+			{
+				kind: "single",
+				collection: "cnsc",
+				via: "auto_detected",
+				historical: false,
+			},
+			"What did REGDOC-2.3.2 change after Fukushima?",
+		).length === 0 &&
+			JSON.stringify(
+				unsearchedMentions(
+					{
+						kind: "single",
+						collection: "cnsc",
+						via: "auto_detected",
+						historical: false,
+					},
+					"What did REGDOC-2.3.2 change after the NAIIC report?",
+				),
+			) === '["fukushima"]',
 	);
 }
 

@@ -47,7 +47,12 @@ const NAMED_DOC_FETCH_PER_DOC = 2;
 // scan per mention (legacy included — it is the same cost surface).
 export const MAX_EXPANSIONS = 6;
 // The binding-presence pass (source.bindingRefs): admit the best binding
-// chunk only when it is this close to the top match.
+// chunk only when it is this close to the top match (and above the OOS
+// gate). Measured on the NRC eval questions (2026-10-01): every binding
+// chunk within 0.2 was the governing provision — 20.1201 for dose limits
+// (gaps 0.007-0.144), 20.1502 for monitoring (0.10-0.13), 20.1301 for
+// public dose (0.13); a 0.1 gap would drop the pinned dose-limit question
+// back to an all-guidance envelope.
 const BINDING_PRESENCE_GAP = 0.2;
 // match_source_chunks reads at most doc_refs[1:10].
 const DOC_REFS_PER_CALL = 10;
@@ -277,13 +282,15 @@ function buildExpansions(
 	query: string,
 	docs: Set<string>,
 	sections: string[],
+	named: ReadonlySet<string> = docs,
 ): string[] {
 	if (docs.size === 0) return [];
 	const noun = pickContextNoun(query);
 	const conceptSeeds = CONCEPT_EXPANSIONS.filter((c) => c.re.test(query)).map(
 		(c) => c.seed,
 	);
-	const perDoc: Array<{ focused: string[]; broad: string }> = [];
+	const perDoc: Array<{ focused: string[]; broad: string; named: boolean }> =
+		[];
 	for (const doc of docs) {
 		const focused: string[] = [];
 		if (sections.length > 0) {
@@ -294,17 +301,22 @@ function buildExpansions(
 			}
 		}
 		for (const seed of conceptSeeds) focused.push(`${doc} ${seed}`);
-		perDoc.push({ focused, broad: `${doc} ${query}` });
+		perDoc.push({ focused, broad: `${doc} ${query}`, named: named.has(doc) });
 	}
 	const out = perDoc.flatMap((d) => [...d.focused, d.broad]);
 	// Under the cap (every real question): exactly the historical list. Over
 	// it (a crafted or very long multi-document query): each document's
-	// BROAD expansion first, then focused ones round-robin, so no named
-	// document is left with nothing.
+	// BROAD expansion first — documents the question names before ones a
+	// concept hint inferred — then focused ones round-robin in the same
+	// order. Past MAX_EXPANSIONS named documents, the last-named get none.
 	if (out.length <= MAX_EXPANSIONS) return out;
-	const capped = perDoc.map((d) => d.broad).slice(0, MAX_EXPANSIONS);
+	const order = [
+		...perDoc.filter((d) => d.named),
+		...perDoc.filter((d) => !d.named),
+	];
+	const capped = order.map((d) => d.broad).slice(0, MAX_EXPANSIONS);
 	for (let i = 0; capped.length < MAX_EXPANSIONS; i++) {
-		const round = perDoc.flatMap((d) =>
+		const round = order.flatMap((d) =>
 			i < d.focused.length ? [d.focused[i]] : [],
 		);
 		if (round.length === 0) break;
@@ -337,7 +349,8 @@ export function embeddingInputsFor(
 ): string[] {
 	const docs = extractMentionedDocs(query, collections);
 	const sections = extractMentionedSections(query);
-	return [query, ...buildExpansions(query, docs, sections)];
+	const named = extractMentionedDocs(query, collections, false);
+	return [query, ...buildExpansions(query, docs, sections, named)];
 }
 
 // Doc-diversity pass: when multiple docs are mentioned, seed the envelope
@@ -765,13 +778,17 @@ export async function embedTexts(
 }
 
 // See RetrievalOptions.source.bindingRefs. Pure; a no-op on the legacy path
-// (no binding rows are ever fetched there).
+// (no binding rows are ever fetched there). Never displaces a chunk of a
+// document the question names (named and diversity picks are all from
+// those): a full envelope gives up its lowest-ranked OTHER chunk, or is
+// left alone.
 export function withBindingPresence(
 	envelope: RetrievedChunk[],
 	bindingRows: readonly RetrievedChunk[],
 	topSim: number,
 	t: RetrievalThresholds,
 	size: number,
+	mentionedDocs: ReadonlySet<string> = new Set(),
 ): RetrievedChunk[] {
 	if (bindingRows.length === 0) return envelope;
 	if (envelope.some((c) => c.source?.legal_force === "binding"))
@@ -780,13 +797,21 @@ export function withBindingPresence(
 	if (
 		!best ||
 		best.similarity < t.minChunk ||
+		best.similarity < t.oos ||
 		best.similarity < topSim - BINDING_PRESENCE_GAP ||
 		envelope.some((c) => c.id === best.id)
 	)
 		return envelope;
-	return envelope.length >= size
-		? [...envelope.slice(0, size - 1), best]
-		: [...envelope, best];
+	if (envelope.length < size) return [...envelope, best];
+	let drop = -1;
+	for (let i = envelope.length - 1; i >= 0; i--) {
+		if (!isMentioned(envelope[i].regdoc_id, mentionedDocs)) {
+			drop = i;
+			break;
+		}
+	}
+	if (drop < 0) return envelope;
+	return [...envelope.slice(0, drop), ...envelope.slice(drop + 1), best];
 }
 
 export async function retrieveChunks(
@@ -854,6 +879,42 @@ export async function retrieveChunks(
 	};
 	const rpcName = opts.source ? "match_source_chunks" : "match_regdoc_chunks";
 
+	// v2: each named document's own best chunks (see source.docRefGroups).
+	// A PRESENCE guarantee, not a flood: NAMED_DOC_BOOST applies to every
+	// chunk of a named document, so admitting 20 of them would crowd out
+	// better matches from other documents ("…under the NSCA and its
+	// regulations…" filled 5 of 8 slots with low-similarity NSCA sections).
+	// Two per named mention, at most four mentions. These and the binding-
+	// presence lookups need only the primary vector, so they run alongside
+	// the primary search rather than after it (no added latency). Each call
+	// settles to {rows, error}: a thrown fetch cannot become an unhandled
+	// rejection if the primary search fails first.
+	const namedGroups = (opts.source?.docRefGroups ?? [])
+		.filter((g) => g.length > 0)
+		.slice(0, NAMED_DOC_FETCH_DOCS)
+		.map((g) => g.slice(0, DOC_REFS_PER_CALL));
+	const bindingRefs = opts.source?.bindingRefs ?? [];
+	const bindingGroups: (readonly string[])[] = [];
+	for (let i = 0; i < bindingRefs.length; i += DOC_REFS_PER_CALL)
+		bindingGroups.push(bindingRefs.slice(i, i + DOC_REFS_PER_CALL));
+	const settle = (
+		p: Promise<{ rows: RetrievedChunk[]; error: unknown }>,
+	): Promise<{ rows: RetrievedChunk[]; error: unknown }> =>
+		p.catch((error: unknown) => ({ rows: [], error }));
+	const sideFetches =
+		namedGroups.length + bindingGroups.length > 0
+			? Promise.all([
+					Promise.all(
+						namedGroups.map((refs) =>
+							settle(match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, refs)),
+						),
+					),
+					Promise.all(
+						bindingGroups.map((refs) => settle(match(embeddings[0], 1, refs))),
+					),
+				])
+			: null;
+
 	// Primary retrieval: 20 chunks by open cosine sim.
 	const { rows: primaryPool, error: rpcErr } = await match(
 		embeddings[0],
@@ -880,31 +941,10 @@ export async function retrieveChunks(
 		}
 		expansionPools.push(expMatches);
 	}
-	// v2: each named document's own best chunks (see source.docRefGroups).
-	// A PRESENCE guarantee, not a flood: NAMED_DOC_BOOST applies to every
-	// chunk of a named document, so admitting 20 of them would crowd out
-	// better matches from other documents ("…under the NSCA and its
-	// regulations…" filled 5 of 8 slots with low-similarity NSCA sections).
-	// Two per named mention, at most four mentions, searched in parallel.
-	const namedGroups = (opts.source?.docRefGroups ?? [])
-		.filter((g) => g.length > 0)
-		.slice(0, NAMED_DOC_FETCH_DOCS)
-		.map((g) => g.slice(0, DOC_REFS_PER_CALL));
-	const bindingRefs = opts.source?.bindingRefs ?? [];
-	const bindingGroups: (readonly string[])[] = [];
-	for (let i = 0; i < bindingRefs.length; i += DOC_REFS_PER_CALL)
-		bindingGroups.push(bindingRefs.slice(i, i + DOC_REFS_PER_CALL));
 	const namedPools: RetrievedChunk[][] = [];
 	const bindingRows: RetrievedChunk[] = [];
-	if (namedGroups.length + bindingGroups.length > 0) {
-		const [named, binding] = await Promise.all([
-			Promise.all(
-				namedGroups.map((refs) =>
-					match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, refs),
-				),
-			),
-			Promise.all(bindingGroups.map((refs) => match(embeddings[0], 1, refs))),
-		]);
+	if (sideFetches) {
+		const [named, binding] = await sideFetches;
 		for (const { rows, error } of named) {
 			if (error) console.error(`${rpcName}_named_doc_error`, error);
 			else namedPools.push(rows);
@@ -967,6 +1007,7 @@ export async function retrieveChunks(
 					topSim,
 					t,
 					opts.envelopeChunks,
+					mentionedDocs,
 				);
 	const avgSim =
 		chunks.length > 0

@@ -192,9 +192,9 @@ export function unsearchedMentions(
 ): CollectionId[] {
 	const searched =
 		scope.kind === "single" ? [scope.collection] : scope.collections;
-	return detectMentions(query).collections.filter(
-		(id) => !searched.includes(id),
-	);
+	// Regimes only: "after Fukushima" is a subject, not a regulator the
+	// answer must disclaim (scope.ts MENTION_RULES events).
+	return detectMentions(query).nonEvent.filter((id) => !searched.includes(id));
 }
 
 /**

@@ -170,8 +170,16 @@ async function main() {
 				console.error(`✗ ${id}: ${bad}`);
 				continue;
 			}
-			await writeFile(path, bytes);
 		}
+		// Downloaded bytes reach the cache (the reviewed copy publish reads,
+		// and --repin-cnsc trusts) only once they match the pin, or for an
+		// entry with nothing pinned yet (that copy is what gets reviewed).
+		// Drifted bytes go next to it as *.unverified for the diff, so a
+		// --refresh can never turn unreviewed text into the cached copy.
+		const keep = async (verified: boolean) => {
+			if (fromCache) return;
+			await writeFile(verified ? path : `${path}.unverified`, bytes);
+		};
 		let sha: string;
 		try {
 			sha = await pinnedChecksum(e, bytes);
@@ -181,6 +189,7 @@ async function main() {
 			continue;
 		}
 		if (e.checksum_sha256 === null) {
+			await keep(true);
 			if (pin) {
 				e.checksum_sha256 = sha;
 				e.content_length = bytes.byteLength;
@@ -195,6 +204,7 @@ async function main() {
 				);
 			}
 		} else if (e.checksum_sha256 !== sha) {
+			await keep(false);
 			const cachedCnsc = e.format === "cnsc-json" && fromCache;
 			if (cachedCnsc && repinCnsc) {
 				e.checksum_sha256 = sha;
@@ -206,9 +216,10 @@ async function main() {
 			console.error(
 				cachedCnsc
 					? `✗ ${id}: CNSC TEXT-HASH MISMATCH on the cached page-data — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. No download happened, so this usually means the CNSC parser changed (adapters/cnsc-html.ts): review the extracted-text diff, then rerun with --repin-cnsc.`
-					: `✗ ${id}: CHECKSUM DRIFT — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. Re-check edition and rights, then update the entry by hand.`,
+					: `✗ ${id}: CHECKSUM DRIFT — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. The download is in ${path}.unverified (the cached copy is unchanged). Re-check edition and rights, then update the entry by hand.`,
 			);
 		} else {
+			await keep(true);
 			console.log(`✓ ${id}`);
 		}
 	}

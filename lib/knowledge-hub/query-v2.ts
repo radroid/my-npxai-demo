@@ -40,6 +40,7 @@ import {
 	lintAuthority,
 	scoreSnippetCitations,
 	toSourceRecords,
+	unitsNote,
 } from "../sources/citations";
 import { DEFAULT_COLLECTION, getEnabledCollections } from "../sources/config";
 import { buildSourceEnvelope } from "../sources/envelope";
@@ -82,11 +83,12 @@ async function cacheKeyV2(
 	query: string,
 	scope: SearchScope,
 	enabled: CollectionId[],
+	model: string,
 ): Promise<string> {
 	const material = [
 		"kh2",
 		PROMPT_VERSION_V2,
-		getSourceChatModel(),
+		model,
 		corpusVersion(),
 		cacheScopeMaterial(scope, query),
 		enabled.join(","),
@@ -197,7 +199,10 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 		);
 	}
 
-	const cKey = await cacheKeyV2(query, scope, enabled);
+	// Logged on hits too: the cache key includes the model.
+	const model = getSourceChatModel();
+	ctx.logFields.model = model;
+	const cKey = await cacheKeyV2(query, scope, enabled, model);
 	const freshAnswer = isRegenerate && args.scopeSwitch !== true;
 	if (freshAnswer) void cacheDelete(cKey, "kh_cache_invalidate_error");
 	const cached = freshAnswer
@@ -214,8 +219,6 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 	ctx.logFields.cache = "miss";
 
 	const openai = args.openai ?? getOpenAIClient();
-	const model = getSourceChatModel();
-	ctx.logFields.model = model;
 	let retrieval: Awaited<ReturnType<typeof retrieveForScope>>;
 	try {
 		retrieval = await retrieveForScope(
@@ -335,9 +338,11 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 			// The stub check below measures the MODEL's answer, not the note.
 			const answerLength = accumulated.trim().length;
 			const authority = lintAuthority(accumulated, sources);
-			const note =
-				outputGuardTripped || streamFailed ? null : authorityNote(authority);
+			const clean = !outputGuardTripped && !streamFailed;
+			const note = clean ? authorityNote(authority) : null;
 			if (note) emit(note);
+			const units = clean ? unitsNote(accumulated) : null;
+			if (units) emit(units);
 			writer.write({ type: "text-end", id: msgId });
 
 			const citations = scoreSnippetCitations(accumulated, sources);

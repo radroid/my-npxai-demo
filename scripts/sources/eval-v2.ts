@@ -36,7 +36,11 @@ import {
 	PROMPT_VERSION,
 	PROMPT_VERSION_V2,
 } from "../../lib/prompts";
-import { extractSnippetIds, lintAuthority } from "../../lib/sources/citations";
+import {
+	extractSnippetIds,
+	lintAuthority,
+	stripAppendedNotes,
+} from "../../lib/sources/citations";
 import { isSourcesPayloadV2 } from "../../lib/sources/payload";
 import { type EvalCase, grade, loadCases, parseStream } from "../eval-kb";
 import { isLocalSupabaseUrl } from "../lib/embed";
@@ -56,7 +60,7 @@ const consoleError = console.error;
 let retrievalErrors = 0;
 console.error = (...args: unknown[]) => {
 	if (/redis|_cache_|accounting|UPSTASH/i.test(String(args[0]))) return;
-	if (/_(?:named_doc|expansion)_error$/.test(String(args[0])))
+	if (/_(?:named_doc|expansion|binding)_error$/.test(String(args[0])))
 		retrievalErrors += 1;
 	consoleError(...args);
 };
@@ -249,7 +253,9 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 		if (!e.references_any.some((ref) => got.includes(ref)))
 			return `references:${got.join(",") || "none"}`;
 	}
-	const text = norm(r.text);
+	// Graded on the model's own words: the appended legal-force / units
+	// notes contain "must", "required" and mSv values.
+	const text = norm(stripAppendedNotes(r.text));
 	for (const banned of e.must_not_contain ?? []) {
 		if (text.includes(banned.toLowerCase())) return `forbidden:${banned}`;
 	}
@@ -355,19 +361,34 @@ async function main() {
 				category: string;
 				pass: boolean;
 				reason: string;
+				authority_flags?: number;
+				units_note?: boolean;
 			}> = [];
 			console.log(
 				`\n== CNSC battery — ${CORPUS}${scope ? ", pinned to CNSC" : ""} — run ${pass}/${repeat} (${cases.length} cases)`,
 			);
 			for (const c of cases as EvalCase[]) {
 				const r = await run(c.question, scope, supabase);
-				const v = grade(c, r.status, r.text, r.sources);
+				const v = grade(c, r.status, stripAppendedNotes(r.text), r.sources);
+				// v2 only: the legacy payload has no legal_force or [[S1]] ids.
+				const v2Sources = isSourcesPayloadV2(r.sources)
+					? r.sources.sources
+					: null;
 				rows.push({
 					id: c.id,
 					suite: c.suite,
 					category: c.category,
 					pass: v.pass,
 					reason: v.reason,
+					...(v2Sources
+						? {
+								authority_flags: lintAuthority(
+									stripAppendedNotes(r.text),
+									v2Sources,
+								).length,
+								units_note: r.text.includes("_Units note:"),
+							}
+						: {}),
 				});
 				console.log(
 					`${v.pass ? "✅" : "❌"} ${String(c.id).padStart(2)} [${c.category}] ${c.question.slice(0, 70)}${v.pass ? "" : `  — ${v.reason}`}`,
@@ -378,13 +399,23 @@ async function main() {
 			const ship = rows.filter((r) => r.suite !== "hard");
 			const hard = rows.filter((r) => r.suite === "hard");
 			const adv = ship.filter((r) => r.category === "adversarial");
+			// How often the legal-force note fires on the CNSC battery (each
+			// answer with ≥1 flag gets it) — the lint's false-positive surface
+			// on REGDOC text, measured rather than assumed.
+			const noted = rows.filter((r) => (r.authority_flags ?? 0) > 0).length;
 			const summary = {
 				ship: `${ship.filter((r) => r.pass).length}/${ship.length}`,
 				hard: `${hard.filter((r) => r.pass).length}/${hard.length}`,
 				adversarial: `${adv.filter((r) => r.pass).length}/${adv.length}`,
+				...(CORPUS === "v2"
+					? {
+							legal_force_note: `${noted}/${rows.length}`,
+							units_note: `${rows.filter((r) => r.units_note).length}/${rows.length}`,
+						}
+					: {}),
 			};
 			console.log(
-				`ship ${summary.ship} · hard ${summary.hard} · adversarial ${summary.adversarial}`,
+				`ship ${summary.ship} · hard ${summary.hard} · adversarial ${summary.adversarial}${CORPUS === "v2" ? ` · legal-force note ${noted}/${rows.length}` : ""}`,
 			);
 			for (const r of rows) {
 				passCounts.set(r.id, (passCounts.get(r.id) ?? 0) + (r.pass ? 1 : 0));
@@ -433,7 +464,10 @@ async function main() {
 					),
 				],
 				per_collection: r.log.retrieval_per_collection,
-				authority_flags: lintAuthority(r.text, payload?.sources ?? []),
+				authority_flags: lintAuthority(
+					stripAppendedNotes(r.text),
+					payload?.sources ?? [],
+				),
 				ms: r.ms,
 				// Kept for the wrong-authority / wrong-jurisdiction review.
 				answer: r.text,

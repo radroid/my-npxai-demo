@@ -34,8 +34,33 @@ export function getArtifactModel(): string {
 // The legacy CNSC path always uses OPENAI_MODELS.chat. Separate because the
 // v2 answers carry legal-force and cross-jurisdiction discipline that the
 // default model follows unreliably (docs/phase-12-sources.md §4).
+//
+// Allowlisted: the spend guard admits requests by TOKENS, not dollars, so a
+// typo'd or premium model id would change cost per admission silently (or
+// fail every request). Anything else falls back to the default, logged once.
+export const SOURCE_CHAT_MODELS = [
+	"gpt-4o-mini",
+	"gpt-4.1-nano",
+	"gpt-4.1-mini",
+	"gpt-4.1",
+	"gpt-4o",
+] as const;
+let warnedSourceModel: string | null = null;
 export function getSourceChatModel(): string {
-	return process.env.KH_V2_CHAT_MODEL || OPENAI_MODELS.chat;
+	const wanted = process.env.KH_V2_CHAT_MODEL?.trim();
+	if (!wanted) return OPENAI_MODELS.chat;
+	if ((SOURCE_CHAT_MODELS as readonly string[]).includes(wanted)) return wanted;
+	if (warnedSourceModel !== wanted) {
+		warnedSourceModel = wanted;
+		console.warn(
+			JSON.stringify({
+				event: "kh_v2_chat_model_rejected",
+				fallback: OPENAI_MODELS.chat,
+				allowed: SOURCE_CHAT_MODELS,
+			}),
+		);
+	}
+	return OPENAI_MODELS.chat;
 }
 
 // Full-dimension text-embedding-3-large. The 3072-dim vectors measurably beat

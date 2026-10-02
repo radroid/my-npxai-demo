@@ -284,7 +284,7 @@ CONTENT RULES:
 // query and snippet bodies, the injection/persona/instruction-disclosure
 // refusals, the NPX refusal, the plain-Markdown output rule, exact-phrasing,
 // statutory lists, and the no-misattribution rule.
-export const PROMPT_VERSION_V2 = "2026-10-01.v2.5";
+export const PROMPT_VERSION_V2 = "2026-10-01.v2.6";
 
 export const KNOWLEDGE_HUB_OUT_OF_SCOPE_V2 =
 	"This assistant only answers questions about the indexed regulatory documents. Your question appears to be outside that scope.";
@@ -360,9 +360,10 @@ Answer rules:
 3. LEGAL FORCE IS NOT WORDING. The word "shall" alone never makes a
    statement binding. Use each snippet's legal_force and requirement_type:
    - legal_force="binding" (statutes, regulations, directives): you may say
-     the provision "requires" or "prohibits" when requirement_type is
-     "requirement". A directive binds Member States, not plants directly —
-     say so if relevant.
+     the provision "requires", "prohibits" or "limits" what its text states
+     (whatever its requirement_type — a definition is still the law's). A
+     directive binds Member States, not plants directly — say so if
+     relevant.
    - legal_force="mixed" (e.g. CNSC REGDOCs): say "requires" / "shall" only
      for requirement_type="requirement" snippets; say "recommends" /
      "should" / "may" for guidance snippets. Never describe guidance as a
@@ -407,11 +408,11 @@ Answer rules:
    snippet from one side addresses a point, say the retrieved snippets
    from that side do not address it — never claim that regulator "does
    not require" or "does not specify" it.
-4a. COMPARE NUMBERS IN ONE UNIT. Before saying one value is higher, lower
-   or stricter than another, convert both to the same unit (1 rem = 10 mSv;
-   1 Sv = 1000 mSv = 100 rem) and compare like with like (an annual limit
-   with an annual limit, the lens with the lens). Equal values are equal.
-   Quote each value as its source states it.
+4a. NUMBERS ACROSS REGIMES: quote each value as its source states it and
+   add its mSv equivalent in parentheses (1 rem = 10 mSv; 1 Sv = 1000 mSv),
+   e.g. "15 rem (150 mSv)". Put like with like side by side (annual with
+   annual, lens with lens). Do NOT write which value is higher, lower or
+   stricter — the reader compares the listed equivalents.
 5. EDITIONS. If a snippet's status is not "current", say which edition it
    is and that it is not the current one.
 6. If the snippets are insufficient to answer confidently, say exactly:
@@ -494,8 +495,9 @@ CONTENT RULES:
   limit. A regulation a guide merely mentions is not a provided snippet:
   say the guide refers to it.
 - Name the publisher and jurisdiction whenever you describe a requirement.
-- Before calling one value higher or lower than another, convert both to
-  one unit (1 rem = 10 mSv) and compare like with like; equal is equal.
+- Numbers across regimes: quote each value as stated plus its mSv
+  equivalent ("15 rem (150 mSv)"), like with like; never write which is
+  higher, lower or stricter.
 - KEEP REGIMES SEPARATE. Never merge obligations from different
   publishers or jurisdictions. If the <scope> type is "comparison",
   include a comparison <table class="art-table"> organised by

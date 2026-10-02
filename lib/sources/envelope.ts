@@ -14,6 +14,7 @@ import {
 	DOCUMENT_KIND_LABELS,
 	JURISDICTION_LABELS,
 } from "./catalog";
+import { collectionsWithText } from "./manifest";
 import { detectMentions, type ResolvedScope } from "./scope";
 
 function htmlEscape(raw: string): string {
@@ -129,7 +130,7 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 	const cues: string[] = [];
 	if (scope.kind === "compare") {
 		cues.push(
-			"COMPARISON SCOPE: organise the answer by jurisdiction, attribute every point to its publisher, and do not merge obligations across regimes.",
+			"COMPARISON SCOPE: organise the answer by jurisdiction, attribute every point to its publisher, and do not merge obligations across regimes. For numeric values, give each as its source states it plus its mSv equivalent (1 rem = 10 mSv) and do NOT write which regime's value is higher, lower or stricter.",
 		);
 	}
 	if (unsearchedMentions.length > 0) {
@@ -139,15 +140,13 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 				`PINNED SCOPE: the user selected ${searched.map(collectionLabel).join(", ")} only. The question also mentions ${others}, which is outside the selected sources — answer the ${searched.map((id) => COLLECTIONS[id].label).join("/")} part from the snippets and state in one sentence that the other regime was not searched.`,
 			);
 		} else {
-			// Say WHY, truthfully: reference-only text is not stored at all; a
-			// collection with text was simply not part of this search (not
-			// enabled here, or past the three-way comparison cap).
-			const refOnly = unsearchedMentions.filter(
-				(id) => !COLLECTIONS[id].searchable,
-			);
-			const notSearched = unsearchedMentions.filter(
-				(id) => COLLECTIONS[id].searchable,
-			);
+			// Say WHY, truthfully: a collection with no stored text (IAEA, and
+			// today AERB and Fukushima) has nothing to search; one with text was
+			// simply not part of this search (not enabled here, or past the
+			// three-way comparison cap).
+			const withText = new Set(collectionsWithText());
+			const refOnly = unsearchedMentions.filter((id) => !withText.has(id));
+			const notSearched = unsearchedMentions.filter((id) => withText.has(id));
 			if (refOnly.length > 0) {
 				cues.push(
 					`REFERENCE ONLY: ${refOnly.map(collectionLabel).join(", ")} ${refOnly.length === 1 ? "is" : "are"} catalogued as titles and links only — no text is stored here. Do not state what ${refOnly.length === 1 ? "it says" : "they say"} beyond what the snippets themselves quote, and say so in one sentence if the question asks.`,
@@ -155,7 +154,7 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 			}
 			if (notSearched.length > 0) {
 				cues.push(
-					`NOT SEARCHED: ${notSearched.map(collectionLabel).join(", ")} ${notSearched.length === 1 ? "was" : "were"} not part of this search. Answer from the snippets and state in one sentence that ${notSearched.length === 1 ? "it was" : "they were"} not searched.`,
+					`NOT SEARCHED: ${notSearched.map(collectionLabel).join(", ")} ${notSearched.length === 1 ? "was" : "were"} not part of this search. Answer from the snippets, state in one sentence that ${notSearched.length === 1 ? "it was" : "they were"} not searched, and never attribute a statement to ${notSearched.length === 1 ? "it" : "them"}.`,
 				);
 			}
 		}

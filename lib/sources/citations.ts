@@ -64,6 +64,12 @@ export interface SourceRecord {
 	url: string | null;
 	similarity: number;
 	requirement_type: "requirement" | "guidance" | null;
+	/**
+	 * The full chunk text states an obligation itself ("requires", "must",
+	 * "mandatory" — OBLIGATION_RE): a guidance-tagged REGDOC section that
+	 * restates the NSCA's duty can be cited for it (lintAuthority).
+	 */
+	obligation_language: boolean;
 	snippet: string;
 	attribution: string | null;
 	regdoc_id: string;
@@ -137,6 +143,7 @@ export function toSourceRecords(chunks: RetrievedChunk[]): SourceRecord[] {
 			url,
 			similarity: Number(c.similarity.toFixed(4)),
 			requirement_type: c.requirement_type,
+			obligation_language: statesObligation(c.chunk_text),
 			snippet: c.chunk_text.slice(0, SNIPPET_PREVIEW_CHARS),
 			attribution: s?.attribution ?? null,
 			regdoc_id: ref,
@@ -186,10 +193,19 @@ const OBLIGATION_RE =
 // … not a requirement") is the right answer, not a violation.
 // Scoped to the clause: "The NRC does not believe that additional
 // reductions … are required" is a negation 60+ characters wide.
+// Only the negated obligation itself counts ("not required", "does not
+// require", "is not a requirement", "no obligation") — a "not" elsewhere in
+// the sentence ("is not limited to X, and licensees must Y") does not. The
+// one wide form is a disbelief verb: "The NRC does not believe that
+// additional reductions … are required".
 const NEGATED_OBLIGATION_RE =
-	/\b(?:not|never|no|non-?binding)\b[^.;:]{0,120}\b(?:requires?|required|must|mandatory|obligat\w*)\b|\b(?:voluntary|non-?binding|not (?:a |an )?(?:legal )?requirements?)\b/i;
+	/\b(?:not|never|no longer)\s+(?:(?:legally|strictly|explicitly|specifically|generally|currently|necessarily)\s+)?(?:requir\w*|mandatory|obligat\w*|binding)\b|n['’]t\s+(?:(?:legally|strictly|explicitly|necessarily)\s+)?(?:requir\w*|mandatory|obligat\w*|binding)\b|\bno\s+(?:legal\s+|regulatory\s+)?(?:requirements?|obligations?|mandate)\b|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding|not (?:a |an )?(?:legal |regulatory )?requirements?)\b/i;
 // "the required safety functions" — an adjective, not an obligation.
 const ADJECTIVAL_REQUIRED_RE = /\bthe required\b/gi;
+
+function statesObligation(text: string): boolean {
+	return OBLIGATION_RE.test(text.replace(ADJECTIVAL_REQUIRED_RE, ""));
+}
 
 export interface AuthorityFlag {
 	sentence: string;
@@ -202,15 +218,20 @@ export interface AuthorityFlag {
 type LintSource = Pick<
 	SourceRecord,
 	"sid" | "chip" | "ref" | "legal_force" | "requirement_type"
->;
+> &
+	Partial<Pick<SourceRecord, "obligation_language">>;
 
-// No obligation to cite: a nonbinding document, or a guidance-tagged
-// snippet of a mixed-force one (a CNSC REGDOC section whose text has no
-// "shall"/"must"/"required" — the chunker's tag means exactly that).
+// No obligation to cite: a nonbinding document, or a section of a mixed-
+// force one (a CNSC REGDOC) that is guidance-tagged AND states no duty in
+// its own text. The chunker's tag only looks for "shall"/"must"/"required
+// to"; a REGDOC section that says "the NSCA requires licensees to…" can be
+// cited for that duty.
 function carriesNoObligation(s: LintSource): boolean {
 	return (
 		s.legal_force === "nonbinding" ||
-		(s.legal_force === "mixed" && s.requirement_type !== "requirement")
+		(s.legal_force === "mixed" &&
+			s.requirement_type !== "requirement" &&
+			s.obligation_language !== true)
 	);
 }
 
@@ -228,8 +249,11 @@ export function lintAuthority(
 	sources: LintSource[],
 ): AuthorityFlag[] {
 	const flags: AuthorityFlag[] = [];
-	// Never split before a citation: "…must do X. [[S1]]" cites S1.
-	for (const raw of text.split(/(?<=[.!?])\s+(?!\[\[|\[S\d)|\n+/)) {
+	// A citation belongs to the sentence before it: "…must do X. [[S1]] The
+	// guide says Y [[S2]]." is two sentences, citing S1 and S2.
+	for (const raw of text.split(
+		/(?<=[.!?](?:\s*\[\[[^\]\n]*\]\])*)\s+(?!\[\[|\[S\d)|\n+/,
+	)) {
 		const sentence = raw.trim();
 		if (
 			!OBLIGATION_RE.test(sentence.replace(ADJECTIVAL_REQUIRED_RE, "")) ||
@@ -262,6 +286,42 @@ export function authorityNote(flags: AuthorityFlag[]): string | null {
 	const refs = [...new Set(flags.flatMap((f) => f.refs))].slice(0, 4);
 	const many = refs.length > 1;
 	return `\n\n_Legal-force note: the passages cited from ${refs.join("; ")} are guidance, not legal requirements. Where this answer says "required" or "must" citing only ${many ? "them" : "it"}, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._`;
+}
+
+// The notes above and below, as appended to an answer — for graders that
+// must judge the model's own text ("must"/"required" and mSv values in a
+// note would otherwise satisfy a must_contain check).
+const APPENDED_NOTE_RE = /\n*_(?:Legal-force|Units) note: [^\n]*_(?=\n|$)/g;
+
+export function stripAppendedNotes(text: string): string {
+	return text.replace(APPENDED_NOTE_RE, "");
+}
+
+const COMPARATIVE_RE =
+	/\b(?:higher|lower|stricter|more stringent|less stringent|more restrictive|less restrictive|greater|exceeds?)\b/i;
+const REM_VALUE_RE = /\b(\d+(?:\.\d+)?)\s*rems?\b/gi;
+const SI_VALUE_RE = /\b\d+(?:\.\d+)?\s*m?Sv\b/;
+
+/**
+ * The deterministic backstop for cross-unit comparisons: an answer that
+ * quotes limits in BOTH rem and sieverts and says one is higher/lower gets
+ * the exact mSv equivalent of every rem value it quoted. gpt-4o-mini
+ * repeatedly called a 50 mSv limit "higher" than 15 rem (= 150 mSv) despite
+ * the prompt's one-unit rule; the note makes any such claim checkable at a
+ * glance.
+ */
+export function unitsNote(text: string): string | null {
+	if (!COMPARATIVE_RE.test(text) || !SI_VALUE_RE.test(text)) return null;
+	const rems = [
+		...new Set([...text.matchAll(REM_VALUE_RE)].map((m) => Number(m[1]))),
+	]
+		.filter((n) => Number.isFinite(n))
+		.sort((a, b) => a - b)
+		.slice(0, 6);
+	if (rems.length === 0) return null;
+	const fmt = (n: number) => Number((n * 10).toPrecision(6)).toString();
+	const pairs = rems.map((n) => `${n} rem = ${fmt(n)} mSv`).join("; ");
+	return `\n\n_Units note: 1 rem = 10 mSv (${pairs}). Check any statement above that one limit is higher or lower against these equivalents._`;
 }
 
 function escapeHtml(raw: string): string {
