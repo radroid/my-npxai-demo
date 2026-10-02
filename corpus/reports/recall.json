@@ -1,5 +1,6 @@
 {
-	"run_at": "2026-10-01T23:49:37.952Z",
+	"run_at": "2026-10-02T00:42:48.915Z",
+	"note": "match_source_chunks is exact by design (enable_indexscan=off), so 1.000 is expected: this is a regression guard, not an HNSW measurement. Filtered-HNSW recall: corpus/reports/hnsw-forced-recall.txt.",
 	"bar": {
 		"mean_recall_at_8": 0.95,
 		"min_recall_at_8": 0.75

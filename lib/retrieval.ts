@@ -37,6 +37,9 @@ export const MIN_CHUNK_SIM = 0.35;
 // in the user query. Calibrated so that a named-doc chunk at sim 0.55
 // ranks above an unrelated-doc chunk at sim 0.70.
 export const NAMED_DOC_BOOST = 0.2;
+// v2 named-document fetch (retrieveChunks, source.docRefs).
+const NAMED_DOC_FETCH_DOCS = 4;
+const NAMED_DOC_FETCH_PER_DOC = 2;
 
 // Recognizes "REGDOC-X.X", "REGDOC-X.X.X", "REGDOC 2.5.2", "NSCA" in user
 // query text. Returns the canonical regdoc_id form.
@@ -792,16 +795,23 @@ export async function retrieveChunks(
 		}
 		expansionPools.push(expMatches);
 	}
-	// v2: the named documents' own best chunks (see source.docRefs).
-	const namedRefs = opts.source?.docRefs ?? [];
+	// v2: each named document's own best chunks (see source.docRefs). A
+	// PRESENCE guarantee, not a flood: NAMED_DOC_BOOST applies to every chunk
+	// of a named document, so admitting 20 of them would crowd out better
+	// matches from other documents ("…under the NSCA and its regulations…"
+	// filled 5 of 8 slots with low-similarity NSCA sections). Two per
+	// document, at most four documents, searched in parallel.
+	const namedRefs = (opts.source?.docRefs ?? []).slice(0, NAMED_DOC_FETCH_DOCS);
 	if (namedRefs.length > 0) {
-		const { rows: named, error: namedErr } = await match(
-			embeddings[0],
-			20,
-			namedRefs.slice(0, 10),
+		const named = await Promise.all(
+			namedRefs.map((ref) =>
+				match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, [ref]),
+			),
 		);
-		if (namedErr) console.error(`${rpcName}_named_doc_error`, namedErr);
-		else expansionPools.push(named);
+		for (const { rows, error } of named) {
+			if (error) console.error(`${rpcName}_named_doc_error`, error);
+			else expansionPools.push(rows);
+		}
 	}
 
 	// Merge + dedupe by chunk.id, keeping the highest observed similarity.

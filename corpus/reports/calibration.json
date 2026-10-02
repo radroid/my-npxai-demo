@@ -1,5 +1,5 @@
 {
-	"run_at": "2026-10-01T23:55:11.846Z",
+	"run_at": "2026-10-02T00:44:12.313Z",
 	"legacy": {
 		"oos": 0.4,
 		"disclaimer": 0.35,
@@ -64,7 +64,7 @@
 					"collection": "*",
 					"kind": "oos",
 					"query": "How do I reverse a linked list in Python?",
-					"topSim": 0.056,
+					"topSim": 0.057,
 					"avgSim": 0.045,
 					"poolAvgSim": 0.045
 				},
@@ -105,8 +105,8 @@
 					"kind": "oos",
 					"query": "What are the best practices for search engine optimization?",
 					"topSim": 0.231,
-					"avgSim": 0.204,
-					"poolAvgSim": 0.204
+					"avgSim": 0.203,
+					"poolAvgSim": 0.203
 				},
 				{
 					"collection": "*",
@@ -162,29 +162,29 @@
 					"query": "What are the record-keeping requirements for licensees regarding nuclear substances and worker training under the General Nuclear Safety and Control Regulations and the Nuclear Substances and Radiation Devices Regulations?",
 					"topSim": 0.739,
 					"avgSim": 0.687,
-					"poolAvgSim": 0.641
+					"poolAvgSim": 0.642
 				},
 				{
 					"collection": "cnsc",
 					"kind": "in",
 					"query": "What information must be included in an application for a licence to operate a Class I nuclear facility and in an application for the amendment, revocation, or replacement of a licence according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
-					"topSim": 0.764,
-					"avgSim": 0.74,
-					"poolAvgSim": 0.694
+					"topSim": 0.835,
+					"avgSim": 0.749,
+					"poolAvgSim": 0.698
 				},
 				{
 					"collection": "cnsc",
 					"kind": "in",
 					"query": "What are the requirements and obligations for a licensee under the NSCA and its regulations when applying for a licence to construct, operate, or decommission a Class I nuclear facility?",
-					"topSim": 0.754,
-					"avgSim": 0.728,
-					"poolAvgSim": 0.692
+					"topSim": 0.749,
+					"avgSim": 0.723,
+					"poolAvgSim": 0.69
 				},
 				{
 					"collection": "cnsc",
 					"kind": "in",
 					"query": "What are the responsibilities of the licensee regarding operator rounds and routines according to REGDOC-2.3.4 §3.3.1, and what specific factors should shift staff note during verification rounds?",
-					"topSim": 0.796,
+					"topSim": 0.797,
 					"avgSim": 0.623,
 					"poolAvgSim": 0.541
 				},
@@ -192,17 +192,17 @@
 					"collection": "cnsc",
 					"kind": "in",
 					"query": "What are the specific requirements for a licence application for a Class I nuclear facility according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
-					"topSim": 0.759,
-					"avgSim": 0.72,
-					"poolAvgSim": 0.684
+					"topSim": 0.797,
+					"avgSim": 0.727,
+					"poolAvgSim": 0.687
 				},
 				{
 					"collection": "cnsc",
 					"kind": "in",
 					"query": "What are the requirements for an application for a licence to operate a Class I nuclear facility, and what records must a licensee keep according to the Class I Nuclear Facilities Regulations?",
-					"topSim": 0.743,
-					"avgSim": 0.708,
-					"poolAvgSim": 0.667
+					"topSim": 0.781,
+					"avgSim": 0.716,
+					"poolAvgSim": 0.673
 				},
 				{
 					"collection": "cnsc",
@@ -467,7 +467,7 @@
 					"collection": "*",
 					"kind": "oos",
 					"query": "Translate 'good morning' into Japanese.",
-					"topSim": 0.113,
+					"topSim": 0.114,
 					"avgSim": 0.09,
 					"poolAvgSim": 0.09
 				},
@@ -694,9 +694,9 @@
 					"collection": "*",
 					"kind": "oos",
 					"query": "Translate 'good morning' into Japanese.",
-					"topSim": 0.109,
-					"avgSim": 0.072,
-					"poolAvgSim": 0.072
+					"topSim": 0.11,
+					"avgSim": 0.073,
+					"poolAvgSim": 0.073
 				},
 				{
 					"collection": "*",
@@ -811,7 +811,7 @@
 					"query": "How often must Member States report to the Commission on implementing the radioactive waste directive?",
 					"topSim": 0.769,
 					"avgSim": 0.602,
-					"poolAvgSim": 0.552
+					"poolAvgSim": 0.553
 				},
 				{
 					"collection": "eu",

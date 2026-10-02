@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { RetrievedChunk } from "../../lib/context-envelope";
+import { retrieveForScope } from "../../lib/knowledge-hub/scoped-retrieval";
 import { retrieveChunks } from "../../lib/retrieval";
 import { thresholdsFor } from "../../lib/sources/thresholds";
 import { checkClients, noopRecordUsage } from "./db";
@@ -87,19 +88,22 @@ async function main() {
 	}
 	const rows: Row[] = [];
 	for (const g of golden) {
-		const [legacy, v2, v2h] = await Promise.all([
+		// v2 goes through retrieveForScope — the production path, including
+		// the named-document search and CNSC's thresholds.
+		const pinned = (historical: boolean) =>
+			retrieveForScope(
+				g.question,
+				{ kind: "single", collection: "cnsc", via: "pinned", historical },
+				deps,
+				ENVELOPE,
+			);
+		const [legacy, v2r, v2hr] = await Promise.all([
 			retrieveChunks(g.question, deps, { envelopeChunks: ENVELOPE }),
-			retrieveChunks(g.question, deps, {
-				envelopeChunks: ENVELOPE,
-				source: { collections: ["cnsc"] },
-				thresholds: t,
-			}),
-			retrieveChunks(g.question, deps, {
-				envelopeChunks: ENVELOPE,
-				source: { collections: ["cnsc"], includeHistorical: true },
-				thresholds: t,
-			}),
+			pinned(false),
+			pinned(true),
 		]);
+		const v2 = { envelope: v2r.chunks, topSim: v2r.topSim };
+		const v2h = { envelope: v2hr.chunks, topSim: v2hr.topSim };
 		const group: Row["group"] = g.gold_chunks.some((c) =>
 			refreshed.has(c.regdoc_id),
 		)

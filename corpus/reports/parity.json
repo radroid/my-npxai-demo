@@ -1,5 +1,5 @@
 {
-	"run_at": "2026-10-01T23:51:06.813Z",
+	"run_at": "2026-10-02T00:48:12.610Z",
 	"envelope": 8,
 	"summary": {
 		"unchanged": {
@@ -59,7 +59,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.738,
-			"v2_top": 0.747,
+			"v2_top": 0.748,
 			"gate_agrees": true
 		},
 		{
@@ -72,7 +72,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.79,
-			"v2_top": 0.79,
+			"v2_top": 0.791,
 			"gate_agrees": true
 		},
 		{
@@ -111,7 +111,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": false,
 			"legacy_top": 0.757,
-			"v2_top": 0.764,
+			"v2_top": 0.835,
 			"gate_agrees": true
 		},
 		{
@@ -124,7 +124,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.752,
-			"v2_top": 0.754,
+			"v2_top": 0.749,
 			"gate_agrees": true
 		},
 		{
@@ -150,7 +150,7 @@
 			"v2_hit": false,
 			"v2_historical_hit": true,
 			"legacy_top": 0.759,
-			"v2_top": 0.759,
+			"v2_top": 0.797,
 			"gate_agrees": true
 		},
 		{
@@ -163,7 +163,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.743,
-			"v2_top": 0.743,
+			"v2_top": 0.781,
 			"gate_agrees": true
 		},
 		{
@@ -267,7 +267,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.729,
-			"v2_top": 0.729,
+			"v2_top": 0.781,
 			"gate_agrees": true
 		},
 		{
@@ -280,7 +280,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.824,
-			"v2_top": 0.813,
+			"v2_top": 0.811,
 			"gate_agrees": true
 		},
 		{
@@ -293,7 +293,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.813,
-			"v2_top": 0.811,
+			"v2_top": 0.813,
 			"gate_agrees": true
 		},
 		{
@@ -540,7 +540,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.821,
-			"v2_top": 0.808,
+			"v2_top": 0.807,
 			"gate_agrees": true
 		},
 		{
@@ -566,7 +566,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.807,
-			"v2_top": 0.732,
+			"v2_top": 0.733,
 			"gate_agrees": true
 		},
 		{
@@ -943,7 +943,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.763,
-			"v2_top": 0.764,
+			"v2_top": 0.763,
 			"gate_agrees": true
 		},
 		{
@@ -1073,7 +1073,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.79,
-			"v2_top": 0.692,
+			"v2_top": 0.691,
 			"gate_agrees": true
 		},
 		{
@@ -1124,7 +1124,7 @@
 			"legacy_hit": true,
 			"v2_hit": true,
 			"v2_historical_hit": true,
-			"legacy_top": 0.686,
+			"legacy_top": 0.685,
 			"v2_top": 0.685,
 			"gate_agrees": true
 		},
@@ -1138,7 +1138,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.747,
-			"v2_top": 0.749,
+			"v2_top": 0.75,
 			"gate_agrees": true
 		},
 		{
