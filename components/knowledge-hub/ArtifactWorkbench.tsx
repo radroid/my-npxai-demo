@@ -15,6 +15,7 @@
 
 import { ArrowUpIcon, DownloadIcon, SquareIcon } from "lucide-react";
 import { type FC, type ReactNode, useEffect, useRef, useState } from "react";
+import { ReferenceLinks } from "@/components/knowledge-hub/ReferenceLinks";
 import {
 	type SourceChunk,
 	SourcesPanel,
@@ -409,34 +410,37 @@ const ScopeSuggestions: FC<{
 	const setAuto = useSourceScope((s) => s.setAuto);
 	const mode = useSourceScope((s) => s.scope.mode);
 	return (
-		<div className="mt-3 flex flex-wrap gap-2">
-			{notice.suggestions.map((s) => (
-				<button
-					key={s.id}
-					type="button"
-					disabled={disabled}
-					onClick={() => {
-						pin(s.id);
-						onRetry();
-					}}
-					className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
-				>
-					Use {s.label} instead
-				</button>
-			))}
-			{mode === "pinned" ? (
-				<button
-					type="button"
-					disabled={disabled}
-					onClick={() => {
-						setAuto();
-						onRetry();
-					}}
-					className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
-				>
-					Switch to Auto and retry
-				</button>
-			) : null}
-		</div>
+		<>
+			<ReferenceLinks references={notice.references} />
+			<div className="mt-3 flex flex-wrap gap-2">
+				{notice.suggestions.map((s) => (
+					<button
+						key={s.id}
+						type="button"
+						disabled={disabled}
+						onClick={() => {
+							pin(s.id);
+							onRetry();
+						}}
+						className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+					>
+						Switch to {s.label} and retry
+					</button>
+				))}
+				{mode === "pinned" ? (
+					<button
+						type="button"
+						disabled={disabled}
+						onClick={() => {
+							setAuto();
+							onRetry();
+						}}
+						className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+					>
+						Switch to Auto and retry
+					</button>
+				) : null}
+			</div>
+		</>
 	);
 };

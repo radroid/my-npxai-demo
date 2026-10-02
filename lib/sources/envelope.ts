@@ -74,8 +74,17 @@ export interface SourceEnvelopeInput {
 	scope: Extract<ResolvedScope, { kind: "single" | "compare" }>;
 	/** Comparison sides that returned nothing relevant enough to show. */
 	missingCollections?: CollectionId[];
-	/** Documents the question names that ARE present in the envelope. */
+	/** Mentioned documents that have at least one snippet in the envelope. */
 	requiredDocs?: readonly string[];
+	/**
+	 * Partial answers only: documents the question names that are NOT
+	 * indexed. Without this cue a model asked about "10 CFR 20.1201 and
+	 * 10 CFR 73.54" with only 20.1201 snippets tends to attribute something
+	 * to 73.54 anyway.
+	 */
+	absentDocs?: readonly string[];
+	/** Partial answers only: named, indexed, but no snippet retrieved. */
+	unretrievedDocs?: readonly string[];
 	/**
 	 * Pinned scope only: other regulators the question names. The answer
 	 * covers the pinned collection and says the rest is outside the
@@ -91,6 +100,8 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 		scope,
 		missingCollections = [],
 		requiredDocs = [],
+		absentDocs = [],
+		unretrievedDocs = [],
 		unsearchedMentions = [],
 	} = input;
 	const searched =
@@ -125,7 +136,18 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 	}
 	if (requiredDocs.length >= 2) {
 		cues.push(
-			`MULTI-DOC SCOPE: The user's question spans ${requiredDocs.join(", ")}. Your response MUST cite at least one snippet from EACH of these documents.`,
+			`MULTI-DOC SCOPE: The user's question spans ${requiredDocs.map(htmlEscape).join(", ")}. Your response MUST cite at least one snippet from EACH of these documents.`,
+		);
+	}
+	const one = (xs: readonly string[]) => xs.length === 1;
+	if (absentDocs.length > 0) {
+		cues.push(
+			`NOT INDEXED: the question also names ${absentDocs.map(htmlEscape).join(", ")}, which ${one(absentDocs) ? "is" : "are"} not among the indexed documents. Answer the rest from the snippets, say in one sentence that ${one(absentDocs) ? "this document is" : "these documents are"} not covered, and never attribute a statement to ${one(absentDocs) ? "it" : "them"}.`,
+		);
+	}
+	if (unretrievedDocs.length > 0) {
+		cues.push(
+			`NO SNIPPET RETRIEVED for ${unretrievedDocs.map(htmlEscape).join(", ")}: answer the rest from the snippets and say the retrieved excerpts do not cover ${one(unretrievedDocs) ? "that document" : "those documents"} — do not answer ${one(unretrievedDocs) ? "it" : "them"} from memory.`,
 		);
 	}
 	const cueText = cues.length > 0 ? `\n\n${cues.join("\n")}` : "";

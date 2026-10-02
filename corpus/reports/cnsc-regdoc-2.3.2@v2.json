@@ -1,10 +1,10 @@
 {
 	"id": "cnsc-regdoc-2.3.2@v2",
-	"register_version": "2026-10-01.2",
+	"register_version": "2026-10-01.3",
 	"outcome": "published",
-	"sha256": "502c60ce2900c4aabbcbf6221af5797f1325122bfbc1662ac67aa23faf19b309",
-	"chunks": 51,
-	"requirement_chunks": 16,
+	"sha256": "b1b0a1500a99f8e3f11087cbbb7fc63e1b2b614bde3471b98003e52d4e907f76",
+	"chunks": 53,
+	"requirement_chunks": 18,
 	"chunks_with_page": 0,
 	"sections_sample": [
 		"Introduction",
@@ -48,5 +48,5 @@
 		"alpha_ratio": 0.834,
 		"word_like_ratio": 0.99
 	},
-	"published_at": "2026-10-01T23:19:29.667Z"
+	"published_at": "2026-10-02T00:26:22.257Z"
 }

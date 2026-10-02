@@ -16,6 +16,15 @@ import type { ScopeRequest } from "./scope";
 
 interface SourceScopeState {
 	scope: ScopeRequest;
+	/**
+	 * Set by a notice's "Switch to …" button just before it re-asks the
+	 * question. The re-ask goes out as a regenerate (it replaces the notice),
+	 * which would normally skip and invalidate the answer cache; this tells
+	 * the server it is a scope change, not a "give me a fresh answer", so a
+	 * cached answer for the new scope is still served. One-shot, not persisted.
+	 */
+	switchPending: boolean;
+	markScopeSwitch: () => void;
 	setAuto: () => void;
 	pin: (collection: CollectionId) => void;
 	setHistorical: (historical: boolean) => void;
@@ -27,6 +36,8 @@ export const useSourceScope = create<SourceScopeState>()(
 	persist(
 		(set, get) => ({
 			scope: { mode: "auto" },
+			switchPending: false,
+			markScopeSwitch: () => set({ switchPending: true }),
 			setAuto: () =>
 				set({ scope: { mode: "auto", historical: get().scope.historical } }),
 			pin: (collection) =>
@@ -46,11 +57,28 @@ export const useSourceScope = create<SourceScopeState>()(
 				}
 			},
 		}),
-		{ name: "kh-source-scope", version: 1 },
+		{
+			name: "kh-source-scope",
+			version: 1,
+			partialize: (s) => ({ scope: s.scope }),
+			// Rehydrated by ScopePicker after mount: reading localStorage while
+			// the store is created would make the first client render differ
+			// from the server's ("Auto") and break hydration.
+			skipHydration: true,
+		},
 	),
 );
 
-/** The body field the chat and artifact requests carry. */
-export function currentScopeBody(): { scope: ScopeRequest } {
-	return { scope: useSourceScope.getState().scope };
+/**
+ * The body fields the chat and artifact requests carry. Consumes the
+ * one-shot scope-switch flag (see switchPending).
+ */
+export function currentScopeBody(): {
+	scope: ScopeRequest;
+	scopeSwitch?: true;
+} {
+	const { scope, switchPending } = useSourceScope.getState();
+	if (!switchPending) return { scope };
+	useSourceScope.setState({ switchPending: false });
+	return { scope, scopeSwitch: true };
 }

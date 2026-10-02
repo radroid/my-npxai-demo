@@ -5,7 +5,7 @@
 //                      answer text so [[S1]] chips resolve while streaming.
 //                      Legacy messages carry { chunks } with no version and
 //                      keep rendering through the REGDOC chip path.
-//   data-scope-notice  { reason, suggestions }         — a deterministic
+//   data-scope-notice  { reason, suggestions, references? } — a deterministic
 //                      scope decline (no retrieval, no model call); the UI
 //                      offers the suggestions as one-click scope switches.
 
@@ -31,6 +31,12 @@ export interface SourcesPayloadV2 {
 export interface ScopeNoticePayload {
 	reason: NoticeReason;
 	suggestions: Array<{ id: CollectionId; label: string }>;
+	/**
+	 * Reference-only documents the question names (IAEA standards): the
+	 * official page, from the register — the "reference link" the notice
+	 * promises. URLs are re-checked against the allowlist before rendering.
+	 */
+	references?: Array<{ label: string; title: string; url: string }>;
 }
 
 export function isSourcesPayloadV2(data: unknown): data is SourcesPayloadV2 {

@@ -33,6 +33,7 @@ import {
 	CitationSourcesProvider,
 	type CitationSourcesValue,
 } from "@/components/knowledge-hub/citation-sources";
+import { ReferenceLinks } from "@/components/knowledge-hub/ReferenceLinks";
 import {
 	SourcesPanel,
 	type SourcesPanelProps,
@@ -446,43 +447,52 @@ const AssistantMessage: FC = () => {
 	);
 };
 
-// One-click recovery from a scope notice: switch the source selector and
-// re-ask the same question (the transport reads the new scope at send time).
+// One-click recovery from a scope notice: switch the source selector (a
+// lasting choice — the labels say so) and re-ask the same question. The
+// transport reads the new scope at send time; markScopeSwitch tells the
+// server this regenerate is a scope change, so it may serve a cached answer.
 const ScopeNoticeActions: FC<{ notice: ScopeNoticePayload }> = ({ notice }) => {
 	const aui = useAui();
 	const pin = useSourceScope((s) => s.pin);
 	const setAuto = useSourceScope((s) => s.setAuto);
 	const mode = useSourceScope((s) => s.scope.mode);
 	const isRunning = useAuiState((s) => s.thread.isRunning);
+	const markScopeSwitch = useSourceScope((s) => s.markScopeSwitch);
 	const retry = (apply: () => void) => {
 		apply();
+		markScopeSwitch();
 		aui.message().reload();
 	};
-	if (notice.suggestions.length === 0 && mode === "auto") return null;
+	const hasRefs = (notice.references?.length ?? 0) > 0;
+	if (notice.suggestions.length === 0 && mode === "auto" && !hasRefs)
+		return null;
 	return (
-		<div className="mt-2 flex flex-wrap gap-2">
-			{notice.suggestions.map((s) => (
-				<button
-					key={s.id}
-					type="button"
-					disabled={isRunning}
-					onClick={() => retry(() => pin(s.id))}
-					className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
-				>
-					Ask {s.label} instead
-				</button>
-			))}
-			{mode === "pinned" ? (
-				<button
-					type="button"
-					disabled={isRunning}
-					onClick={() => retry(setAuto)}
-					className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
-				>
-					Switch to Auto and retry
-				</button>
-			) : null}
-		</div>
+		<>
+			<ReferenceLinks references={notice.references} />
+			<div className="mt-2 flex flex-wrap gap-2">
+				{notice.suggestions.map((s) => (
+					<button
+						key={s.id}
+						type="button"
+						disabled={isRunning}
+						onClick={() => retry(() => pin(s.id))}
+						className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+					>
+						Switch to {s.label} and retry
+					</button>
+				))}
+				{mode === "pinned" ? (
+					<button
+						type="button"
+						disabled={isRunning}
+						onClick={() => retry(setAuto)}
+						className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+					>
+						Switch to Auto and retry
+					</button>
+				) : null}
+			</div>
+		</>
 	);
 };
 

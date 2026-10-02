@@ -12,6 +12,11 @@
 
 import { get_encoding } from "tiktoken";
 
+// Bumped whenever chunkDocPaged's OUTPUT can change (text, boundaries or
+// page ranges). Stored with each published edition so the publisher's
+// unchanged-edition skip re-embeds after a chunker change. @2: page ranges
+// cover sentences that run past a page break.
+export const CHUNKER_VERSION = "chunk@2";
 export const CHUNK_TARGET_TOKENS = 400;
 export const CHUNK_OVERLAP_TOKENS = 60;
 export const CHUNK_MIN_TOKENS = 40; // skip tiny orphan chunks (ToC remnants, etc.)
@@ -283,6 +288,8 @@ export function chunkDocPaged(
 						chunk_index: chunkIndex++,
 						url,
 						requirement_type: classifyRequirement(piece),
+						// Every piece gets the whole sentence's range — approximate
+						// for a multi-page table/list, never a wrong single page.
 						...pageRange([sentPages]),
 					});
 					stats.chunksEmitted++;

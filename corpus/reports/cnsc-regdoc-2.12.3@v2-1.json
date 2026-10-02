@@ -1,10 +1,10 @@
 {
 	"id": "cnsc-regdoc-2.12.3@v2-1",
-	"register_version": "2026-10-01.2",
+	"register_version": "2026-10-01.3",
 	"outcome": "published",
-	"sha256": "11c544910da7307640f19a4e9f4b7c0a9d7500ff8595d73e7df5aa4368ea3668",
-	"chunks": 118,
-	"requirement_chunks": 49,
+	"sha256": "2a2b7d8053a45e82a9defbffdd95f3ed2954fab91604deb8da6708b4fa0863dd",
+	"chunks": 121,
+	"requirement_chunks": 50,
 	"chunks_with_page": 0,
 	"sections_sample": [
 		"Preface",
@@ -46,5 +46,5 @@
 		"alpha_ratio": 0.811,
 		"word_like_ratio": 0.991
 	},
-	"published_at": "2026-10-01T23:19:25.975Z"
+	"published_at": "2026-10-02T00:26:19.360Z"
 }

@@ -11,9 +11,26 @@
 //           is reported as missing rather than silently dropped.
 
 import type { RetrievedChunk } from "../context-envelope";
-import { type RetrievalDeps, retrieveChunks } from "../retrieval";
-import type { CollectionId } from "../sources/catalog";
-import { detectMentions, type ResolvedScope } from "../sources/scope";
+import {
+	embeddingInputsFor,
+	embedTexts,
+	extractNamedDocs,
+	type RetrievalDeps,
+	refMatchesMention,
+	retrieveChunks,
+} from "../retrieval";
+import { COLLECTIONS, type CollectionId } from "../sources/catalog";
+import {
+	collectionsWithText,
+	namedReferenceLinks,
+	textDocRefs,
+} from "../sources/manifest";
+import type { ScopeNoticePayload } from "../sources/payload";
+import {
+	detectMentions,
+	type ResolvedScope,
+	scopeKey as scopeKeyOf,
+} from "../sources/scope";
 import { thresholdsFor } from "../sources/thresholds";
 
 export type SearchScope = Extract<
@@ -29,11 +46,31 @@ export interface ScopedRetrieval {
 	avgSim: number;
 	poolAvgSim: number;
 	mentionedDocs: string[];
+	/**
+	 * Mentioned documents that DO have a snippet in the envelope — the only
+	 * ones the "cite each document" instruction may name.
+	 */
+	requiredDocs: string[];
+	/**
+	 * Partial-answer case only (the question names several documents and at
+	 * least one IS in the envelope): named documents that are not indexed at
+	 * all. The model is told to say so, not to attribute. Empty otherwise —
+	 * a question that names only unknown documents ("cite REGDOC-9.9.9") is
+	 * left to the normal decline rules rather than having the id echoed back.
+	 */
+	absentDocs: string[];
+	/** Same case: named documents that ARE indexed but had no snippet here. */
+	unretrievedDocs: string[];
 	/** True when every searched collection fell below its refusal gate. */
 	outOfScope: boolean;
 	/** Comparison sides below their refusal gate. */
 	missing: CollectionId[];
-	/** True when the (present) snippets sit below the limited-context gate. */
+	/**
+	 * True when a present collection's candidate POOL averages below its
+	 * limited-context gate. The pool, not the envelope: the envelope is
+	 * filtered at minChunk (= the disclaimer value), so its mean can never
+	 * dip under the gate and the check would be dead.
+	 */
 	limited: boolean;
 	perCollection: Array<{
 		collection: CollectionId;
@@ -55,16 +92,43 @@ export async function retrieveForScope(
 			? envelopeChunks
 			: Math.max(3, Math.floor(envelopeChunks / collections.length));
 
+	// Compare: embed every side's inputs (they differ only in doc-specific
+	// expansions) in ONE request, so a comparison costs one embedding call
+	// and one circuit-breaker increment like any other question.
+	let precomputedEmbeddings: Map<string, number[]> | undefined;
+	if (collections.length > 1) {
+		const inputs = [
+			...new Set(collections.flatMap((c) => embeddingInputsFor(query, [c]))),
+		];
+		const vectors = await embedTexts(inputs, deps);
+		precomputedEmbeddings = new Map(inputs.map((t, i) => [t, vectors[i]]));
+	}
+
+	// Named documents, resolved against the register per collection.
+	const named = extractNamedDocs(query, collections);
+	const refsByCollection = new Map(
+		collections.map((c) => [c, textDocRefs(c, scope.historical)]),
+	);
+	const isIndexed = (mention: string) =>
+		[...refsByCollection.values()].some((refs) =>
+			refs.some((ref) => refMatchesMention(ref, mention)),
+		);
+
 	const results = await Promise.all(
 		collections.map(async (collection) => {
 			const t = thresholdsFor(collection);
+			const docRefs = (refsByCollection.get(collection) ?? []).filter((ref) =>
+				named.some((m) => refMatchesMention(ref, m)),
+			);
 			const r = await retrieveChunks(query, deps, {
 				envelopeChunks: share,
 				source: {
 					collections: [collection],
 					includeHistorical: scope.historical,
+					docRefs,
 				},
 				thresholds: t,
+				precomputedEmbeddings,
 			});
 			return { collection, t, r };
 		}),
@@ -78,15 +142,22 @@ export async function retrieveForScope(
 	const avg = (xs: number[]) =>
 		xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 	const avgSim = avg(present.map(({ r }) => r.avgSim));
+	const inEnvelope = (doc: string) =>
+		chunks.some((c) => refMatchesMention(c.regdoc_id, doc));
+	const mentionedDocs = [
+		...new Set(results.flatMap(({ r }) => r.mentionedDocs)),
+	];
 	return {
 		chunks,
 		topSim: Math.max(0, ...results.map(({ r }) => r.topSim)),
 		avgSim,
 		poolAvgSim: avg(results.map(({ r }) => r.poolAvgSim)),
-		mentionedDocs: [...new Set(present.flatMap(({ r }) => r.mentionedDocs))],
+		mentionedDocs,
+		requiredDocs: mentionedDocs.filter(inEnvelope),
+		...partialAnswerGaps(named, inEnvelope, isIndexed),
 		outOfScope: present.length === 0,
 		missing: scope.kind === "compare" ? missing : [],
-		limited: present.some(({ r, t }) => r.avgSim < t.disclaimer),
+		limited: present.some(({ r, t }) => r.poolAvgSim < t.disclaimer),
 		perCollection: results.map(({ collection, r }) => ({
 			collection,
 			topSim: Number(r.topSim.toFixed(4)),
@@ -104,4 +175,55 @@ export function unsearchedMentions(
 	return detectMentions(query).collections.filter(
 		(id) => id !== scope.collection,
 	);
+}
+
+/**
+ * The scope part of an answer-cache key. scopeKey() alone is not enough: the
+ * same "single:nrc" scope reached via Auto and via a pin builds a different
+ * envelope (the pinned one carries the "other regime was not searched" cue
+ * for the regimes the question names) and a different Sources-panel label,
+ * so both — plus the cue's regimes — are part of the key.
+ */
+export function cacheScopeMaterial(scope: SearchScope, query: string): string {
+	const via = scope.kind === "single" ? scope.via : "compare";
+	return `${scopeKeyOf(scope)}|${via}|${unsearchedMentions(scope, query).join("+")}`;
+}
+
+/**
+ * The data-scope-notice payload: one-click scope switches, plus the official
+ * links of any reference-only document the question names (an IAEA standard
+ * has no text here, but its page does exist — the notice says so and links it).
+ */
+export function buildNoticePayload(
+	scope: Extract<ResolvedScope, { kind: "notice" }>,
+	query: string,
+): ScopeNoticePayload {
+	const withText = new Set(collectionsWithText());
+	const references = detectMentions(query)
+		.collections.filter((id) => !withText.has(id))
+		.flatMap((id) => namedReferenceLinks(id, query))
+		.slice(0, 3);
+	return {
+		reason: scope.reason,
+		suggestions: scope.suggestions.map((id) => ({
+			id,
+			label: COLLECTIONS[id].label,
+		})),
+		...(references.length > 0 ? { references } : {}),
+	};
+}
+
+function partialAnswerGaps(
+	named: string[],
+	inEnvelope: (doc: string) => boolean,
+	isIndexed: (doc: string) => boolean,
+): { absentDocs: string[]; unretrievedDocs: string[] } {
+	const missing = named.filter((d) => !inEnvelope(d));
+	if (named.length < 2 || missing.length === named.length) {
+		return { absentDocs: [], unretrievedDocs: [] };
+	}
+	return {
+		absentDocs: missing.filter((d) => !isIndexed(d)),
+		unretrievedDocs: missing.filter((d) => isIndexed(d)),
+	};
 }

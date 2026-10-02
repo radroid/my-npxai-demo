@@ -222,9 +222,9 @@ export function registerIssues(register: SourceRegister): RegisterIssue[] {
 						"ingest=true requires fetch_url and format (or backfill_from_regdoc)",
 					);
 				}
-				// CNSC page-data is regenerated on every site build, so its bytes
-				// are not stable enough to pin; its text is hashed per chunk.
-				if (e.format !== "cnsc-json" && !e.checksum_sha256) {
+				// CNSC page-data is pinned by its extracted text (its bytes change
+				// on every site build) — scripts/sources/content-hash.ts.
+				if (!e.checksum_sha256) {
 					issue(
 						"ingest=true requires a pinned checksum_sha256 (run scripts/sources/fetch.ts --pin)",
 					);

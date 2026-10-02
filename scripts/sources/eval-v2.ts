@@ -61,8 +61,24 @@ interface V2Case {
 		cite_collections_all?: boolean;
 		must_contain_any?: string[];
 		must_not_contain?: string[];
+		/**
+		 * The right answer is a DECLINE by the model (on-topic but not in the
+		 * corpus): refusal / low-confidence line, or an explicit "not
+		 * covered" statement. Without this flag an answer case must cite.
+		 */
+		decline?: boolean;
+		/** The answer must say a named document is not covered. */
+		notes_absent?: boolean;
+		/** Notice must link at least one of these reference documents. */
+		references_any?: string[];
 	};
+	/** Added after the 2026-10-01 prompt fixes — never tuned against. */
+	held_out?: boolean;
 }
+
+// "The indexed sources do not cover 10 CFR 73.54", "no snippet comes from…"
+const NOT_COVERED_RE =
+	/\b(?:not (?:covered|included|addressed|indexed|available|among)|(?:does|do|did) not (?:contain|cover|include|address|mention|provide)|doesn't (?:contain|cover|include|address)|don't (?:contain|cover|include|address)|no (?:snippets?|information|indexed)|outside the selected sources|isn't covered|aren't covered)\b/;
 
 let handler: ((req: NextRequest) => Promise<Response>) | null = null;
 
@@ -147,6 +163,8 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 			: isRefusalText(r.text)
 				? "oos"
 				: "unknown";
+	// A decline case may also be declined by the refusal gate itself.
+	if (e.decline && kind === "oos") return null;
 	if (e.kind !== "any" && kind !== e.kind) return `kind:${kind}≠${e.kind}`;
 	if (
 		e.notice_reason &&
@@ -160,6 +178,13 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 		).map((s) => s.id);
 		if (!e.suggestions.every((s) => got.includes(s)))
 			return `suggestions:${got.join(",")}`;
+	}
+	if (e.references_any) {
+		const got = (
+			(r.notice as { references?: Array<{ label: string }> })?.references ?? []
+		).map((x) => x.label);
+		if (!e.references_any.some((ref) => got.includes(ref)))
+			return `references:${got.join(",") || "none"}`;
 	}
 	const text = norm(r.text);
 	for (const banned of e.must_not_contain ?? []) {
@@ -175,14 +200,25 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 	const cited = ids.map((id) => payload.sources.find((s) => s.sid === id));
 	if (cited.some((s) => !s))
 		return `unresolved:${ids.filter((_, i) => !cited[i]).join(",")}`;
-	if (ids.length === 0 && isLowConfidenceText(r.text) && e.kind !== "any")
-		return "low_confidence";
-	if (
-		ids.length === 0 &&
-		!isRefusalText(r.text) &&
-		!isLowConfidenceText(r.text)
-	)
-		return "no_citations";
+	const declined =
+		isRefusalText(r.text) ||
+		isLowConfidenceText(r.text) ||
+		NOT_COVERED_RE.test(text);
+	if (e.decline) {
+		// The model must not present uncovered material as answered: a decline,
+		// and nothing attributed to a document outside the envelope (checked
+		// by the unresolved-id test above).
+		if (!declined) return "answered_uncovered_question";
+	} else if (e.kind === "single" || e.kind === "compare") {
+		// An answer case passes only on a cited answer — a refusal or a
+		// "not covered" line with no citation is a failure, not a pass.
+		if (ids.length === 0)
+			return isLowConfidenceText(r.text) || isRefusalText(r.text)
+				? "declined_answerable"
+				: "no_citations";
+	}
+	if (e.notes_absent && !NOT_COVERED_RE.test(text))
+		return "absent_doc_not_flagged";
 	const allowed = new Set(payload.scope.collections);
 	const wrong = cited.filter((s) => s && !allowed.has(s.collection));
 	if (wrong.length > 0)
@@ -317,6 +353,7 @@ async function main() {
 				category: c.category,
 				pass: fail === null,
 				reason: fail ?? "ok",
+				held_out: c.held_out === true,
 				scope_key: r.log.scope_key,
 				cited: [
 					...new Set(
@@ -327,6 +364,8 @@ async function main() {
 				],
 				per_collection: r.log.retrieval_per_collection,
 				ms: r.ms,
+				// Kept for the wrong-authority / wrong-jurisdiction review.
+				answer: r.text,
 			});
 			console.log(
 				`${fail === null ? "✅" : "❌"} ${c.id.padEnd(30)} ${String(r.log.scope_key ?? "").padEnd(24)}${fail ? `  — ${fail}` : ""}`,
@@ -335,8 +374,18 @@ async function main() {
 				console.log(`   ${r.text.slice(0, 600).replace(/\n/g, "\n   ")}`);
 		}
 		const passed = rows.filter((r) => r.pass).length;
-		console.log(`sources: ${passed}/${rows.length}`);
-		report.sources = { summary: `${passed}/${rows.length}`, rows };
+		const held = rows.filter((r) => r.held_out);
+		const heldPassed = held.filter((r) => r.pass).length;
+		const tuned = rows.length - held.length;
+		console.log(
+			`sources: ${passed}/${rows.length}  (tuned-on ${passed - heldPassed}/${tuned} · held-out ${heldPassed}/${held.length})`,
+		);
+		report.sources = {
+			summary: `${passed}/${rows.length}`,
+			tuned_on: `${passed - heldPassed}/${tuned}`,
+			held_out: `${heldPassed}/${held.length}`,
+			rows,
+		};
 	}
 
 	const name = `eval-${CORPUS}${suite === "all" ? "" : `-${suite}`}.json`;

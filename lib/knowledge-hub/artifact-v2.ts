@@ -28,6 +28,7 @@ import { COLLECTIONS } from "../sources/catalog";
 import {
 	extractSnippetIds,
 	renderArtifactCitations,
+	SNIPPET_CITATION_RE,
 	type SourceRecord,
 	toSourceRecords,
 } from "../sources/citations";
@@ -37,7 +38,12 @@ import { corpusVersion } from "../sources/manifest";
 import type { ScopeNoticePayload, ScopeSummary } from "../sources/payload";
 import { resolveScope, scopeKey } from "../sources/scope";
 import { parseScopeRequest, scopeSummary } from "./query-v2";
-import { retrieveForScope, unsearchedMentions } from "./scoped-retrieval";
+import {
+	buildNoticePayload,
+	cacheScopeMaterial,
+	retrieveForScope,
+	unsearchedMentions,
+} from "./scoped-retrieval";
 
 const ARTIFACT_MAX_TOKENS = 3000;
 const ARTIFACT_ENVELOPE_CHUNKS = 12;
@@ -134,13 +140,7 @@ export async function artifactV2(args: ArtifactV2Args): Promise<Response> {
 		ctx.logFields.notice_reason = scope.reason;
 		ctx.logFields.fallback_taken = true;
 		ctx.logFields.output_tokens = 0;
-		const notice: ScopeNoticePayload = {
-			reason: scope.reason,
-			suggestions: scope.suggestions.map((id) => ({
-				id,
-				label: COLLECTIONS[id].label,
-			})),
-		};
+		const notice: ScopeNoticePayload = buildNoticePayload(scope, query);
 		return sseError("scope_notice", scope.message, { notice });
 	}
 
@@ -150,7 +150,7 @@ export async function artifactV2(args: ArtifactV2Args): Promise<Response> {
 			PROMPT_VERSION_V2,
 			corpusVersion(),
 			model,
-			scopeKey(scope),
+			cacheScopeMaterial(scope, query),
 			enabled.join(","),
 			query.toLowerCase(),
 		].join(":"),
@@ -215,15 +215,17 @@ export async function artifactV2(args: ArtifactV2Args): Promise<Response> {
 
 	const sources = toSourceRecords(retrieval.chunks);
 	const summary = scopeSummary(scope, retrieval.missing);
-	// Raw-pool mean, as the legacy route (its envelope mean can never dip
-	// below the per-chunk floor, so gating on it would be dead code).
-	const limitedCoverage = retrieval.limited || retrieval.poolAvgSim < 0.35;
+	// Per-collection raw-pool gate (scoped-retrieval), as the legacy route's
+	// pool-mean check — the envelope mean can never dip below the floor.
+	const limitedCoverage = retrieval.limited;
 	const envelope = buildSourceEnvelope({
 		chunks: retrieval.chunks,
 		query,
 		scope,
 		missingCollections: retrieval.missing,
-		requiredDocs: retrieval.mentionedDocs,
+		requiredDocs: retrieval.requiredDocs,
+		absentDocs: retrieval.absentDocs,
+		unretrievedDocs: retrieval.unretrievedDocs,
 		unsearchedMentions: unsearchedMentions(scope, query),
 	});
 
@@ -305,7 +307,12 @@ export async function artifactV2(args: ArtifactV2Args): Promise<Response> {
 			const truncated = finishReason === "length";
 			const html = assembleArtifactDocumentV2({
 				fragment: cited.html,
-				title: sanitized.title,
+				// The <title> is plain text: drop snippet ids rather than show "[[S1]]".
+				title:
+					sanitized.title
+						?.replace(SNIPPET_CITATION_RE, "")
+						.replace(/\s{2,}/g, " ")
+						.trim() || null,
 				query,
 				sources,
 				scopeLabel: scopeLabel(summary),

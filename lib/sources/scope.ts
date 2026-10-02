@@ -220,6 +220,18 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 		(id) => COLLECTIONS[id].searchable,
 	);
 
+	// Nothing to search at all (misconfigured deployment) — decline rather
+	// than resolve to an undefined collection. config.ts also keeps the app
+	// in legacy mode in this state; this is the second line.
+	if (enabled.length === 0) {
+		return {
+			kind: "notice",
+			reason: "not_enabled",
+			message: `No regulatory sources are available right now, so this is ${SCOPE_NOTICE_MARKER}.`,
+			suggestions: [],
+		};
+	}
+
 	if (request.mode === "pinned") {
 		const pinned = request.collection;
 		// Pinned to something this deployment does not serve (stale client
@@ -304,6 +316,15 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 			kind: "notice",
 			reason: unsearchable.includes("iaea") ? "reference_only" : "not_enabled",
 			message: `I can't compare against ${listLabels(unsearchable)} — those sources are not searchable here, so that comparison is ${SCOPE_NOTICE_MARKER}. ${availableSentence(enabled)}`,
+			suggestions: indexed,
+		};
+	}
+	// "Compare CNSC and Finland …": the other side has no collection at all.
+	if (comparing && mentions.notIndexed) {
+		return {
+			kind: "notice",
+			reason: "not_indexed",
+			message: `I can't compare against that regulator — its documents are not indexed, so that comparison is ${SCOPE_NOTICE_MARKER}. ${availableSentence(enabled)}`,
 			suggestions: indexed,
 		};
 	}

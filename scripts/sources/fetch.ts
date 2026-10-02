@@ -1,26 +1,32 @@
 // Download the bytes behind every text entry in corpus/register.json into
 // corpus/.cache/ and check them against the pinned checksum.
 //
-//   bun run scripts/sources/fetch.ts            # verify: fail on any drift
-//   bun run scripts/sources/fetch.ts --pin      # record sha256 + length for
-//                                               # entries that have none yet
+//   bun run sources:fetch              # download what is not cached yet, then
+//                                      # verify every cached file vs its pin
+//   bun run sources:fetch --refresh    # RE-DOWNLOAD everything and verify —
+//                                      # the upstream revision recheck (run on
+//                                      # the register's recheck cadence)
+//   bun run sources:fetch --pin        # record sha256 + length for entries
+//                                      # that have none yet
 //   bun run scripts/sources/fetch.ts --only nrc-rg-1.21,eu-dir-2014-87
 //   bun run scripts/sources/fetch.ts --import <key@version> <file>
 //                                               # a file a human downloaded
 //                                               # (publisher blocks scripts)
 //
-// A checksum mismatch means the publisher changed the file behind the same
-// URL (a new revision, a re-upload, an erratum). That is exactly the moment
-// a human must re-check edition and rights, so verify mode never re-pins on
-// its own — it exits non-zero and names the entry.
+// Without --refresh only the LOCAL cache is checked (offline, and what
+// publish needs). With --refresh a mismatch means the publisher changed the
+// file behind the same URL (a new revision, a re-upload, an erratum). That is
+// exactly the moment a human must re-check edition and rights, so verify mode
+// never re-pins on its own — it exits non-zero and names the entry.
 //
-// CNSC page-data JSON is fetched but not pinned: Gatsby regenerates it on
-// every site build. Its text is hashed per chunk at publish time instead.
+// CNSC page-data is pinned by its extracted text, not its bytes (Gatsby
+// rebuilds change the bytes, not the document) — see content-hash.ts.
 
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { cnscPageDataUrl } from "./adapters/cnsc-html";
-import { fetchSource, sha256Hex } from "./http";
+import { pinnedChecksum } from "./content-hash";
+import { fetchSource } from "./http";
 import {
 	cachePath,
 	ensureDirs,
@@ -86,7 +92,7 @@ async function importFile(id: string, file: string): Promise<void> {
 	if (bad) throw new Error(`${id}: ${bad}`);
 	await ensureDirs();
 	await writeFile(cachePath(e), bytes);
-	e.checksum_sha256 = await sha256Hex(bytes);
+	e.checksum_sha256 = await pinnedChecksum(e, bytes);
 	e.content_length = bytes.byteLength;
 	await writeRegister(register);
 	console.log(
@@ -150,9 +156,12 @@ async function main() {
 			}
 			await writeFile(path, bytes);
 		}
-		const sha = await sha256Hex(bytes);
-		if (e.format === "cnsc-json") {
-			console.log(`· ${id}: ${bytes.byteLength} bytes (page-data, not pinned)`);
+		let sha: string;
+		try {
+			sha = await pinnedChecksum(e, bytes);
+		} catch (err) {
+			failures += 1;
+			console.error(`✗ ${id}: ${(err as Error).message}`);
 			continue;
 		}
 		if (e.checksum_sha256 === null) {

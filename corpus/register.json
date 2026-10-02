@@ -1,5 +1,5 @@
 {
-	"version": "2026-10-01.2",
+	"version": "2026-10-01.3",
 	"recheck_cadence_days": 180,
 	"entries": [
 		{
@@ -92,8 +92,8 @@
 			"published_date": "2019-05-29",
 			"effective_date": null,
 			"as_of": "2026-10-01",
-			"checksum_sha256": null,
-			"content_length": null,
+			"checksum_sha256": "830a5fc3ce4cc23255df2a9aa5d06aa8c33e515a47024d1967a1f2003a014274",
+			"content_length": 34798,
 			"backfill_from_regdoc": null,
 			"rights": {
 				"decision": "full_text",
@@ -162,8 +162,8 @@
 			"published_date": "2016-02-25",
 			"effective_date": null,
 			"as_of": "2026-10-01",
-			"checksum_sha256": null,
-			"content_length": null,
+			"checksum_sha256": "7b64919be02a2b88cc8cb831f1df3b7b914eaeca20ddc6aa156ed1fed356ead2",
+			"content_length": 115455,
 			"backfill_from_regdoc": null,
 			"rights": {
 				"decision": "full_text",
@@ -267,8 +267,8 @@
 			"published_date": "2020-09",
 			"effective_date": null,
 			"as_of": "2026-10-01",
-			"checksum_sha256": null,
-			"content_length": null,
+			"checksum_sha256": "2a2b7d8053a45e82a9defbffdd95f3ed2954fab91604deb8da6708b4fa0863dd",
+			"content_length": 260189,
 			"backfill_from_regdoc": null,
 			"rights": {
 				"decision": "full_text",
@@ -337,8 +337,8 @@
 			"published_date": "2016-12-30",
 			"effective_date": null,
 			"as_of": "2026-10-01",
-			"checksum_sha256": null,
-			"content_length": null,
+			"checksum_sha256": "ac10a4aee2e7dd2cd10aa82e3dbfca02797b04fe101d831d2529a73f0d18fdc6",
+			"content_length": 56013,
 			"backfill_from_regdoc": null,
 			"rights": {
 				"decision": "full_text",
@@ -442,8 +442,8 @@
 			"published_date": "2015-09-29",
 			"effective_date": null,
 			"as_of": "2026-10-01",
-			"checksum_sha256": null,
-			"content_length": null,
+			"checksum_sha256": "b1b0a1500a99f8e3f11087cbbb7fc63e1b2b614bde3471b98003e52d4e907f76",
+			"content_length": 121417,
 			"backfill_from_regdoc": null,
 			"rights": {
 				"decision": "full_text",
@@ -582,8 +582,8 @@
 			"published_date": "2023-05",
 			"effective_date": null,
 			"as_of": "2026-10-01",
-			"checksum_sha256": null,
-			"content_length": null,
+			"checksum_sha256": "26f04cc151ff463a474854beabfc4fd260a74c5037b837a5e7bc3fedb13a6732",
+			"content_length": 695566,
 			"backfill_from_regdoc": null,
 			"rights": {
 				"decision": "full_text",
@@ -687,8 +687,8 @@
 			"published_date": "2025-04",
 			"effective_date": null,
 			"as_of": "2026-10-01",
-			"checksum_sha256": null,
-			"content_length": null,
+			"checksum_sha256": "8f5415676a8c069106774cea0ab54aaf7e2a4fd694fa8696cc7507cce8897673",
+			"content_length": 254881,
 			"backfill_from_regdoc": null,
 			"rights": {
 				"decision": "full_text",

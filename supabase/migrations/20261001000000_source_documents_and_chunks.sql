@@ -507,6 +507,26 @@ $$;
 REVOKE ALL ON FUNCTION unpublish_source_document(text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION unpublish_source_document(text, text) TO service_role;
 
+-- Remove an edition the register no longer lists (sources:publish --prune).
+-- Chunks go with it (ON DELETE CASCADE). Returns the rows deleted (0 or 1).
+CREATE OR REPLACE FUNCTION delete_source_document(p_document_key text, p_version_key text)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_deleted integer;
+BEGIN
+  DELETE FROM source_documents
+   WHERE document_key = p_document_key AND version_key = p_version_key;
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END;
+$$;
+REVOKE ALL ON FUNCTION delete_source_document(text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION delete_source_document(text, text) TO service_role;
+
 -- Rollout switch for one collection (gate 5: enable collections one at a
 -- time). The CHECK constraint keeps IAEA closed regardless.
 CREATE OR REPLACE FUNCTION set_source_collection_searchable(p_collection text, p_searchable boolean)
@@ -525,18 +545,31 @@ GRANT EXECUTE ON FUNCTION set_source_collection_searchable(text, boolean) TO ser
 -- ---------------------------------------------------------------------------
 -- Public search. Filters BEFORE ranking: requested collections (at most 6),
 -- DB-searchable collections, rights-cleared documents, current editions
--- (superseded only when include_historical). hnsw.iterative_scan keeps the
--- approximate index returning enough rows after the filter (pgvector >= 0.8;
--- hosted verified 0.8.0, local 0.8.2); ef_search 100 raises the candidate
--- list above the default 40 — scripts/sources/recall-bench.ts measures the
--- result against exact search. Hard cap of 20 rows, as match_regdoc_chunks.
+-- (superseded only when include_historical). Hard cap of 20 rows, as
+-- match_regdoc_chunks.
+--
+-- EXACT search by design (enable_indexscan = off keeps the planner off the
+-- HNSW index; the collection btree is still usable as a bitmap scan). At
+-- ~8.6k chunks an exact scan costs ~0.2 s and is always right, while the
+-- filtered HNSW path measurably is not: scripts/sources/sql/
+-- hnsw-forced-recall.sql found mixed-probe recall@8 of 0.955 overall with a
+-- worst case of 0/8 inside one collection (ef_search 100, iterative_scan
+-- relaxed_order). Left to the planner, which path runs is a cost-model
+-- accident that can differ between local and hosted. Revisit — tune
+-- ef_search / hnsw.max_scan_tuples, re-run the probe, then allow the index —
+-- if the corpus grows past ~50k chunks or latency matters.
 
 CREATE OR REPLACE FUNCTION match_source_chunks(
   query_embedding    halfvec(3072),
   collection_ids     text[],
   match_count        integer DEFAULT 8,
   min_similarity     double precision DEFAULT 0.3,
-  include_historical boolean DEFAULT false
+  include_historical boolean DEFAULT false,
+  -- Optional: only these documents (at most 10 refs). The app passes the
+  -- documents a question NAMES ("10 CFR 20.1201"), resolved against the
+  -- register, so a question that is all identifiers and no topic still
+  -- retrieves the named text. NULL = no document filter.
+  doc_refs           text[] DEFAULT NULL
 )
 RETURNS TABLE (
   id               bigint,
@@ -567,8 +600,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-SET hnsw.ef_search = 100
-SET hnsw.iterative_scan = relaxed_order
+SET enable_indexscan = off
 AS $$
   SELECT
     c.id, d.document_key, d.doc_ref, d.label, d.title, d.publisher,
@@ -584,13 +616,14 @@ AS $$
     AND sc.searchable
     AND d.rights_decision = 'full_text'
     AND (d.status = 'current' OR (include_historical AND d.status = 'superseded'))
+    AND (doc_refs IS NULL OR d.doc_ref = ANY (doc_refs[1:10]))
     AND 1 - (c.embedding <=> query_embedding) > min_similarity
   ORDER BY c.embedding <=> query_embedding
   LIMIT LEAST(GREATEST(match_count, 1), 20);
 $$;
 
-REVOKE ALL ON FUNCTION match_source_chunks(halfvec, text[], integer, double precision, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION match_source_chunks(halfvec, text[], integer, double precision, boolean) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION match_source_chunks(halfvec, text[], integer, double precision, boolean, text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION match_source_chunks(halfvec, text[], integer, double precision, boolean, text[]) TO anon, authenticated, service_role;
 
 -- Exact (sequential) twin for the recall benchmark only. Same filters, no
 -- index — the ground truth the approximate search is measured against.

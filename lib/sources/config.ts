@@ -14,8 +14,9 @@
 //     collection. A collection with no current text document is never
 //     offered, whatever the flag says.
 //
-// A register that fails validation forces legacy mode: the app never serves
-// from a corpus whose rights/edition record it cannot read.
+// A register that fails validation, or one with no enabled text collection,
+// forces legacy mode: the app never serves from a corpus whose rights/edition
+// record it cannot read, and never resolves a scope to nothing.
 
 import {
 	COLLECTION_IDS,
@@ -37,7 +38,8 @@ export const DEFAULT_COLLECTION: CollectionId = "cnsc";
 
 export function getSourceCorpusMode(): SourceCorpusMode {
 	if (process.env.KH_SOURCE_CORPUS !== "v2") return "legacy";
-	return getRegister() ? "v2" : "legacy";
+	// v2 needs a readable register AND something to answer from.
+	return getRegister() && getEnabledCollections().length > 0 ? "v2" : "legacy";
 }
 
 export function getEnabledCollections(): CollectionId[] {

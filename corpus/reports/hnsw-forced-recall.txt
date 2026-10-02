@@ -1,0 +1,15 @@
+SELECT 100
+SELECT 100
+CREATE FUNCTION
+CREATE FUNCTION
+forced plan uses HNSW index (eu): true
+forced plan uses HNSW index (all): true
+chunk cnsc|25|1.000|8
+chunk eu|25|0.995|7
+chunk nrc|25|1.000|8
+chunk onr|25|0.995|7
+mixed all|100|0.955|3
+mixed cnsc|25|0.995|7
+mixed eu|25|0.985|5
+mixed nrc|25|0.960|0
+mixed onr|25|1.000|8

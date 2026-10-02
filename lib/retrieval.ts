@@ -115,6 +115,7 @@ const V2_DOC_PATTERNS: Array<{
 function extractMentionedDocs(
 	query: string,
 	collections?: readonly CollectionId[],
+	withConceptHints = true,
 ): Set<string> {
 	const out = new Set<string>();
 	const cnscInScope = !collections || collections.includes("cnsc");
@@ -123,8 +124,10 @@ function extractMentionedDocs(
 			if (m[1]) out.add(`REGDOC-${m[1]}`);
 			else if (m[2]) out.add("NSCA");
 		}
-		for (const [re, doc] of CONCEPT_DOC_HINTS) {
-			if (re.test(query)) out.add(doc);
+		if (withConceptHints) {
+			for (const [re, doc] of CONCEPT_DOC_HINTS) {
+				if (re.test(query)) out.add(doc);
+			}
 		}
 	}
 	if (collections) {
@@ -136,6 +139,19 @@ function extractMentionedDocs(
 	return out;
 }
 
+/**
+ * Documents the question NAMES ("10 CFR 73.54", "REGDOC-2.3.4") — the
+ * mentions without the concept hints, which are inferred, not named. The v2
+ * envelope uses this to tell the model which named documents have no
+ * snippet, so it says so instead of attributing to them.
+ */
+export function extractNamedDocs(
+	query: string,
+	collections: readonly CollectionId[],
+): string[] {
+	return [...extractMentionedDocs(query, collections, false)];
+}
+
 // Does a chunk's doc ref satisfy a mentioned ref? Exact match, plus one
 // widening: a CFR PART mention ("10 CFR 20") matches every provision in it
 // ("10 CFR 20.1201"). Legacy refs (REGDOC-*, NSCA) never start with "10 CFR",
@@ -143,7 +159,7 @@ function extractMentionedDocs(
 // A mention names a document or a family of them: "10 CFR 20" covers
 // "10 CFR 20.1201"; "10 CFR 50" also covers "10 CFR 50 App. B"; a
 // multi-volume "NUREG-1757" covers "NUREG-1757 Vol. 2".
-function refMatchesMention(ref: string, mention: string): boolean {
+export function refMatchesMention(ref: string, mention: string): boolean {
 	if (ref === mention) return true;
 	if (/^10 CFR \d+$/.test(mention)) {
 		return ref.startsWith(`${mention}.`) || ref.startsWith(`${mention} `);
@@ -414,9 +430,21 @@ export interface RetrievalOptions {
 	source?: {
 		collections: readonly CollectionId[];
 		includeHistorical?: boolean;
+		/**
+		 * Register doc_refs of the documents the question NAMES that exist in
+		 * these collections. One extra search restricted to them (primary
+		 * vector) joins the pool, so "What do 10 CFR 20.1201 and … require?" —
+		 * identifiers, no topic — still retrieves 20.1201's own text.
+		 */
+		docRefs?: readonly string[];
 	};
 	// ADDITIVE (Phase 12): per-collection gate values; see DEFAULT_THRESHOLDS.
 	thresholds?: RetrievalThresholds;
+	// ADDITIVE (Phase 12): vectors for this call's embedding inputs, keyed by
+	// input text (from embedTexts over embeddingInputsFor). When every input
+	// is present the call makes no embedding request and records no usage —
+	// the caller already did both.
+	precomputedEmbeddings?: ReadonlyMap<string, number[]>;
 }
 
 // One row of match_source_chunks (supabase/migrations/20261001000000_*).
@@ -618,42 +646,28 @@ export interface RetrievalResult {
 	mentionedDocs: string[];
 }
 
-export async function retrieveChunks(
-	query: string,
+/**
+ * Embed `inputs` (one OpenAI call) and record it against the daily
+ * circuit breaker. retrieveChunks' own embedding step, exported so compare
+ * mode can embed every side's inputs at once and pass the vectors in.
+ */
+export async function embedTexts(
+	inputs: string[],
 	deps: RetrievalDeps,
-	opts: RetrievalOptions,
-): Promise<RetrievalResult> {
-	const { supabase, openai } = deps;
-	const t = opts.thresholds ?? DEFAULT_THRESHOLDS;
-	const collections = opts.source?.collections;
-
-	const mentionedDocs = extractMentionedDocs(query, collections);
-	const mentionedSections = extractMentionedSections(query);
-
-	// Build the list of embedding inputs. The primary input is always the
-	// original user query; additional "doc-focused" inputs are emitted for
-	// each mentioned doc so that chunks in heavy-legal or glossary docs
-	// (NSCA §48, REGDOC-3.5.3 §5.4) can surface even when they embed
-	// weakly against the verbose natural-language question.
-	//
-	// Routed through embeddingInputsFor() (fix round 2, issue 3) so the eval
-	// cost accountant charges the SAME list this call actually sends — one
-	// source of truth, no drift, no guessed multiplier.
-	const embedInputs = embeddingInputsFor(query, collections);
-	const expansions = embedInputs.slice(1);
-
+): Promise<number[][]> {
+	const { openai } = deps;
 	let embeddings: number[][];
 	try {
 		const embResp = await openai.embeddings.create({
 			model: OPENAI_MODELS.embedding,
-			input: embedInputs,
+			input: inputs,
 			// FULL 3072 dims — must match the corpus embeddings written by
 			// scripts/ingest.ts and the halfvec(3072) column, or cosine search
 			// silently compares vectors from different spaces.
 			dimensions: EMBEDDING_DIMENSIONS,
 		});
 		embeddings = embResp.data.map((d) => d.embedding);
-		if (embeddings.length !== embedInputs.length) {
+		if (embeddings.length !== inputs.length) {
 			throw new Error("embedding count mismatch");
 		}
 	} catch (err) {
@@ -684,6 +698,41 @@ export async function retrieveChunks(
 		if (isCostCapError(err)) throw err;
 		console.error("retrieval_accounting_unavailable", err);
 	}
+	return embeddings;
+}
+
+export async function retrieveChunks(
+	query: string,
+	deps: RetrievalDeps,
+	opts: RetrievalOptions,
+): Promise<RetrievalResult> {
+	const { supabase } = deps;
+	const t = opts.thresholds ?? DEFAULT_THRESHOLDS;
+	const collections = opts.source?.collections;
+
+	const mentionedDocs = extractMentionedDocs(query, collections);
+	const mentionedSections = extractMentionedSections(query);
+
+	// Build the list of embedding inputs. The primary input is always the
+	// original user query; additional "doc-focused" inputs are emitted for
+	// each mentioned doc so that chunks in heavy-legal or glossary docs
+	// (NSCA §48, REGDOC-3.5.3 §5.4) can surface even when they embed
+	// weakly against the verbose natural-language question.
+	//
+	// Routed through embeddingInputsFor() (fix round 2, issue 3) so the eval
+	// cost accountant charges the SAME list this call actually sends — one
+	// source of truth, no drift, no guessed multiplier.
+	const embedInputs = embeddingInputsFor(query, collections);
+	const expansions = embedInputs.slice(1);
+
+	// Compare mode embeds every side's inputs in one call up front and hands
+	// the vectors in (opts.precomputedEmbeddings), so a 3-way comparison costs
+	// one embedding request and one circuit-breaker increment, not three.
+	const pre = opts.precomputedEmbeddings;
+	const embeddings =
+		pre && embedInputs.every((i) => pre.has(i))
+			? embedInputs.map((i) => pre.get(i) as number[])
+			: await embedTexts(embedInputs, deps);
 
 	// One vector search. Legacy: match_regdoc_chunks over the CNSC table,
 	// call shape unchanged. v2: match_source_chunks, which filters to the
@@ -692,6 +741,7 @@ export async function retrieveChunks(
 	const match = async (
 		embedding: number[],
 		count: number,
+		docRefs?: readonly string[],
 	): Promise<{ rows: RetrievedChunk[]; error: unknown }> => {
 		if (!opts.source) {
 			const { data, error } = await supabase.rpc("match_regdoc_chunks", {
@@ -707,6 +757,7 @@ export async function retrieveChunks(
 			match_count: count,
 			min_similarity: 0,
 			include_historical: opts.source.includeHistorical === true,
+			...(docRefs && docRefs.length > 0 ? { doc_refs: [...docRefs] } : {}),
 		});
 		return {
 			rows: ((data ?? []) as SourceMatchRow[]).map(fromSourceRow),
@@ -740,6 +791,17 @@ export async function retrieveChunks(
 			continue;
 		}
 		expansionPools.push(expMatches);
+	}
+	// v2: the named documents' own best chunks (see source.docRefs).
+	const namedRefs = opts.source?.docRefs ?? [];
+	if (namedRefs.length > 0) {
+		const { rows: named, error: namedErr } = await match(
+			embeddings[0],
+			20,
+			namedRefs.slice(0, 10),
+		);
+		if (namedErr) console.error(`${rpcName}_named_doc_error`, namedErr);
+		else expansionPools.push(named);
 	}
 
 	// Merge + dedupe by chunk.id, keeping the highest observed similarity.

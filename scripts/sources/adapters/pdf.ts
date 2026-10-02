@@ -13,7 +13,9 @@
 //      NRC-style numbers ("C" + "1.2" → "C.1.2");
 //   4. join wrapped lines into paragraphs (de-hyphenating), new paragraph on
 //      bullets / list designators / headings.
-// Structure is best-effort; pages are exact. Quality evidence goes in the
+// Structure is best-effort; paragraph pages are exact. A chunk spans the
+// pages of its sentences; the rare run-on "sentence" split into several
+// chunks (tables, long lists) gives every piece that sentence's whole range. Quality evidence goes in the
 // report and the publisher refuses documents that fail scripts/sources/quality.
 
 import { getDocumentProxy } from "unpdf";

@@ -1,7 +1,7 @@
 -- Forced-HNSW recall probe (local stack only; read-only, temp objects).
 --
 --   docker exec -i supabase_db_<project> psql -U postgres -d postgres -At \
---     < scripts/sources/sql/hnsw-forced-recall.sql
+--     < scripts/sources/sql/hnsw-forced-recall.sql > corpus/reports/hnsw-forced-recall.txt
 --
 -- Why this exists: at the current corpus size (~8.6k chunks) the planner
 -- answers match_source_chunks with an exact scan + sort, never the HNSW
@@ -9,8 +9,16 @@
 -- measures 1.000 by construction. This probe forces the index path
 -- (enable_seqscan/enable_sort off) with the production settings
 -- (ef_search 100, iterative_scan relaxed_order) and compares it to an exact
--- scan — the recall the app would get once the corpus grows enough for the
--- planner to pick the index. Probes: 25 stored chunk vectors per collection
+-- scan — the recall the app WOULD get if the planner ever picked the index.
+-- Whether it will is itself uncertain: match_source_chunks is a SQL function
+-- that cannot be inlined (SECURITY DEFINER + SET) and has a non-constant
+-- LIMIT, so its statement may be planned generically and stay on a seq scan
+-- at any size — then the risk is latency, not recall. Re-check both with
+-- EXPLAIN whenever the corpus grows.
+-- Bar: recall-bench.ts uses mean recall@8 >= 0.95; at the time of writing the
+-- "mixed" probes are 0.935-0.943 on the cnsc/all scopes, i.e. the CURRENT
+-- index settings would FAIL that bar if the index were used — raise
+-- hnsw.ef_search (e.g. 200) before relying on the index path. Probes: 25 stored chunk vectors per collection
 -- ("chunk", easy — each is its own nearest neighbour) and the same vectors
 -- summed with a chunk from another collection ("mixed", farther from every
 -- stored vector, closer to how a question embeds). Dynamic SQL so every call
@@ -49,20 +57,25 @@ BEGIN
   RETURN r;
 END $$;
 
-CREATE FUNCTION pg_temp.forced_plan_uses_hnsw(q halfvec) RETURNS boolean LANGUAGE plpgsql AS $$
+-- Plan check on the SAME statement topk() measures (join + filters), for
+-- the smallest and the widest scope.
+CREATE FUNCTION pg_temp.forced_plan_uses_hnsw(q halfvec, cols text[]) RETURNS boolean LANGUAGE plpgsql AS $$
 DECLARE line text; found boolean := false;
 BEGIN
   PERFORM set_config('enable_seqscan', 'off', true);
   PERFORM set_config('enable_sort', 'off', true);
+  PERFORM set_config('enable_indexscan', 'on', true);
   PERFORM set_config('enable_bitmapscan', 'off', true);
-  FOR line IN EXECUTE 'EXPLAIN SELECT c.id FROM source_chunks c
-      WHERE c.collection = ANY(ARRAY[''eu'']) ORDER BY c.embedding <=> $1 LIMIT 8' USING q LOOP
+  FOR line IN EXECUTE 'EXPLAIN SELECT c.id FROM source_chunks c JOIN source_documents d ON d.id = c.document_id
+      WHERE c.collection = ANY($2) AND d.rights_decision = ''full_text'' AND d.status = ''current''
+      ORDER BY c.embedding <=> $1 LIMIT 8' USING q, cols LOOP
     IF line LIKE '%source_chunks_embedding_idx%' THEN found := true; END IF;
   END LOOP;
   RETURN found;
 END $$;
 
-SELECT 'forced plan uses HNSW index: ' || pg_temp.forced_plan_uses_hnsw((SELECT embedding FROM probes LIMIT 1));
+SELECT 'forced plan uses HNSW index (eu): ' || pg_temp.forced_plan_uses_hnsw((SELECT embedding FROM probes LIMIT 1), ARRAY['eu']);
+SELECT 'forced plan uses HNSW index (all): ' || pg_temp.forced_plan_uses_hnsw((SELECT embedding FROM probes LIMIT 1), ARRAY['cnsc','nrc','onr','eu']);
 
 SELECT kind || ' ' || scope AS probe_scope, count(*) AS n,
        round(avg(cardinality(ARRAY(SELECT unnest(h) INTERSECT SELECT unnest(e)))::numeric / 8), 3) AS mean_recall_at_8,

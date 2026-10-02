@@ -36,8 +36,17 @@ export function ScopePicker({ options }: { options: ScopeOptions }) {
 	const setHistorical = useSourceScope((s) => s.setHistorical);
 	const reconcile = useSourceScope((s) => s.reconcile);
 
+	// Restore the remembered choice after mount (the store skips hydration so
+	// server and first client render agree), then drop a pin this deployment
+	// no longer offers.
 	useEffect(() => {
-		reconcile(options.collections.map((c) => c.id));
+		let cancelled = false;
+		void Promise.resolve(useSourceScope.persist.rehydrate()).then(() => {
+			if (!cancelled) reconcile(options.collections.map((c) => c.id));
+		});
+		return () => {
+			cancelled = true;
+		};
 	}, [options, reconcile]);
 
 	const pinned =

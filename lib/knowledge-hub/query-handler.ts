@@ -111,6 +111,7 @@ export const knowledgeHubQueryHandler: GuardedHandler = async ({
 		messages?: UIMessageLike[];
 		trigger?: string;
 		scope?: unknown;
+		scopeSwitch?: unknown;
 	} | null;
 	// Phase 12 rollout flag (lib/sources/config.ts). "legacy" keeps this
 	// handler byte-for-byte on the pre-Phase-12 path below.
@@ -192,6 +193,7 @@ export const knowledgeHubQueryHandler: GuardedHandler = async ({
 			query,
 			rawScope: body?.scope,
 			isRegenerate,
+			scopeSwitch: body?.scopeSwitch === true,
 			ctx,
 			supabase,
 		});

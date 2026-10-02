@@ -206,9 +206,10 @@ function citationsToText(
 			return sources[idx].chip;
 		});
 	const labels = parts.filter((p): p is string => p !== null);
+	// A bad id inside a mixed group ("[[S1, S99]]") stays visible.
+	if (unresolved > 0) labels.push("unverified citation");
 	return {
-		text:
-			labels.length > 0 ? `[${labels.join("; ")}]` : "[unverified citation]",
+		text: `[${labels.join("; ")}]`,
 		unresolved,
 	};
 }
@@ -239,9 +240,7 @@ export function renderArtifactCitations(
 				const text = escapeHtml(r.text);
 				if (inSvg) return text;
 				const cls =
-					r.text === "[unverified citation]"
-						? "art-cite art-cite-unresolved"
-						: "art-cite";
+					r.unresolved > 0 ? "art-cite art-cite-unresolved" : "art-cite";
 				return `<cite class="${cls}">${text}</cite>`;
 			});
 		})

@@ -53,7 +53,11 @@ function fnv1a(input: string): string {
  * "2026-10-01.2+3f9a0c11": the register version plus a fingerprint of every
  * text edition (key, version, checksum, status). Goes into answer-cache keys
  * and request logs, so a re-published or re-statused document can never be
- * answered from a cache entry built on the old text.
+ * answered from a cache entry built on the old text. Every fetched entry's
+ * checksum pins its content (CNSC page-data by extracted text —
+ * scripts/sources/content-hash.ts); a backfilled entry is keyed by its
+ * legacy source, so re-backfilling after a legacy re-ingest needs a register
+ * version bump.
  */
 export function corpusVersion(): string {
 	const register = getRegister();
@@ -61,7 +65,7 @@ export function corpusVersion(): string {
 	const material = textEntries(register)
 		.map(
 			(e) =>
-				`${e.document_key}@${e.version_key}:${e.checksum_sha256 ?? e.backfill_from_regdoc ?? "live"}:${e.status}`,
+				`${e.document_key}@${e.version_key}:${e.checksum_sha256 ?? `backfill:${e.backfill_from_regdoc}`}:${e.status}`,
 		)
 		.sort()
 		.join("|");
@@ -93,4 +97,56 @@ export function referenceEntries(collection: CollectionId): RegisterEntry[] {
 			e.status === "current" &&
 			!(e.ingest && e.rights.decision === "full_text"),
 	);
+}
+
+const squashRef = (s: string) =>
+	s
+		.replace(/^IAEA\s+/i, "")
+		.replace(/\(Rev\.\s*\d+\)/i, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]/g, "");
+
+/**
+ * Reference-only documents of `collection` that the question names
+ * ("GSR Part 3", "ssg-23"), at most 3 — titles and official links only.
+ */
+export function namedReferenceLinks(
+	collection: CollectionId,
+	query: string,
+): Array<{ label: string; title: string; url: string }> {
+	const q = query.toLowerCase().replace(/[^a-z0-9]/g, "");
+	return referenceEntries(collection)
+		.filter((e) => {
+			const key = squashRef(e.doc_ref);
+			// Whole-token match: "gsg1" must not fire inside "gsg19".
+			const at = q.indexOf(key);
+			return key.length >= 3 && at >= 0 && !/\d/.test(q[at + key.length] ?? "");
+		})
+		.slice(0, 3)
+		.map((e) => ({ label: e.label, title: e.title, url: e.canonical_url }));
+}
+
+/**
+ * doc_refs of the searchable text editions in `collection` (current, plus
+ * superseded when `includeHistorical`) — what a named-document search may
+ * target and what "is this named document indexed?" is decided against.
+ */
+export function textDocRefs(
+	collection: CollectionId,
+	includeHistorical: boolean,
+): string[] {
+	const register = getRegister();
+	if (!register) return [];
+	return [
+		...new Set(
+			textEntries(register)
+				.filter(
+					(e) =>
+						e.collection === collection &&
+						(e.status === "current" ||
+							(includeHistorical && e.status === "superseded")),
+				)
+				.map((e) => e.doc_ref),
+		),
+	];
 }

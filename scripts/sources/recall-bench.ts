@@ -1,24 +1,21 @@
-// Approximate-vs-exact recall for the filtered HNSW search (gate 5).
+// Production search vs exact search (gate 5: "benchmark filtered recall
+// against exact search").
 //
 //   bun run sources:recall            # every searchable collection + all-at-once
 //   bun run sources:recall --force    # allow a non-local Supabase URL
 //
-// match_source_chunks filters BEFORE ranking (collection, searchable, rights,
-// status). With a small collection inside a large index — 86 EU chunks among
-// ~8,500 — a filtered HNSW scan can come back short or miss neighbours unless
-// iterative scanning keeps walking the graph (hnsw.iterative_scan =
-// relaxed_order, ef_search = 100; supabase/migrations/20261001000000_*). This
-// measures it: for each question, the top-k ids from match_source_chunks
-// against the top-k from match_source_chunks_exact (same filters, sequential
-// scan). recall@k = |approx ∩ exact| / k. Pass bar: mean recall@8 ≥ 0.95 and
-// no question below 0.75 for every scope.
+// For each question, the top-k ids from match_source_chunks (what the app
+// calls) against match_source_chunks_exact (same filters, sequential scan).
+// recall@k = |production ∩ exact| / k. Pass bar: mean recall@8 >= 0.95 and no
+// question below 0.75 for every scope.
 //
-// This calls the PRODUCTION function, so it measures what the app gets — and
-// at the current corpus size (~8.6k chunks) the planner answers it with an
-// exact scan + sort, never the HNSW index (verified with EXPLAIN), so 1.000 is
-// expected and says nothing about the index. The index path itself is probed
-// by scripts/sources/sql/hnsw-forced-recall.sql (forces the index, compares
-// to exact); rerun both whenever the corpus grows.
+// match_source_chunks is EXACT by design at this corpus size (it sets
+// enable_indexscan = off — see the migration), so 1.000 is expected. This is
+// a REGRESSION GUARD, not a measurement of HNSW: if someone re-enables the
+// index path, this is what turns red. The filtered-HNSW path itself is
+// measured by scripts/sources/sql/hnsw-forced-recall.sql (forces the index;
+// report in corpus/reports/hnsw-forced-recall.txt) — run it before allowing
+// the index.
 // Writes corpus/reports/recall.json. Cost: embeddings only (~$0.001).
 
 import { readFileSync } from "node:fs";
@@ -179,7 +176,7 @@ async function main() {
 	}
 	await writeFile(
 		join(REPORTS_DIR, "recall.json"),
-		`${JSON.stringify({ run_at: new Date().toISOString(), bar: { mean_recall_at_8: MEAN_BAR, min_recall_at_8: MIN_BAR }, scopes: out }, null, "\t")}\n`,
+		`${JSON.stringify({ run_at: new Date().toISOString(), note: "match_source_chunks is exact by design (enable_indexscan=off), so 1.000 is expected: this is a regression guard, not an HNSW measurement. Filtered-HNSW recall: corpus/reports/hnsw-forced-recall.txt.", bar: { mean_recall_at_8: MEAN_BAR, min_recall_at_8: MIN_BAR }, scopes: out }, null, "\t")}\n`,
 	);
 	console.log("report → corpus/reports/recall.json");
 	if (!pass) process.exit(1);

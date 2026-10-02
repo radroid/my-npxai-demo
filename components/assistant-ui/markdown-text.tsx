@@ -140,8 +140,11 @@ function snippetTooltip(s: SourceRecord): string {
 // One [[S…]] group → one chip per id. Everything shown comes from the
 // server's data-sources payload; an id it did not hand out renders as an
 // explicit "unverified" marker, never as a guess.
-function SnippetCitation({ ids }: { ids: string[] }) {
+function SnippetCitation({ ids, raw }: { ids: string[]; raw: string }) {
 	const sources = useSnippetSources();
+	// A message without a v2 payload (every pre-Phase-12 thread) has no ids to
+	// resolve against — show the text as written, not an "unverified" chip.
+	if (!sources) return <>{raw}</>;
 	return (
 		<>
 			{ids.map((sid, i) => {
@@ -153,13 +156,9 @@ function SnippetCitation({ ids }: { ids: string[] }) {
 							key={key}
 							data-citation="unresolved"
 							className={`${CHIP_BASE} border-dashed border-border text-fg-muted`}
-							title={
-								sources
-									? "This citation does not match a retrieved source"
-									: "Source details unavailable"
-							}
+							title="This citation does not match a retrieved source"
 						>
-							{sources ? "unverified" : sid}
+							unverified
 						</span>
 					);
 				}
@@ -218,7 +217,7 @@ function renderWithCitations(children: ReactNode): ReactNode {
 					.split(/[,;]/)
 					.map((x) => x.trim())
 					.filter(Boolean);
-				out.push(<SnippetCitation key={key} ids={ids} />);
+				out.push(<SnippetCitation key={key} ids={ids} raw={m[0]} />);
 			} else {
 				out.push(<CitationChip key={key} label={m[0]} />);
 			}
@@ -230,41 +229,49 @@ function renderWithCitations(children: ReactNode): ReactNode {
 }
 
 const defaultComponents = memoizeMarkdownComponents({
-	h1: ({ className, ...props }) => (
+	h1: ({ className, children, ...props }) => (
 		<h1
 			className={cn(
 				"aui-md-h1 mb-2 scroll-m-20 font-semibold text-base first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h1>
 	),
-	h2: ({ className, ...props }) => (
+	h2: ({ className, children, ...props }) => (
 		<h2
 			className={cn(
 				"aui-md-h2 mt-3 mb-1.5 scroll-m-20 font-semibold text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h2>
 	),
-	h3: ({ className, ...props }) => (
+	h3: ({ className, children, ...props }) => (
 		<h3
 			className={cn(
 				"aui-md-h3 mt-2.5 mb-1 scroll-m-20 font-semibold text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h3>
 	),
-	h4: ({ className, ...props }) => (
+	h4: ({ className, children, ...props }) => (
 		<h4
 			className={cn(
 				"aui-md-h4 mt-2 mb-1 scroll-m-20 font-medium text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h4>
 	),
 	h5: ({ className, ...props }) => (
 		<h5
@@ -295,15 +302,33 @@ const defaultComponents = memoizeMarkdownComponents({
 			{renderWithCitations(children)}
 		</p>
 	),
-	a: ({ className, ...props }) => (
-		<a
-			className={cn(
-				"aui-md-a text-primary underline underline-offset-2 hover:text-primary/80",
-				className,
-			)}
-			{...props}
-		/>
-	),
+	// Model-written links (markdown links and GFM-autolinked bare URLs) are
+	// live only for the official-source allowlist — the same rule as chips,
+	// the Sources panel and artifacts. Retrieved text can carry third-party
+	// or injected URLs ("download the updated guide at …"); those render as
+	// plain text the user can still read and copy.
+	a: ({ className, href, children, ...props }) =>
+		isAllowedSourceUrl(href) ? (
+			<a
+				className={cn(
+					"aui-md-a text-primary underline underline-offset-2 hover:text-primary/80",
+					className,
+				)}
+				{...props}
+				href={href}
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				{children}
+			</a>
+		) : (
+			<span
+				className="aui-md-a-blocked break-all"
+				title="Link not opened: only official source links are clickable"
+			>
+				{children}
+			</span>
+		),
 	blockquote: ({ className, ...props }) => (
 		<blockquote
 			className={cn(
@@ -346,14 +371,16 @@ const defaultComponents = memoizeMarkdownComponents({
 			{...props}
 		/>
 	),
-	th: ({ className, ...props }) => (
+	th: ({ className, children, ...props }) => (
 		<th
 			className={cn(
 				"aui-md-th bg-muted px-2 py-1 text-left font-medium first:rounded-tl-lg last:rounded-tr-lg [[align=center]]:text-center [[align=right]]:text-right",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</th>
 	),
 	td: ({ className, children, ...props }) => (
 		<td

@@ -4,9 +4,19 @@
 //   bun run sources:publish                       # everything in the register
 //   bun run sources:publish --only nrc-rg-1.21    # one document (all its editions)
 //   bun run sources:publish --force               # allow a non-local Supabase URL
+//   bun run sources:publish --prune               # also DELETE editions the
+//                                                 # register no longer lists
+//   bun run sources:publish --reembed             # re-embed even unchanged editions
+//
+// An edition already in the DB with the same pinned checksum, parser +
+// chunker version and embedding model is UNCHANGED: its metadata is
+// refreshed (register_source_document) and its chunks are kept — a rerun
+// after a register-only edit costs nothing.
 //
 // Per entry, in register order (superseded editions before current ones):
-//   • not ingestible (metadata-only, draft, fetch-blocked) → register_source_document
+//   • not ingestible (metadata-only, draft, fetch-blocked) → unpublish_source_document
+//     (drops any chunks an earlier register allowed — pulling a document from
+//     the register must pull its text from search) then register_source_document
 //     (metadata row, zero chunks — the DB refuses chunks for it anyway)
 //   • backfill_from_regdoc → backfill_source_document_from_regdoc (legacy rows
 //     copied with their embeddings, no API cost)
@@ -15,6 +25,8 @@
 //     stage, and publish_source_document (atomic: the edition's metadata and
 //     exactly N chunks land, or nothing changes; reruns replace, never
 //     duplicate; other documents are never touched).
+// A full run (no --only) then lists DB editions the register no longer names:
+// it fails with their ids, and --prune deletes them (chunks cascade).
 // Evidence for every text entry is written to corpus/reports/<key@version>.json.
 
 import { existsSync } from "node:fs";
@@ -25,6 +37,7 @@ import OpenAI from "openai";
 import { EMBEDDING_DIMENSIONS } from "../../lib/openai";
 import type { RegisterEntry, SourceRegister } from "../../lib/sources/register";
 import {
+	CHUNKER_VERSION,
 	type ChunkingStats,
 	chunkDocPaged,
 	emptyStats,
@@ -37,12 +50,13 @@ import {
 	embedBatch,
 	isLocalSupabaseUrl,
 } from "../lib/embed";
-import { parseCnscPageData } from "./adapters/cnsc-html";
-import { parseDocx } from "./adapters/docx";
-import { parseEcfrXml } from "./adapters/ecfr-xml";
-import { parseEuXhtml } from "./adapters/eu-xhtml";
-import { parsePdf } from "./adapters/pdf";
+import { CNSC_PARSER_VERSION, parseCnscPageData } from "./adapters/cnsc-html";
+import { DOCX_PARSER_VERSION, parseDocx } from "./adapters/docx";
+import { ECFR_PARSER_VERSION, parseEcfrXml } from "./adapters/ecfr-xml";
+import { EU_PARSER_VERSION, parseEuXhtml } from "./adapters/eu-xhtml";
+import { PDF_PARSER_VERSION, parsePdf } from "./adapters/pdf";
 import type { ParsedSource } from "./adapters/types";
+import { pinnedChecksum } from "./content-hash";
 import { sha256Hex } from "./http";
 import { buildReport } from "./quality";
 import {
@@ -63,6 +77,28 @@ const LEGAL_TEXT_MIN_TOKENS = 8;
 const MAX_CHUNKS_PER_DOCUMENT = 3000;
 const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run");
+const PRUNE = argv.includes("--prune");
+const REEMBED = argv.includes("--reembed");
+
+const ADAPTER_VERSIONS: Record<string, string> = {
+	pdf: PDF_PARSER_VERSION,
+	"cnsc-json": CNSC_PARSER_VERSION,
+	"ecfr-xml": ECFR_PARSER_VERSION,
+	"eu-xhtml": EU_PARSER_VERSION,
+	docx: DOCX_PARSER_VERSION,
+};
+/** What publish_source_document records as parser_version. */
+function pipelineVersion(format: string): string {
+	return `${ADAPTER_VERSIONS[format] ?? format}+${CHUNKER_VERSION}`;
+}
+
+interface PublishedRow {
+	checksum_sha256: string | null;
+	parser_version: string | null;
+	embedding_model: string | null;
+	embedding_dims: number | null;
+	chunk_count: number;
+}
 const FORCE_REMOTE =
 	argv.includes("--force") || process.env.ALLOW_REMOTE_INGEST === "1";
 
@@ -269,7 +305,20 @@ async function main() {
 		register.entries.filter((e) => selected(e, only)),
 	);
 	const stats: ChunkingStats = emptyStats();
+	const publishedRows = new Map<string, PublishedRow>();
+	if (supabase) {
+		const { data, error } = await supabase
+			.from("source_documents")
+			.select(
+				"document_key,version_key,checksum_sha256,parser_version,embedding_model,embedding_dims,chunk_count",
+			);
+		if (error) throw new Error(error.message);
+		for (const d of data ?? []) {
+			publishedRows.set(`${d.document_key}@${d.version_key}`, d);
+		}
+	}
 	const summary = {
+		unchanged: 0,
 		metadata: 0,
 		backfilled: 0,
 		published: 0,
@@ -283,6 +332,16 @@ async function main() {
 		try {
 			if (!canIngestText(e)) {
 				if (supabase) {
+					const { data: dropped, error: unpubErr } = await supabase.rpc(
+						"unpublish_source_document",
+						{ p_document_key: e.document_key, p_version_key: e.version_key },
+					);
+					if (unpubErr) throw new Error(unpubErr.message);
+					if (typeof dropped === "number" && dropped > 0) {
+						console.log(
+							`⊖ ${id}: removed ${dropped} chunk(s) the register no longer allows`,
+						);
+					}
 					const { error } = await supabase.rpc("register_source_document", {
 						p_doc: docPayload(e),
 						p_register_version: register.version,
@@ -328,12 +387,35 @@ async function main() {
 				continue;
 			}
 
+			const prior = publishedRows.get(id);
+			if (
+				supabase &&
+				!REEMBED &&
+				prior &&
+				prior.chunk_count > 0 &&
+				prior.checksum_sha256 === e.checksum_sha256 &&
+				prior.parser_version === pipelineVersion(e.format as string) &&
+				prior.embedding_model === EMBEDDING_MODEL &&
+				prior.embedding_dims === EMBEDDING_DIMENSIONS
+			) {
+				const { error } = await supabase.rpc("register_source_document", {
+					p_doc: docPayload(e),
+					p_register_version: register.version,
+				});
+				if (error) throw new Error(error.message);
+				summary.unchanged += 1;
+				console.log(
+					`= ${id}: unchanged — metadata refreshed, ${prior.chunk_count} chunks kept`,
+				);
+				continue;
+			}
+
 			const path = cachePath(e);
 			if (!existsSync(path))
 				throw new Error("not downloaded — run scripts/sources/fetch.ts first");
 			const bytes = new Uint8Array(await readFile(path));
-			const sha = await sha256Hex(bytes);
-			if (e.format !== "cnsc-json" && sha !== e.checksum_sha256) {
+			const sha = await pinnedChecksum(e, bytes);
+			if (sha !== e.checksum_sha256) {
 				throw new Error(
 					`cached bytes ${sha.slice(0, 12)}… do not match pinned ${String(e.checksum_sha256).slice(0, 12)}…`,
 				);
@@ -394,7 +476,7 @@ async function main() {
 				register,
 				e,
 				chunks,
-				report.parser_version,
+				pipelineVersion(e.format as string),
 			);
 			await writeReport({
 				...base,
@@ -410,10 +492,44 @@ async function main() {
 		}
 	}
 	freeEncoder();
+
+	// Editions in the DB that the register no longer lists. Only on a full
+	// run: with --only the rest of the register was not considered.
+	let orphans = 0;
+	if (supabase && only === null) {
+		const listed = new Set(register.entries.map(entryId));
+		const { data, error } = await supabase
+			.from("source_documents")
+			.select("document_key,version_key,chunk_count");
+		if (error) throw new Error(error.message);
+		for (const d of data ?? []) {
+			const id = `${d.document_key}@${d.version_key}`;
+			if (listed.has(id)) continue;
+			if (PRUNE) {
+				const { error: delErr } = await supabase.rpc("delete_source_document", {
+					p_document_key: d.document_key,
+					p_version_key: d.version_key,
+				});
+				if (delErr) {
+					summary.errors += 1;
+					console.error(`✗ ${id}: prune failed: ${delErr.message}`);
+				} else {
+					console.log(
+						`⊗ ${id}: deleted (not in the register; ${d.chunk_count} chunks)`,
+					);
+				}
+			} else {
+				orphans += 1;
+				console.error(
+					`✗ ${id}: in the database but not in the register (${d.chunk_count} chunks still searchable) — rerun with --prune to delete`,
+				);
+			}
+		}
+	}
 	console.log(
-		`\nmetadata-only ${summary.metadata} · backfilled ${summary.backfilled} · published ${summary.published} · quality-blocked ${summary.blocked} · errors ${summary.errors} · chunks ${summary.chunks}`,
+		`\nunchanged ${summary.unchanged} · metadata-only ${summary.metadata} · backfilled ${summary.backfilled} · published ${summary.published} · quality-blocked ${summary.blocked} · errors ${summary.errors} · chunks ${summary.chunks}${orphans ? ` · unlisted ${orphans}` : ""}`,
 	);
-	if (summary.errors > 0) process.exit(1);
+	if (summary.errors > 0 || orphans > 0) process.exit(1);
 }
 
 if (import.meta.main) await main();

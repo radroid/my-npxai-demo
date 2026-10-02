@@ -193,5 +193,34 @@ if (reconcileEffect) {
 	);
 }
 
+// =============================================================================
+// (e) Phase 12 review fix: model-written markdown links (and GFM-autolinked
+//     bare URLs) are live ONLY for allowlisted official-source URLs.
+// =============================================================================
+
+{
+	const md = stripComments(
+		readSrc("../components/assistant-ui/markdown-text.tsx"),
+	);
+	const anchor = md.match(/\ba: \(\{[^)]*\}\) =>([\s\S]*?)\n\tblockquote:/);
+	check(
+		"markdown `a` renders a link only when isAllowedSourceUrl(href)",
+		anchor !== null && /isAllowedSourceUrl\(href\)\s*\?/.test(anchor[1]),
+		anchor?.[1]?.slice(0, 200),
+	);
+	check(
+		"…and the non-allowlisted branch renders no <a>",
+		anchor !== null &&
+			(anchor[1].split(") : (")[1] ?? "").includes("<span") &&
+			!(anchor[1].split(") : (")[1] ?? "").includes("<a"),
+	);
+	check(
+		"…and our target/rel win over any spread prop",
+		anchor !== null &&
+			anchor[1].indexOf("{...props}") <
+				anchor[1].indexOf('rel="noopener noreferrer"'),
+	);
+}
+
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

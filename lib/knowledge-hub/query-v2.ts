@@ -45,13 +45,14 @@ import type {
 } from "../sources/payload";
 import {
 	AUTO_SCOPE,
-	type ResolvedScope,
 	resolveScope,
 	type ScopeRequest,
 	scopeKey,
 	scopeRequestSchema,
 } from "../sources/scope";
 import {
+	buildNoticePayload,
+	cacheScopeMaterial,
 	retrieveForScope,
 	type SearchScope,
 	unsearchedMentions,
@@ -73,14 +74,14 @@ export function parseScopeRequest(raw: unknown): ScopeRequest | null {
 
 async function cacheKeyV2(
 	query: string,
-	scope: ResolvedScope,
+	scope: SearchScope,
 	enabled: CollectionId[],
 ): Promise<string> {
 	const material = [
 		"kh2",
 		PROMPT_VERSION_V2,
 		corpusVersion(),
-		scopeKey(scope),
+		cacheScopeMaterial(scope, query),
 		enabled.join(","),
 		query.toLowerCase(),
 	].join(":");
@@ -135,6 +136,11 @@ export interface AnswerV2Args {
 	query: string;
 	rawScope: unknown;
 	isRegenerate: boolean;
+	/**
+	 * A regenerate sent by a notice's "Switch to …" button: the user changed
+	 * the scope, not asked for a fresh answer — keep the answer cache.
+	 */
+	scopeSwitch?: boolean;
 	ctx: GuardContext;
 	supabase: GuardedHandlerArgs["supabase"];
 	/** Test seam; production uses the shared client. */
@@ -178,21 +184,16 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 		ctx.logFields.notice_reason = scope.reason;
 		ctx.logFields.fallback_taken = true;
 		ctx.logFields.output_tokens = 0;
-		const notice: ScopeNoticePayload = {
-			reason: scope.reason,
-			suggestions: scope.suggestions.map((id) => ({
-				id,
-				label: COLLECTIONS[id].label,
-			})),
-		};
+		const notice: ScopeNoticePayload = buildNoticePayload(scope, query);
 		return oneShot(scope.message, (w) =>
 			w.write({ type: "data-scope-notice", data: notice } as never),
 		);
 	}
 
 	const cKey = await cacheKeyV2(query, scope, enabled);
-	if (isRegenerate) void cacheDelete(cKey, "kh_cache_invalidate_error");
-	const cached = isRegenerate
+	const freshAnswer = isRegenerate && args.scopeSwitch !== true;
+	if (freshAnswer) void cacheDelete(cKey, "kh_cache_invalidate_error");
+	const cached = freshAnswer
 		? null
 		: await cacheRead<CachedAnswerV2>(cKey, "kh_cache_read_error");
 	if (cached?.text && cached.payload?.version === 2) {
@@ -256,7 +257,9 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 		query,
 		scope,
 		missingCollections: retrieval.missing,
-		requiredDocs: retrieval.mentionedDocs,
+		requiredDocs: retrieval.requiredDocs,
+		absentDocs: retrieval.absentDocs,
+		unretrievedDocs: retrieval.unretrievedDocs,
 		unsearchedMentions: unsearchedMentions(scope, query),
 	});
 
