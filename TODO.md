@@ -460,7 +460,7 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] If the corpus grows past ~50k chunks (or search latency matters): tune `hnsw.ef_search` / `hnsw.max_scan_tuples`, re-run `scripts/sources/sql/hnsw-forced-recall.sql` until mixed probes clear 0.95 with no 0/8 tail, then allow the index in `match_source_chunks`.
 - [ ] Display `third_party_notice` (e.g. REGDOC-2.6.3 "adapted from IAEA NS-G-2.12") on source cards once R1 is decided. The field is stored in the register but not yet in `source_documents`.
 - [ ] Re-key CNSC battery cases #21 and #26 to the current REGDOC-2.5.2 / REGDOC-2.1.1 editions once 👤 decides (PLAN → "CNSC battery vs current editions").
-- [ ] Scope resolver residuals (`docs/phase-12-sources.md` §4): oddly cased "US"/"UK", "licensed in Sweden"-style subjects without a rules word, comparisons phrased as trade questions. Consider a small intent classifier only if live logs show these matter; regex rules are at their useful limit.
+- [ ] Scope resolver residuals (`docs/phase-12-sources.md` §4): oddly cased "US"/"UK", "licensed in Sweden"-style subjects without a rules word, comparisons where only the Canadian side sits in the comparison slot, comparatives outside the comparison list ("tougher"). Consider a small intent classifier only if live logs show these matter; regex rules are at their useful limit.
 - [ ] Run `bun run test:tiers` against a dev server on :3001 (not run in the Phase 12 sessions — the worktree had no server and agents do not start one).
 
 ---

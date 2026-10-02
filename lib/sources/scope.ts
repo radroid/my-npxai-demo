@@ -82,9 +82,10 @@ export type ResolvedScope =
 // makes an explicit comparison) or INCIDENTAL (a cue at most):
 //   res          — regime mentions: a regulator, its documents;
 //   countries    — the regulator's country: a regime unless the question is
-//                  about trade or movement, compares nothing, and the
-//                  country is not its subject ("import a source from a US
-//                  supplier", "export to a customer in Japan");
+//                  about trade or transport and the country is only its
+//                  far end ("import a source from a US supplier", "export
+//                  to a customer in Japan", "transport a package to the
+//                  US"), not its subject or compared (detectMentions);
 //   incidental   — always incidental: an event ("post-Fukushima");
 //   incidentalPhrases — phrases removed before `res` is tested: CNSC's own
 //                  use of an IAEA scheme ("IAEA Category 1", "IAEA
@@ -175,8 +176,8 @@ const MENTION_RULES: Array<{
 			/\bSF-1\b/i,
 			/\bIRRS\b/i,
 			/\bINFCIRC\b/i,
-			/\b(?:Nuclear Security Series|Safety (?:Standards|Reports?) Series)\b/i,
-			/\b(?:IAEA|International Atomic Energy Agency)(?:['’]s\b|\s+(?:[\w-]+\s+){0,2}?(?:requirements?|limits?|standards?|recommendations?|recommends?|requires?|approach|position|view|guidance|principles?|definitions?|defines?|says?|states?|expects?|Code of Conduct)\b)/i,
+			/\b(?:Nuclear Security Series|Safety (?:Standards|Reports?) Series|TECDOC)\b/i,
+			/\b(?:IAEA|International Atomic Energy Agency)(?:['’]s\b|\s+(?:[\w-]+\s+){0,2}?(?:requirements?|limits?|standards?|recommendations?|recommends?|requires?|approach|position|view|guidance|guidelines?|fundamentals|principles?|definitions?|defines?|says?|states?|expects?|Code of Conduct)\b)/i,
 			/\b(?:does|do|did|would)\s+(?:the\s+)?IAEA\b/i,
 			/\baccording to (?:the\s+)?IAEA\b/i,
 		],
@@ -185,6 +186,8 @@ const MENTION_RULES: Array<{
 		// is a CNSC safeguards question.
 		incidentalPhrases: [
 			/\b(?:the\s+)?IAEA\s+(?:source\s+)?(?:categor\w*|Category\s+\d|scheme|classification)/gi,
+			// TECDOC-1344, the source categorisation REGDOC-2.12.3 adopts.
+			/\b(?:the\s+)?(?:IAEA[-\s]+)?TECDOC[-\s]?\d+\s+(?:source\s+)?(?:categor\w*|Category\s+\d|scheme|classification)/gi,
 			/\b(?:the\s+)?IAEA\s+(?:safeguards?|inspect\w*)/gi,
 			/\b(?:safeguards?|inspect\w*|report\w*|submit\w*|notif\w*|declar\w*|agreements?)\b[^.?!]{0,40}?\b(?:to|with|by)\s+the\s+IAEA\b/gi,
 		],
@@ -219,6 +222,10 @@ const TRADE_CORE =
 	"export\\w*|import\\w*|ship\\w*|transfer\\w*|supplier\\w*|customer\\w*|vendor\\w*|client\\w*|buyer\\w*|destin\\w*|cross-border|border";
 const TRADE_WORDS = `${TRADE_CORE}|bound|from`;
 const TRADE_RE = new RegExp(`\\b(?:${TRADE_CORE})\\b`, "i");
+// A question about moving material: trade, or transport to or from a place
+// ("transporting a Type B package to the US"). Only for telling an indexed
+// country's role (detectMentions); comparison slots keep TRADE_CORE.
+const MOVEMENT_RE = new RegExp(`\\b(?:${TRADE_CORE}|transport\\w*)\\b`, "i");
 // A country as the SUBJECT of the question — its own rules: "Finland's",
 // "France requires", "Spain requirements" (adjacent), or a rules word
 // governing the place: "regulated in Sweden", "mandatory in Finland", "the
@@ -249,6 +256,24 @@ const INDEXED_COUNTRY_SUBJECT = Object.fromEntries(
 		id,
 		countrySubjectRe(names as string),
 	]),
+) as Partial<Record<CollectionId, RegExp>>;
+// The country as the far end of a movement — "to the US", "from a US
+// supplier", "into the UK", "a customer in Japan" — so a comparison word
+// elsewhere ("the difference between Type A and Type B packages for
+// shipments to the US") does not make it a regime.
+const PARTNER_NOUNS =
+	"suppliers?|customers?|vendors?|clients?|buyers?|destinations?|recipients?|consignees?|carriers?|sites?|facilit(?:y|ies)";
+const INDEXED_COUNTRY_TRADED = Object.fromEntries(
+	Object.entries(INDEXED_COUNTRY_NAMES).map(([id, names]) => {
+		const c = `(?:${names})(?![\\w-])`;
+		return [
+			id,
+			new RegExp(
+				`\\b(?:to|from|into|via|through|across|out\\s+of)\\s+(?:the\\s+|an?\\s+)?${c}|\\b${c}\\s+(?:${PARTNER_NOUNS})\\b|\\b(?:${PARTNER_NOUNS})\\s+(?:in|from)\\s+(?:the\\s+)?${c}`,
+				"i",
+			),
+		];
+	}),
 ) as Partial<Record<CollectionId, RegExp>>;
 
 // The names that put a collection's regime into a comparison slot (below).
@@ -373,10 +398,10 @@ function slotSources(
 		].join("|"),
 		direct: [
 			`\\b(?:[Dd]iffer(?:s|ed|ent|ence|ences)?|[Ss]imilar(?:ity|ities)?|[Cc]ompared?|[Cc]omparison|[Cc]ontrast(?:s|ed)?)\\s+(?:from|to|with|between)\\s+${LEAD}${r}`,
-			`\\b[Cc]ompar(?:e[ds]?|ing)\\b[^,.?;:]{0,60}?\\b(?:with|to|against)\\s+${LEAD}${r}`,
+			`\\b[Cc]ompar(?:e[ds]?|ing)\\b[^,.?;:]{0,60}?${notTraded}\\b(?:with|to|against)\\s+${LEAD}${r}`,
 			`(?<!\\b(?:[Oo]ther|[Rr]ather)\\s)\\b[Tt]han\\s+${LEAD}${r}`,
 			`\\b(?:vs\\.?|versus)\\s+${LEAD}${r}`,
-			`${r}\\s+(?:vs\\b|versus\\b)`,
+			`${notTraded}${r}\\s+(?:vs\\b|versus\\b)`,
 		].join("|"),
 	};
 }
@@ -455,11 +480,12 @@ export interface Mentions {
 export function detectMentions(query: string): Mentions {
 	const collections: CollectionId[] = [];
 	const nonEvent: CollectionId[] = [];
-	// A trade question that compares nothing: its countries are partners.
-	const trade =
-		TRADE_RE.test(query) &&
-		!COMPARISON_CONTEXT_RE.test(query) &&
-		!EXPLICIT_COMPARE_RE.test(query);
+	// In a question about moving material, a country is a partner unless it
+	// is the subject ("US import requirements"), sits in a comparison slot
+	// ("differ between Canada and the US"), or is compared without being
+	// the far end of the movement ("Are US import rules stricter?").
+	const movement = MOVEMENT_RE.test(query);
+	const comparing = COMPARISON_CONTEXT_RE.test(query);
 	for (const rule of MENTION_RULES) {
 		const stripped = (rule.incidentalPhrases ?? []).reduce(
 			(q, re) => q.replace(re, " "),
@@ -469,8 +495,11 @@ export function detectMentions(query: string): Mentions {
 		const regime =
 			rule.res.some((re) => re.test(stripped)) ||
 			(country &&
-				(!trade ||
-					INDEXED_COUNTRY_SUBJECT[rule.collection]?.test(query) === true));
+				(!movement ||
+					INDEXED_COUNTRY_SUBJECT[rule.collection]?.test(query) === true ||
+					COLLECTION_SLOT[rule.collection](query) ||
+					(comparing &&
+						INDEXED_COUNTRY_TRADED[rule.collection]?.test(query) !== true)));
 		if (
 			regime ||
 			country ||

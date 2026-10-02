@@ -2054,6 +2054,62 @@ check(
 			CNSC_ONLY,
 			"single:cnsc",
 		],
+		// Answered (round-7 review): a country at the far end of a transport
+		// or a shipment, even with a comparison word elsewhere.
+		[
+			"What are the requirements for transporting a Type B package to the US?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the requirements for transporting a Type B package to the US?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"What are the requirements for transport through the US?",
+			AUTO,
+			ALL,
+			"single:cnsc",
+		],
+		[
+			"What is the difference between Type A and Type B packages for shipments to the US?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Compare Type A and Type B packages for shipments to the US.",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can I import a source from a US supplier with activity higher than 1 TBq?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Does the CNSC have different requirements for exports to the US versus exports to Japan?",
+			AUTO,
+			ALL,
+			"single:cnsc",
+		],
+		[
+			"What is the IAEA TECDOC-1344 categorization?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"How does Canada implement the IAEA guidelines on the import and export of radioactive sources?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
 		// Declined (round-6 review): comparisons that mention trade, IAEA subject.
 		[
 			"What did the IAEA conclude about the Fukushima accident?",
@@ -2145,6 +2201,52 @@ check(
 			AUTO,
 			CNSC_ONLY,
 			"notice:reference_only",
+		],
+		// Declined or compared (round-7 review): a trade or transport country
+		// that is the subject, or compared without being the far end.
+		[
+			"What are the US requirements for transporting Type B packages?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How do UK transport regulations compare with the PTNSR?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		[
+			"Are US import requirements stricter than Canada's?",
+			AUTO,
+			ALL,
+			"compare:cnsc+nrc",
+		],
+		[
+			"How does the transport of radioactive material in the US differ from Canada?",
+			AUTO,
+			ALL,
+			"compare:cnsc+nrc",
+		],
+		[
+			"What are the IAEA guidelines on ageing management?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:reference_only",
+		],
+		[
+			"Summarize IAEA-TECDOC-1000.",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		// "than in the UK" is a slot even with a comparative outside
+		// COMPARE_RE: the pick-one notice, never CNSC alone.
+		[
+			"Are transport rules for Type B packages tougher in Canada than in the UK?",
+			AUTO,
+			ALL,
+			"notice:ambiguous",
 		],
 		// Declined (round-4 review): the US, joined pairs, comparatives, IAEA ids.
 		[
@@ -2444,6 +2546,9 @@ check(
 		"Dose monitoring is not merely recommended but mandatory [[S2]].",
 		"This is not just recommended but required [[S2]].",
 		"Licensees must confirm that no open regulatory requirements remain [[S2]].",
+		// A negation excuses only what it negates (round-7 review).
+		"Licensees must perform an ALARA review with no new requirements beyond Part 20 [[S2]].",
+		"Licensees are required to keep records but are not required to submit them [[S2]].",
 	];
 	check(
 		"lint: prohibitions and 'not merely X but required' upgrades on a guide are flagged",

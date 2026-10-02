@@ -210,9 +210,15 @@ const OBLIGATION_RE =
 // (CLAUSE_SPLIT_RE), so "they need not test them" cannot excuse "licensees
 // must brief workers" in the same sentence. The one wide form is a
 // disbelief verb: "The NRC does not believe that additional reductions …
-// are required".
+// are required". The spans are removed before OBLIGATION_RE is tested, so a
+// negation excuses only the words it negates: "places no additional
+// obligations" passes, "must perform the review with no new requirements"
+// does not.
 const NEGATED_OBLIGATION_RE =
-	/(?<!\b(?:must|shall)\s)\b(?:not|never|no longer),?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|n['’]t,?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b|\bno\s+(?:(?:legal|regulatory|such|specific|explicit|formal|binding|additional|new|further|other)\s+)?(?:requirements?|obligations?|mandates?|duty|duties)\b|\b(?:must|shall)\s+not\s+be\s+(?:\w+\s+)?(?:requir\w*|mandatory|obligat\w*)|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bneed not\b|\b(?:voluntary|non-?binding)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/i;
+	/(?<!\b(?:must|shall)\s)\b(?:not|never|no longer),?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b(?:\s+(?:any|an?|such|the)\s+(?:\w+\s+)?(?:obligations?|duty|duties|mandates?|requirements?)\b)?|n['’]t,?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b(?:\s+(?:any|an?|such|the)\s+(?:\w+\s+)?(?:obligations?|duty|duties|mandates?|requirements?)\b)?|\bno\s+(?:(?:legal|regulatory|such|specific|explicit|formal|binding|additional|new|further|other)\s+)?(?:requirements?|obligations?|mandates?|duty|duties)\b|\b(?:must|shall)\s+not\s+be\s+(?:\w+\s+)?(?:requir\w*|mandatory|obligat\w*)|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/gi;
+// A clause that calls the text itself non-binding ("voluntary guidance …")
+// is the right answer, whatever else it says.
+const NONBINDING_CLAUSE_RE = /\bneed not\b|\b(?:voluntary|non-?binding)\b/i;
 const CLAUSE_SPLIT_RE =
 	/\s*[;:]\s*|,\s*(?=(?:and|but|while|whereas|although)\b)|\s+[—–]\s+/;
 // "the required safety functions" — an adjective, not an obligation.
@@ -275,7 +281,8 @@ export function lintAuthority(
 			.split(CLAUSE_SPLIT_RE)
 			.some(
 				(clause) =>
-					OBLIGATION_RE.test(clause) && !NEGATED_OBLIGATION_RE.test(clause),
+					!NONBINDING_CLAUSE_RE.test(clause) &&
+					OBLIGATION_RE.test(clause.replace(NEGATED_OBLIGATION_RE, " ")),
 			);
 		if (!asserts) continue;
 		const cited = extractSnippetIds(sentence)
