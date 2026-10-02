@@ -34,7 +34,12 @@ import {
 } from "../prompts";
 import { ENVELOPE_CHUNKS, RetrievalError } from "../retrieval";
 import { COLLECTIONS, type CollectionId } from "../sources/catalog";
-import { scoreSnippetCitations, toSourceRecords } from "../sources/citations";
+import {
+	authorityNote,
+	lintAuthority,
+	scoreSnippetCitations,
+	toSourceRecords,
+} from "../sources/citations";
 import { DEFAULT_COLLECTION, getEnabledCollections } from "../sources/config";
 import { buildSourceEnvelope } from "../sources/envelope";
 import { corpusVersion } from "../sources/manifest";
@@ -323,9 +328,14 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 					delta: "\n\n_[error generating response]_",
 				});
 			}
+			const authority = lintAuthority(accumulated, sources);
+			const note =
+				outputGuardTripped || streamFailed ? null : authorityNote(authority);
+			if (note) emit(note);
 			writer.write({ type: "text-end", id: msgId });
 
 			const citations = scoreSnippetCitations(accumulated, sources);
+			const authorityFlags = authority.length;
 			// Cache only clean answers: no guard truncation, no stream error,
 			// every cited id resolvable, and long enough not to be a stub.
 			const cacheable =
@@ -351,6 +361,7 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 				output_tokens: outputTokens,
 				citations_total: citations.total,
 				citations_unresolved: citations.unresolved.length,
+				authority_flags: authorityFlags,
 				output_guard_tripped: outputGuardTripped,
 				cached_write: cacheable,
 			});

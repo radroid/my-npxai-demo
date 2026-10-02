@@ -26,12 +26,12 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { assembleArtifactDocumentV2 } from "../lib/artifact-template";
+import type { RetrievedChunk } from "../lib/context-envelope";
 import {
 	buildNoticePayload,
 	cacheScopeMaterial,
 	retrieveForScope,
 } from "../lib/knowledge-hub/scoped-retrieval";
-import type { RetrievedChunk } from "../lib/context-envelope";
 import {
 	isLowConfidenceText,
 	isRefusalText,
@@ -41,10 +41,16 @@ import {
 	KNOWLEDGE_HUB_OUT_OF_SCOPE_V2,
 	KNOWLEDGE_HUB_SYSTEM_V2,
 } from "../lib/prompts";
-import { DEFAULT_THRESHOLDS } from "../lib/retrieval";
+import {
+	DEFAULT_THRESHOLDS,
+	embeddingInputsFor,
+	MAX_EXPANSIONS,
+} from "../lib/retrieval";
 import { isAllowedSourceUrl } from "../lib/sources/catalog";
 import {
+	authorityNote,
 	extractSnippetIds,
+	lintAuthority,
 	renderArtifactCitations,
 	type SourceRecord,
 	scoreSnippetCitations,
@@ -59,6 +65,7 @@ import {
 	buildSourceEnvelope,
 	wrapSourceSnippet,
 } from "../lib/sources/envelope";
+import { namedReferenceLinks } from "../lib/sources/manifest";
 import {
 	parseRegister,
 	type RegisterEntry,
@@ -71,8 +78,11 @@ import {
 	scopeKey,
 	scopeRequestSchema,
 } from "../lib/sources/scope";
-import { namedReferenceLinks } from "../lib/sources/manifest";
-import { currentScopeBody, useSourceScope } from "../lib/sources/scope-store";
+import {
+	currentScope,
+	currentScopeBody,
+	useSourceScope,
+} from "../lib/sources/scope-store";
 import { thresholdsFor } from "../lib/sources/thresholds";
 
 // sha256 of JSON.stringify(chunkDoc over scraped_regdocs/) — identical to
@@ -80,7 +90,8 @@ import { thresholdsFor } from "../lib/sources/thresholds";
 // with a deliberate legacy re-ingest.
 const LEGACY_CHUNKS_SHA256 =
 	"a3380a2ef159a5e1468bdde45525e3fd479d9a6371446d9c372473c82b715335";
-import { chunkDoc, chunkDocPaged, emptyStats, type Doc } from "./lib/chunker";
+
+import { chunkDoc, chunkDocPaged, type Doc, emptyStats } from "./lib/chunker";
 
 let failures = 0;
 function check(name: string, cond: boolean, extra?: unknown) {
@@ -827,6 +838,24 @@ check(
 			.map((x) => x.label)
 			.join() === "IAEA GSG-19",
 	);
+	check(
+		"IAEA notice: both GSG-19 and GSG-1 named → both linked (every occurrence is checked)",
+		namedReferenceLinks("iaea", "Compare IAEA GSG-19 and GSG-1")
+			.map((x) => x.label)
+			.sort()
+			.join() === "IAEA GSG-1,IAEA GSG-19",
+		namedReferenceLinks("iaea", "Compare IAEA GSG-19 and GSG-1"),
+	);
+	check(
+		'IAEA notice: no left-boundary false match ("ESF 1" is not SF-1)',
+		namedReferenceLinks("iaea", "What is ESF 1 in the plant?").length === 0,
+	);
+	check(
+		'IAEA notice: separators are optional ("ssg23" = SSG-23)',
+		namedReferenceLinks("iaea", "what does ssg23 cover").some((x) =>
+			x.label.includes("SSG-23"),
+		),
+	);
 	const notice = r("What does IAEA GSR Part 3 require?");
 	check(
 		"notice payload carries the reference link",
@@ -989,7 +1018,197 @@ check(
 			second.scopeSwitch === undefined &&
 			first.scope.mode === "pinned",
 	);
+	useSourceScope.getState().markScopeSwitch();
+	currentScope();
+	check(
+		"an artifact request (currentScope) does not consume the chat's switch flag",
+		currentScopeBody().scopeSwitch === true,
+	);
+	useSourceScope.setState({ switchPendingAt: Date.now() - 60_000 });
+	check(
+		"a switch flag that never reached the transport expires (a later Regenerate is fresh)",
+		currentScopeBody().scopeSwitch === undefined &&
+			useSourceScope.getState().switchPendingAt === 0,
+	);
 	useSourceScope.getState().setAuto();
+}
+
+// Fix round 2 (adversarial re-review of bffe1d2).
+{
+	// Loose cue words in a single-regulator question are not a comparison.
+	for (const q of [
+		"CNSC requirements for exporting sealed sources to France, and the difference between Category 1 and 2",
+		"Does the NRC require both a PSAR and an FSAR for an AP1000 being built in China?",
+		"difference between REGDOC-2.5.2 and REGDOC-2.4.1 for a reactor vendor from Korea",
+	]) {
+		const got = r(q);
+		check(
+			`incidental country + cue word is answered, not declined: "${q.slice(0, 40)}…"`,
+			got.kind === "single",
+			scopeKey(got),
+		);
+	}
+	check(
+		"an explicit comparison with an unindexed regulator still declines",
+		is(
+			r("Compare CNSC and Finland on periodic safety review"),
+			"notice:not_indexed",
+		),
+	);
+	check(
+		"an explicit comparison with IAEA still declines as reference-only",
+		is(
+			r("Compare CNSC REGDOC-2.7.1 with IAEA GSR Part 3"),
+			"notice:reference_only",
+		),
+	);
+
+	// The fan-out is bounded: one embedding input + one exact scan per
+	// expansion, so a query naming dozens of documents must not scale.
+	const flood = Array.from({ length: 40 }, (_, i) => `REGDOC-2.${i}.1`).join(
+		" ",
+	);
+	check(
+		"a query naming 40 documents makes at most MAX_EXPANSIONS expansions",
+		embeddingInputsFor(flood).length === 1 + MAX_EXPANSIONS &&
+			embeddingInputsFor(flood, ["cnsc"]).length === 1 + MAX_EXPANSIONS,
+		embeddingInputsFor(flood).length,
+	);
+
+	// Envelope cues.
+	const guide = {
+		id: 1,
+		regdoc_id: "NS-TAST-GD-001",
+		section_number: "5.8",
+		section_title: null,
+		chunk_text: "The PSR should identify shortfalls.",
+		url: null,
+		requirement_type: "guidance",
+		similarity: 0.6,
+		source: { legal_force: "nonbinding" },
+	} as unknown as RetrievedChunk;
+	const reg = {
+		...guide,
+		id: 2,
+		regdoc_id: "10 CFR 20.1201",
+		source: { legal_force: "binding" },
+	} as unknown as RetrievedChunk;
+	const onr = {
+		kind: "single",
+		collection: "onr",
+		via: "auto_detected",
+		historical: false,
+	} as const;
+	const regdoc = {
+		...guide,
+		id: 3,
+		regdoc_id: "REGDOC-2.3.3",
+		source: { legal_force: "mixed" },
+	} as unknown as RetrievedChunk;
+	const envLf = buildSourceEnvelope({
+		chunks: [reg, guide, regdoc],
+		query: "How often is a PSR expected?",
+		scope: onr,
+	});
+	check(
+		"LEGAL FORCE cue names exactly the nonbinding snippet ids",
+		/LEGAL FORCE: S2 is nonbinding/.test(envLf) &&
+			!/S3 is nonbinding|S2, S3/.test(envLf) &&
+			!/S1 is nonbinding/.test(envLf),
+	);
+	check(
+		"no LEGAL FORCE cue when every snippet is binding",
+		!buildSourceEnvelope({ chunks: [reg], query: "q", scope: onr }).includes(
+			"LEGAL FORCE",
+		),
+	);
+	check(
+		"an unindexed regulator in the question → conditional UNINDEXED cue",
+		buildSourceEnvelope({
+			chunks: [guide],
+			query: "How does ONR's PSR differ from Finland's?",
+			scope: onr,
+		}).includes("UNINDEXED REGULATOR"),
+	);
+	const envAuto = buildSourceEnvelope({
+		chunks: [guide],
+		query: "q",
+		scope: onr,
+		unsearchedMentions: ["iaea"],
+	});
+	check(
+		"Auto scope with an unsearchable regime named → NOT SEARCHED cue (not PINNED)",
+		envAuto.includes("NOT SEARCHED") && !envAuto.includes("PINNED SCOPE"),
+	);
+}
+
+// Wrong-authority lint: obligation language citing only nonbinding sources.
+{
+	const src = [
+		{
+			sid: "S1",
+			chip: "NS-TAST-GD-001 §5.8",
+			legal_force: "nonbinding" as const,
+		},
+		{ sid: "S2", chip: "10 CFR 20.1201(a)", legal_force: "binding" as const },
+		{ sid: "S3", chip: "RG 8.29 §D.2", legal_force: "nonbinding" as const },
+	];
+	const flagged = lintAuthority(
+		"Interim safety reviews are required every few years [[S1]]. The guide describes an acceptable method [[S3]].",
+		src,
+	);
+	check(
+		"lintAuthority flags 'required' cited only to a nonbinding guide",
+		flagged.length === 1 && flagged[0].cited[0] === "NS-TAST-GD-001 §5.8",
+		flagged,
+	);
+	check(
+		"lintAuthority accepts obligation language backed by a binding snippet",
+		lintAuthority(
+			"The annual limit is required by regulation [[S2]][[S3]].\n- Licensees must monitor [[S2]].",
+			src,
+		).length === 0,
+	);
+	const note = authorityNote(flagged);
+	check(
+		"a flagged answer gets a legal-force note naming the nonbinding source",
+		note !== null &&
+			note.includes("NS-TAST-GD-001 §5.8") &&
+			note.includes("non-binding guidance") &&
+			extractSnippetIds(note).length === 0,
+		note,
+	);
+	check("no flags → no note", authorityNote([]) === null);
+	{
+		const q = readFileSync(
+			new URL("../lib/knowledge-hub/query-v2.ts", import.meta.url),
+			"utf8",
+		);
+		const at = (needle: string) => q.indexOf(needle);
+		check(
+			"chat v2 emits the note through the output guard, before text-end, never after a guard trip or stream error",
+			at("authorityNote(authority)") >
+				at("for await (const part of completion)") &&
+				at("if (note) emit(note);") > 0 &&
+				at("if (note) emit(note);") <
+					at('writer.write({ type: "text-end", id: msgId });') &&
+				/outputGuardTripped \|\| streamFailed \? null : authorityNote/.test(q),
+		);
+	}
+	check(
+		"lintAuthority: 'voluntary … not a requirement' and 'the required X' are not violations",
+		lintAuthority(
+			"The guide provides voluntary guidance for the mandatory forms and is not a requirement [[S3]]. Measures should deliver the required safety functions [[S1]].",
+			src,
+		).length === 0,
+	);
+	check(
+		"lintAuthority ignores negations, uncited sentences and the noun 'requirements'",
+		lintAuthority(
+			"RG 8.29 is nonbinding and is not required [[S3]]. It explains the requirements of Part 20 [[S3]]. Licensees must comply.",
+			src,
+		).length === 0,
+	);
 }
 
 // Legacy chunker output is pinned: any change to chunkDoc on the scraped CNSC

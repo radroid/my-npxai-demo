@@ -202,23 +202,33 @@ if (reconcileEffect) {
 	const md = stripComments(
 		readSrc("../components/assistant-ui/markdown-text.tsx"),
 	);
-	const anchor = md.match(/\ba: \(\{[^)]*\}\) =>([\s\S]*?)\n\tblockquote:/);
+	const anchor = md.match(/\ba: \(\{[^)]*\}\) =>([\s\S]*?)\n\timg:/);
+	const branches = anchor?.[1].split(") : (") ?? [];
+	const blocked = branches[branches.length - 1] ?? "";
 	check(
-		"markdown `a` renders a link only when isAllowedSourceUrl(href)",
-		anchor !== null && /isAllowedSourceUrl\(href\)\s*\?/.test(anchor[1]),
+		"markdown `a` renders an external link only when isAllowedSourceUrl(href)",
+		anchor !== null &&
+			/isAllowedSourceUrl\(href\)\s*\?/.test(anchor[1]) &&
+			// the only other live branch is an in-page anchor (GFM footnotes)
+			/href\?\.startsWith\("#"\)\s*\?/.test(anchor[1]) &&
+			branches.length === 2,
 		anchor?.[1]?.slice(0, 200),
 	);
 	check(
 		"…and the non-allowlisted branch renders no <a>",
-		anchor !== null &&
-			(anchor[1].split(") : (")[1] ?? "").includes("<span") &&
-			!(anchor[1].split(") : (")[1] ?? "").includes("<a"),
+		blocked.includes("<span") && !blocked.includes("<a"),
 	);
 	check(
 		"…and our target/rel win over any spread prop",
 		anchor !== null &&
-			anchor[1].indexOf("{...props}") <
+			anchor[1].indexOf("{...props}", anchor[1].indexOf("isAllowedSourceUrl")) <
 				anchor[1].indexOf('rel="noopener noreferrer"'),
+	);
+	const img = md.match(/\n\timg: ([\s\S]*?)\n\tblockquote:/);
+	check(
+		"markdown `img` never renders an <img> (no zero-click fetch of a model URL)",
+		img !== null && !img[1].includes("<img") && !img[1].includes("src"),
+		img?.[1],
 	);
 }
 

@@ -27,6 +27,7 @@ import { RetrievalError } from "../retrieval";
 import { COLLECTIONS } from "../sources/catalog";
 import {
 	extractSnippetIds,
+	lintAuthority,
 	renderArtifactCitations,
 	SNIPPET_CITATION_RE,
 	type SourceRecord,
@@ -346,6 +347,10 @@ export async function artifactV2(args: ArtifactV2Args): Promise<Response> {
 				output_tokens: outputTokens,
 				citations_total: extractSnippetIds(sanitized.fragment).length,
 				citations_unresolved: cited.unresolved,
+				authority_flags: lintAuthority(
+					sanitized.fragment.replace(/<[^>]+>/g, " "),
+					sources,
+				).length,
 				output_guard_tripped: false,
 				cached_write: cacheable,
 			});

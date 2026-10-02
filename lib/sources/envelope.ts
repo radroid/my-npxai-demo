@@ -14,7 +14,7 @@ import {
 	DOCUMENT_KIND_LABELS,
 	JURISDICTION_LABELS,
 } from "./catalog";
-import type { ResolvedScope } from "./scope";
+import { detectMentions, type ResolvedScope } from "./scope";
 
 function htmlEscape(raw: string): string {
 	return raw
@@ -86,9 +86,10 @@ export interface SourceEnvelopeInput {
 	/** Partial answers only: named, indexed, but no snippet retrieved. */
 	unretrievedDocs?: readonly string[];
 	/**
-	 * Pinned scope only: other regulators the question names. The answer
-	 * covers the pinned collection and says the rest is outside the
-	 * selected sources — it does not refuse the whole question.
+	 * Collections the question names that this answer does not search: a
+	 * pin's other regimes, or (Auto/compare) regimes that are not searchable
+	 * here. The answer covers what was searched and says the rest was not —
+	 * it does not refuse the whole question.
 	 */
 	unsearchedMentions?: CollectionId[];
 }
@@ -125,8 +126,18 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 		);
 	}
 	if (unsearchedMentions.length > 0) {
+		const others = unsearchedMentions.map(collectionLabel).join(", ");
 		cues.push(
-			`PINNED SCOPE: the user selected ${searched.map(collectionLabel).join(", ")} only. The question also mentions ${unsearchedMentions.map(collectionLabel).join(", ")}, which is outside the selected sources — answer the ${searched.map((id) => COLLECTIONS[id].label).join("/")} part from the snippets and state in one sentence that the other regime was not searched.`,
+			scope.kind === "single" && scope.via === "pinned"
+				? `PINNED SCOPE: the user selected ${searched.map(collectionLabel).join(", ")} only. The question also mentions ${others}, which is outside the selected sources — answer the ${searched.map((id) => COLLECTIONS[id].label).join("/")} part from the snippets and state in one sentence that the other regime was not searched.`
+				: `NOT SEARCHED: the question also mentions ${others}, whose text is not searchable here — answer from the snippets, state in one sentence that ${others} was not searched, and never attribute anything to it.`,
+		);
+	}
+	// A country or regulator with no collection at all ("… and Finland").
+	// Phrased conditionally: the name may be incidental ("exports to France").
+	if (detectMentions(query).notIndexed) {
+		cues.push(
+			"UNINDEXED REGULATOR: the question names a country or regulator whose documents are not indexed here. If it asks what that regulator requires, say in one sentence that its documents are not indexed — never answer that part from these snippets.",
 		);
 	}
 	if (missingCollections.length > 0) {
@@ -148,6 +159,17 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 	if (unretrievedDocs.length > 0) {
 		cues.push(
 			`NO SNIPPET RETRIEVED for ${unretrievedDocs.map(htmlEscape).join(", ")}: answer the rest from the snippets and say the retrieved excerpts do not cover ${one(unretrievedDocs) ? "that document" : "those documents"} — do not answer ${one(unretrievedDocs) ? "it" : "them"} from memory.`,
+		);
+	}
+	// Small models read the legal_force attribute unreliably; restating it
+	// last, by snippet id, is what stops "expected" becoming "required".
+	const nonbinding = chunks
+		.map((c, i) => ({ c, id: `S${i + 1}` }))
+		.filter(({ c }) => c.source?.legal_force === "nonbinding");
+	if (nonbinding.length > 0) {
+		const ids = nonbinding.map(({ id }) => id).join(", ");
+		cues.push(
+			`LEGAL FORCE: ${ids} ${nonbinding.length === 1 ? "is" : "are"} nonbinding (guides, principles or reports). A sentence supported only by ${nonbinding.length === 1 ? "it" : "them"} must say what the document "states", "recommends" or "expects" — never "requires", "required", "must" or "obligation". Keep the source's own verb, and attribute any ICRP/NCRP/IAEA recommendation to that body.`,
 		);
 	}
 	const cueText = cues.length > 0 ? `\n\n${cues.join("\n")}` : "";

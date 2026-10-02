@@ -164,6 +164,13 @@ const NOT_INDEXED_RE =
 
 const COMPARE_RE =
 	/\b(?:compare[ds]?|comparing|comparison|versus|vs\.?|differ(?:s|ent|ence|ences)?|contrast(?:s|ing)?|similar(?:ity|ities)?|both|between)\b/i;
+// The looser cue words above ("difference", "both", "between", "similar")
+// are everyday words in single-regulator questions ("the difference between
+// Category 1 and 2", "an AP1000 built in China"). They are enough to compare
+// two SEARCHABLE regulators the question names, but a hard decline needs an
+// explicit comparison.
+const EXPLICIT_COMPARE_RE =
+	/\b(?:compare[ds]?|comparing|comparison|versus|vs\.?|contrast(?:s|ing)?)\b/i;
 
 export interface Mentions {
 	collections: CollectionId[];
@@ -181,6 +188,10 @@ export function detectMentions(query: string): Mentions {
 
 export function hasComparisonIntent(query: string): boolean {
 	return COMPARE_RE.test(query);
+}
+
+export function hasExplicitComparison(query: string): boolean {
+	return EXPLICIT_COMPARE_RE.test(query);
 }
 
 function labelOf(id: CollectionId): string {
@@ -305,13 +316,16 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 		};
 	}
 
-	// A comparison that names a regime we cannot search must say so, not
-	// quietly answer one side of it.
+	// An explicit comparison that names a regime we cannot search must say
+	// so, not quietly answer one side of it. A looser cue word falls through
+	// to the indexed side; the envelope then tells the model the other
+	// regulator was not searched (unsearchedOthers in scoped-retrieval).
 	const unsearchable = mentions.collections.filter(
 		(id) => !isEnabled(id) || !COLLECTIONS[id].searchable,
 	);
 	const comparing = hasComparisonIntent(query);
-	if (comparing && unsearchable.length > 0) {
+	const explicit = hasExplicitComparison(query);
+	if (explicit && unsearchable.length > 0) {
 		return {
 			kind: "notice",
 			reason: unsearchable.includes("iaea") ? "reference_only" : "not_enabled",
@@ -320,7 +334,7 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 		};
 	}
 	// "Compare CNSC and Finland …": the other side has no collection at all.
-	if (comparing && mentions.notIndexed) {
+	if (explicit && mentions.notIndexed) {
 		return {
 			kind: "notice",
 			reason: "not_indexed",

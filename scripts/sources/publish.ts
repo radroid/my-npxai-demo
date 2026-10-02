@@ -8,10 +8,12 @@
 //                                                 # register no longer lists
 //   bun run sources:publish --reembed             # re-embed even unchanged editions
 //
-// An edition already in the DB with the same pinned checksum, parser +
-// chunker version and embedding model is UNCHANGED: its metadata is
-// refreshed (register_source_document) and its chunks are kept — a rerun
-// after a register-only edit costs nothing.
+// An edition whose re-parsed chunk rows (text, sections, pages, locators,
+// requirement tags) are exactly what the DB holds, under the same embedding
+// model, is UNCHANGED: its metadata is refreshed (register_source_document)
+// and its chunks are kept — a rerun after a register-only edit costs no
+// embeddings. Every text entry is still re-parsed, so an adapter or chunker
+// change republishes whatever it changed even without a version bump.
 //
 // Per entry, in register order (superseded editions before current ones):
 //   • not ingestible (metadata-only, draft, fetch-blocked) → unpublish_source_document
@@ -26,7 +28,9 @@
 //     exactly N chunks land, or nothing changes; reruns replace, never
 //     duplicate; other documents are never touched).
 // A full run (no --only) then lists DB editions the register no longer names:
-// it fails with their ids, and --prune deletes them (chunks cascade).
+// it fails with their ids, and --prune deletes them (chunks cascade) — but
+// only after a run with no errors or quality blocks, and never when the DB
+// was published from a newer register than this checkout's.
 // Evidence for every text entry is written to corpus/reports/<key@version>.json.
 
 import { existsSync } from "node:fs";
@@ -57,16 +61,17 @@ import { EU_PARSER_VERSION, parseEuXhtml } from "./adapters/eu-xhtml";
 import { PDF_PARSER_VERSION, parsePdf } from "./adapters/pdf";
 import type { ParsedSource } from "./adapters/types";
 import { pinnedChecksum } from "./content-hash";
+import { selectAll } from "./db";
 import { sha256Hex } from "./http";
 import { buildReport } from "./quality";
 import {
 	cachePath,
+	ensureDirs,
 	entryId,
 	loadRegister,
 	parseOnly,
 	REPORTS_DIR,
 	selected,
-	ensureDirs,
 } from "./register-io";
 
 const STAGE_BATCH = 200;
@@ -93,6 +98,7 @@ function pipelineVersion(format: string): string {
 }
 
 interface PublishedRow {
+	id: number;
 	checksum_sha256: string | null;
 	parser_version: string | null;
 	embedding_model: string | null;
@@ -210,6 +216,82 @@ async function writeReport(r: DocReport): Promise<void> {
 	);
 }
 
+type ChunkRowTuple = [
+	number,
+	string | null,
+	string | null,
+	number | null,
+	number | null,
+	string | null,
+	string,
+	string | null,
+];
+const FINGERPRINT_COLUMNS =
+	"chunk_index,section_number,section_title,page_start,page_end,locator_url,chunk_text,requirement_type";
+
+function fingerprint(rows: ChunkRowTuple[]): Promise<string> {
+	return sha256Hex(new TextEncoder().encode(JSON.stringify(rows)));
+}
+
+/** Everything a re-parse can change in a document's rows, except vectors. */
+function chunkFingerprint(e: RegisterEntry, chunks: PagedChunk[]) {
+	return fingerprint(
+		chunks.map((c) => [
+			c.chunk_index,
+			c.section_number,
+			c.section_title,
+			c.page_start,
+			c.page_end,
+			locatorFor(e, c),
+			c.chunk_text,
+			c.requirement_type,
+		]),
+	);
+}
+
+async function publishedFingerprint(
+	supabase: SupabaseClient,
+	documentId: number,
+): Promise<string> {
+	const rows = await selectAll<{
+		chunk_index: number;
+		section_number: string | null;
+		section_title: string | null;
+		page_start: number | null;
+		page_end: number | null;
+		locator_url: string | null;
+		chunk_text: string;
+		requirement_type: string | null;
+	}>((from, to) =>
+		supabase
+			.from("source_chunks")
+			.select(FINGERPRINT_COLUMNS)
+			.eq("document_id", documentId)
+			.order("chunk_index")
+			.range(from, to),
+	);
+	return fingerprint(
+		rows.map((r) => [
+			r.chunk_index,
+			r.section_number,
+			r.section_title,
+			r.page_start,
+			r.page_end,
+			r.locator_url,
+			r.chunk_text,
+			r.requirement_type,
+		]),
+	);
+}
+
+/** Register versions are "YYYY-MM-DD.N": date first, then N as a number. */
+export function compareRegisterVersions(a: string, b: string): number {
+	const [da = "", na = "0"] = a.split(".");
+	const [db = "", nb = "0"] = b.split(".");
+	if (da !== db) return da < db ? -1 : 1;
+	return Number(na) - Number(nb);
+}
+
 async function stageAndPublish(
 	supabase: SupabaseClient,
 	openai: OpenAI,
@@ -310,7 +392,7 @@ async function main() {
 		const { data, error } = await supabase
 			.from("source_documents")
 			.select(
-				"document_key,version_key,checksum_sha256,parser_version,embedding_model,embedding_dims,chunk_count",
+				"id,document_key,version_key,checksum_sha256,parser_version,embedding_model,embedding_dims,chunk_count",
 			);
 		if (error) throw new Error(error.message);
 		for (const d of data ?? []) {
@@ -387,29 +469,6 @@ async function main() {
 				continue;
 			}
 
-			const prior = publishedRows.get(id);
-			if (
-				supabase &&
-				!REEMBED &&
-				prior &&
-				prior.chunk_count > 0 &&
-				prior.checksum_sha256 === e.checksum_sha256 &&
-				prior.parser_version === pipelineVersion(e.format as string) &&
-				prior.embedding_model === EMBEDDING_MODEL &&
-				prior.embedding_dims === EMBEDDING_DIMENSIONS
-			) {
-				const { error } = await supabase.rpc("register_source_document", {
-					p_doc: docPayload(e),
-					p_register_version: register.version,
-				});
-				if (error) throw new Error(error.message);
-				summary.unchanged += 1;
-				console.log(
-					`= ${id}: unchanged — metadata refreshed, ${prior.chunk_count} chunks kept`,
-				);
-				continue;
-			}
-
 			const path = cachePath(e);
 			if (!existsSync(path))
 				throw new Error("not downloaded — run scripts/sources/fetch.ts first");
@@ -417,7 +476,9 @@ async function main() {
 			const sha = await pinnedChecksum(e, bytes);
 			if (sha !== e.checksum_sha256) {
 				throw new Error(
-					`cached bytes ${sha.slice(0, 12)}… do not match pinned ${String(e.checksum_sha256).slice(0, 12)}…`,
+					e.format === "cnsc-json"
+						? `cached page-data text hash ${sha.slice(0, 12)}… does not match pinned ${String(e.checksum_sha256).slice(0, 12)}… — if the CNSC parser changed, see sources:fetch --repin-cnsc`
+						: `cached bytes ${sha.slice(0, 12)}… do not match pinned ${String(e.checksum_sha256).slice(0, 12)}…`,
 				);
 			}
 			const parsed = await parseEntry(e, bytes);
@@ -470,6 +531,33 @@ async function main() {
 				);
 				continue;
 			}
+			// Unchanged edition: the re-parsed chunk rows are exactly what is
+			// published (text, sections, pages, locators, requirement tags) under
+			// the same embedding model — refresh metadata, re-embed nothing. The
+			// comparison is on the parse OUTPUT, not on version strings, so an
+			// adapter or chunker change that forgets a version bump still
+			// republishes (and one that changes nothing costs nothing).
+			const prior = publishedRows.get(id);
+			if (
+				!REEMBED &&
+				prior &&
+				prior.chunk_count === chunks.length &&
+				prior.embedding_model === EMBEDDING_MODEL &&
+				prior.embedding_dims === EMBEDDING_DIMENSIONS &&
+				(await publishedFingerprint(supabase, prior.id)) ===
+					(await chunkFingerprint(e, chunks))
+			) {
+				const { error } = await supabase.rpc("register_source_document", {
+					p_doc: docPayload(e),
+					p_register_version: register.version,
+				});
+				if (error) throw new Error(error.message);
+				summary.unchanged += 1;
+				console.log(
+					`= ${id}: unchanged — metadata refreshed, ${prior.chunk_count} chunks kept`,
+				);
+				continue;
+			}
 			await stageAndPublish(
 				supabase,
 				openai,
@@ -500,12 +588,28 @@ async function main() {
 		const listed = new Set(register.entries.map(entryId));
 		const { data, error } = await supabase
 			.from("source_documents")
-			.select("document_key,version_key,chunk_count");
+			.select("document_key,version_key,chunk_count,register_version");
 		if (error) throw new Error(error.message);
+		// Prune only from a clean run on an up-to-date register. After a
+		// failure, a re-keyed edition's old copy may be the only searchable one
+		// left; and a stale checkout would delete editions a newer register
+		// added.
+		const newer = (data ?? []).filter(
+			(d) => compareRegisterVersions(d.register_version, register.version) > 0,
+		);
+		const pruneBlocked =
+			summary.errors + summary.blocked > 0
+				? `this run had ${summary.errors} error(s) and ${summary.blocked} quality-blocked edition(s)`
+				: newer.length > 0
+					? `the database was published from register ${newer[0].register_version}, newer than this checkout's ${register.version} — pull first`
+					: null;
+		if (PRUNE && pruneBlocked) {
+			console.error(`✗ --prune refused: ${pruneBlocked}. Nothing deleted.`);
+		}
 		for (const d of data ?? []) {
 			const id = `${d.document_key}@${d.version_key}`;
 			if (listed.has(id)) continue;
-			if (PRUNE) {
+			if (PRUNE && !pruneBlocked) {
 				const { error: delErr } = await supabase.rpc("delete_source_document", {
 					p_document_key: d.document_key,
 					p_version_key: d.version_key,

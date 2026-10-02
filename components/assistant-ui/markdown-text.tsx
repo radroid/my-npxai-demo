@@ -273,23 +273,27 @@ const defaultComponents = memoizeMarkdownComponents({
 			{renderWithCitations(children)}
 		</h4>
 	),
-	h5: ({ className, ...props }) => (
+	h5: ({ className, children, ...props }) => (
 		<h5
 			className={cn(
 				"aui-md-h5 mt-2 mb-1 font-medium text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h5>
 	),
-	h6: ({ className, ...props }) => (
+	h6: ({ className, children, ...props }) => (
 		<h6
 			className={cn(
 				"aui-md-h6 mt-2 mb-1 font-medium text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h6>
 	),
 	p: ({ className, children, ...props }) => (
 		<p
@@ -306,9 +310,19 @@ const defaultComponents = memoizeMarkdownComponents({
 	// live only for the official-source allowlist — the same rule as chips,
 	// the Sources panel and artifacts. Retrieved text can carry third-party
 	// or injected URLs ("download the updated guide at …"); those render as
-	// plain text the user can still read and copy.
+	// their label text only. A bare URL's label IS the URL, so it stays
+	// readable; a labelled link's target is not shown. In-page anchors (GFM
+	// footnotes) stay links.
 	a: ({ className, href, children, ...props }) =>
-		isAllowedSourceUrl(href) ? (
+		href?.startsWith("#") ? (
+			<a
+				className={cn("aui-md-a text-primary underline", className)}
+				{...props}
+				href={href}
+			>
+				{children}
+			</a>
+		) : isAllowedSourceUrl(href) ? (
 			<a
 				className={cn(
 					"aui-md-a text-primary underline underline-offset-2 hover:text-primary/80",
@@ -329,6 +343,11 @@ const defaultComponents = memoizeMarkdownComponents({
 				{children}
 			</span>
 		),
+	// Never load a model-written image: an injected ![](https://…) would be
+	// fetched with no click (the same exfiltration channel the link gate
+	// closes). The alt text is shown instead.
+	img: ({ alt }) =>
+		alt ? <span className="aui-md-img-blocked italic">{alt}</span> : null,
 	blockquote: ({ className, ...props }) => (
 		<blockquote
 			className={cn(

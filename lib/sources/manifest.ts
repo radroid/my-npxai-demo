@@ -52,12 +52,15 @@ function fnv1a(input: string): string {
 /**
  * "2026-10-01.2+3f9a0c11": the register version plus a fingerprint of every
  * text edition (key, version, checksum, status). Goes into answer-cache keys
- * and request logs, so a re-published or re-statused document can never be
- * answered from a cache entry built on the old text. Every fetched entry's
- * checksum pins its content (CNSC page-data by extracted text —
+ * and request logs, so a new or re-statused edition can never be answered
+ * from a cache entry built on the old text. Every fetched entry's checksum
+ * pins its content (CNSC page-data by extracted text —
  * scripts/sources/content-hash.ts); a backfilled entry is keyed by its
  * legacy source, so re-backfilling after a legacy re-ingest needs a register
- * version bump.
+ * version bump. A RE-CHUNK of the same text (parser/chunker change) does not
+ * change it: answers cached before such a republish can be served until
+ * their 30-minute TTL — they carry their own sources, so they stay
+ * self-consistent, just not re-chunked.
  */
 export function corpusVersion(): string {
 	const register = getRegister();
@@ -99,12 +102,13 @@ export function referenceEntries(collection: CollectionId): RegisterEntry[] {
 	);
 }
 
-const squashRef = (s: string) =>
+// A reference's identifying tokens: "IAEA SSG-23 (Rev. 1)" → ["ssg", "23"].
+const refTokens = (s: string): string[] =>
 	s
 		.replace(/^IAEA\s+/i, "")
 		.replace(/\(Rev\.\s*\d+\)/i, "")
 		.toLowerCase()
-		.replace(/[^a-z0-9]/g, "");
+		.match(/[a-z0-9]+/g) ?? [];
 
 /**
  * Reference-only documents of `collection` that the question names
@@ -114,13 +118,17 @@ export function namedReferenceLinks(
 	collection: CollectionId,
 	query: string,
 ): Array<{ label: string; title: string; url: string }> {
-	const q = query.toLowerCase().replace(/[^a-z0-9]/g, "");
+	const q = query.toLowerCase();
 	return referenceEntries(collection)
 		.filter((e) => {
-			const key = squashRef(e.doc_ref);
-			// Whole-token match: "gsg1" must not fire inside "gsg19".
-			const at = q.indexOf(key);
-			return key.length >= 3 && at >= 0 && !/\d/.test(q[at + key.length] ?? "");
+			// The ref's alphanumeric tokens, any separators between them, and a
+			// boundary on both sides: "SSG-23" = "ssg 23" = "ssg23", but "GSG-1"
+			// never fires inside "GSG-19" and "SF-1" never inside "ESF 1".
+			const tokens = refTokens(e.doc_ref);
+			if (tokens.join("").length < 3) return false;
+			return new RegExp(
+				`(?<![a-z0-9])${tokens.join("[^a-z0-9]*")}(?![a-z0-9])`,
+			).test(q);
 		})
 		.slice(0, 3)
 		.map((e) => ({ label: e.label, title: e.title, url: e.canonical_url }));

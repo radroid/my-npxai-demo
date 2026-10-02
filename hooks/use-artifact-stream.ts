@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SourceChunk } from "@/components/knowledge-hub/SourcesPanel";
 import type { SourceRecord } from "@/lib/sources/citations";
 import type { ScopeNoticePayload, ScopeSummary } from "@/lib/sources/payload";
-import { currentScopeBody } from "@/lib/sources/scope-store";
+import { currentScope } from "@/lib/sources/scope-store";
 
 // Parses the SSE frames /api/knowledge-hub/artifact streams into workbench
 // state (item-1 slice 1.2). Frame-parsing follows the useGenerateStream
@@ -121,7 +121,7 @@ export function useArtifactStream() {
 			const res = await fetch("/api/knowledge-hub/artifact", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ query, ...currentScopeBody() }),
+				body: JSON.stringify({ query, ...currentScope() }),
 				signal: controller.signal,
 			});
 

@@ -37,9 +37,14 @@ export const MIN_CHUNK_SIM = 0.35;
 // in the user query. Calibrated so that a named-doc chunk at sim 0.55
 // ranks above an unrelated-doc chunk at sim 0.70.
 export const NAMED_DOC_BOOST = 0.2;
-// v2 named-document fetch (retrieveChunks, source.docRefs).
+// v2 named-document fetch (retrieveChunks, source.docRefGroups).
 const NAMED_DOC_FETCH_DOCS = 4;
 const NAMED_DOC_FETCH_PER_DOC = 2;
+// Expansion searches per question. Every eval question in the repo (333,
+// legacy and v2) produces at most 4; the cap only bounds a crafted query
+// that names dozens of documents, which would otherwise mean one embedding
+// input and one exact vector scan per mention.
+export const MAX_EXPANSIONS = 6;
 
 // Recognizes "REGDOC-X.X", "REGDOC-X.X.X", "REGDOC 2.5.2", "NSCA" in user
 // query text. Returns the canonical regdoc_id form.
@@ -293,7 +298,10 @@ export function embeddingInputsFor(
 ): string[] {
 	const docs = extractMentionedDocs(query, collections);
 	const sections = extractMentionedSections(query);
-	return [query, ...buildExpansions(query, docs, sections)];
+	return [
+		query,
+		...buildExpansions(query, docs, sections).slice(0, MAX_EXPANSIONS),
+	];
 }
 
 // Doc-diversity pass: when multiple docs are mentioned, seed the envelope
@@ -435,11 +443,13 @@ export interface RetrievalOptions {
 		includeHistorical?: boolean;
 		/**
 		 * Register doc_refs of the documents the question NAMES that exist in
-		 * these collections. One extra search restricted to them (primary
-		 * vector) joins the pool, so "What do 10 CFR 20.1201 and … require?" —
-		 * identifiers, no topic — still retrieves 20.1201's own text.
+		 * these collections, one group per mention ("10 CFR 20" → every
+		 * indexed Part 20 provision). One extra search per group (primary
+		 * vector, best two chunks) joins the pool, so "What do 10 CFR 20.1201
+		 * and … require?" — identifiers, no topic — still retrieves 20.1201's
+		 * own text.
 		 */
-		docRefs?: readonly string[];
+		docRefGroups?: readonly (readonly string[])[];
 	};
 	// ADDITIVE (Phase 12): per-collection gate values; see DEFAULT_THRESHOLDS.
 	thresholds?: RetrievalThresholds;
@@ -669,7 +679,10 @@ export async function embedTexts(
 			// silently compares vectors from different spaces.
 			dimensions: EMBEDDING_DIMENSIONS,
 		});
-		embeddings = embResp.data.map((d) => d.embedding);
+		// By index, not position: compare mode maps these back to inputs.
+		embeddings = [...embResp.data]
+			.sort((a, b) => a.index - b.index)
+			.map((d) => d.embedding);
 		if (embeddings.length !== inputs.length) {
 			throw new Error("embedding count mismatch");
 		}
@@ -795,22 +808,25 @@ export async function retrieveChunks(
 		}
 		expansionPools.push(expMatches);
 	}
-	// v2: each named document's own best chunks (see source.docRefs). A
-	// PRESENCE guarantee, not a flood: NAMED_DOC_BOOST applies to every chunk
-	// of a named document, so admitting 20 of them would crowd out better
-	// matches from other documents ("…under the NSCA and its regulations…"
-	// filled 5 of 8 slots with low-similarity NSCA sections). Two per
-	// document, at most four documents, searched in parallel.
-	const namedRefs = (opts.source?.docRefs ?? []).slice(0, NAMED_DOC_FETCH_DOCS);
-	if (namedRefs.length > 0) {
+	// v2: each named document's own best chunks (see source.docRefGroups).
+	// A PRESENCE guarantee, not a flood: NAMED_DOC_BOOST applies to every
+	// chunk of a named document, so admitting 20 of them would crowd out
+	// better matches from other documents ("…under the NSCA and its
+	// regulations…" filled 5 of 8 slots with low-similarity NSCA sections).
+	// Two per named mention, at most four mentions, searched in parallel.
+	const namedGroups = (opts.source?.docRefGroups ?? [])
+		.filter((g) => g.length > 0)
+		.slice(0, NAMED_DOC_FETCH_DOCS);
+	const namedPools: RetrievedChunk[][] = [];
+	if (namedGroups.length > 0) {
 		const named = await Promise.all(
-			namedRefs.map((ref) =>
-				match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, [ref]),
+			namedGroups.map((refs) =>
+				match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, refs),
 			),
 		);
 		for (const { rows, error } of named) {
 			if (error) console.error(`${rpcName}_named_doc_error`, error);
-			else expansionPools.push(rows);
+			else namedPools.push(rows);
 		}
 	}
 
@@ -819,6 +835,13 @@ export async function retrieveChunks(
 	for (const c of [...primaryPool, ...expansionPools.flat()]) {
 		const existing = merged.get(c.id);
 		if (!existing || c.similarity > existing.similarity) merged.set(c.id, c);
+	}
+	// The pool mean (limited-context gate) is taken BEFORE the named fetch:
+	// those rows are admitted at any similarity to guarantee presence, and
+	// must not drag the topical pool's average down.
+	const searchedPool = Array.from(merged.values());
+	for (const c of namedPools.flat()) {
+		if (!merged.has(c.id)) merged.set(c.id, c);
 	}
 	const rawPool = Array.from(merged.values()).sort(
 		(a, b) => b.similarity - a.similarity,
@@ -854,13 +877,16 @@ export async function retrieveChunks(
 		chunks.length > 0
 			? chunks.reduce((acc, c) => acc + c.similarity, 0) / chunks.length
 			: 0;
-	// Raw-pool mean (see RetrievalResult.poolAvgSim). `ranked` is the full
-	// merged candidate pool — the NAMED_DOC_BOOST only reorders it, so the
-	// mean is identical to the pre-boost pool's. In the OOS branch this
-	// equals `avgSim` exactly (there `chunks` IS the full pool).
+	// Raw-pool mean (see RetrievalResult.poolAvgSim) over the searched pool:
+	// the merged candidates minus named-fetch-only rows. The legacy path has
+	// no named fetch, so there this is the full pool exactly as before; the
+	// NAMED_DOC_BOOST only reorders, so it never moves the mean.
+	// Summed in `ranked` order, so the legacy value is bit-identical too.
+	const searchedIds = new Set(searchedPool.map((c) => c.id));
+	const meanPool = ranked.filter((c) => searchedIds.has(c.id));
 	const poolAvgSim =
-		ranked.length > 0
-			? ranked.reduce((acc, c) => acc + c.similarity, 0) / ranked.length
+		meanPool.length > 0
+			? meanPool.reduce((acc, c) => acc + c.similarity, 0) / meanPool.length
 			: 0;
 
 	// ADDITIVE (item-2 DELTA D1): trace is built AFTER every production value

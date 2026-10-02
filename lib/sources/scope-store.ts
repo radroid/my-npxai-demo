@@ -21,9 +21,12 @@ interface SourceScopeState {
 	 * question. The re-ask goes out as a regenerate (it replaces the notice),
 	 * which would normally skip and invalidate the answer cache; this tells
 	 * the server it is a scope change, not a "give me a fresh answer", so a
-	 * cached answer for the new scope is still served. One-shot, not persisted.
+	 * cached answer for the new scope is still served. One-shot, not
+	 * persisted, and only honoured for SWITCH_WINDOW_MS: if that re-ask never
+	 * reaches the transport, a later manual Regenerate is not mistaken for
+	 * it. A timestamp (0 = none).
 	 */
-	switchPending: boolean;
+	switchPendingAt: number;
 	markScopeSwitch: () => void;
 	setAuto: () => void;
 	pin: (collection: CollectionId) => void;
@@ -36,8 +39,8 @@ export const useSourceScope = create<SourceScopeState>()(
 	persist(
 		(set, get) => ({
 			scope: { mode: "auto" },
-			switchPending: false,
-			markScopeSwitch: () => set({ switchPending: true }),
+			switchPendingAt: 0,
+			markScopeSwitch: () => set({ switchPendingAt: Date.now() }),
 			setAuto: () =>
 				set({ scope: { mode: "auto", historical: get().scope.historical } }),
 			pin: (collection) =>
@@ -69,16 +72,26 @@ export const useSourceScope = create<SourceScopeState>()(
 	),
 );
 
+const SWITCH_WINDOW_MS = 5000;
+
 /**
- * The body fields the chat and artifact requests carry. Consumes the
- * one-shot scope-switch flag (see switchPending).
+ * The body fields the CHAT request carries. Consumes the one-shot
+ * scope-switch flag (see switchPendingAt). The artifact request uses
+ * currentScope() and never touches the flag.
  */
 export function currentScopeBody(): {
 	scope: ScopeRequest;
 	scopeSwitch?: true;
 } {
-	const { scope, switchPending } = useSourceScope.getState();
-	if (!switchPending) return { scope };
-	useSourceScope.setState({ switchPending: false });
-	return { scope, scopeSwitch: true };
+	const { scope, switchPendingAt } = useSourceScope.getState();
+	if (switchPendingAt === 0) return { scope };
+	useSourceScope.setState({ switchPendingAt: 0 });
+	return Date.now() - switchPendingAt <= SWITCH_WINDOW_MS
+		? { scope, scopeSwitch: true }
+		: { scope };
+}
+
+/** The scope alone, for requests that have no regenerate (artifacts). */
+export function currentScope(): { scope: ScopeRequest } {
+	return { scope: useSourceScope.getState().scope };
 }

@@ -89,6 +89,8 @@ export interface StreamEndFields {
 	output_tokens: number;
 	citations_total: number;
 	citations_unresolved: number;
+	/** v2: sentences with obligation language citing only nonbinding sources. */
+	authority_flags?: number;
 	output_guard_tripped: boolean;
 	cached_write: boolean;
 }

@@ -8,6 +8,11 @@
 //                                      # the register's recheck cadence)
 //   bun run sources:fetch --pin        # record sha256 + length for entries
 //                                      # that have none yet
+//   bun run sources:fetch --repin-cnsc # re-pin CNSC text hashes from the
+//                                      # CACHED page-data after a reviewed
+//                                      # CNSC parser change (never with
+//                                      # --refresh: new upstream text is a
+//                                      # rights/edition re-check, not a re-pin)
 //   bun run scripts/sources/fetch.ts --only nrc-rg-1.21,eu-dir-2014-87
 //   bun run scripts/sources/fetch.ts --import <key@version> <file>
 //                                               # a file a human downloaded
@@ -24,6 +29,7 @@
 
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
+import type { RegisterEntry } from "../../lib/sources/register";
 import { cnscPageDataUrl } from "./adapters/cnsc-html";
 import { pinnedChecksum } from "./content-hash";
 import { fetchSource } from "./http";
@@ -36,7 +42,6 @@ import {
 	selected,
 	writeRegister,
 } from "./register-io";
-import type { RegisterEntry } from "../../lib/sources/register";
 
 const ACCEPT: Record<string, { accept: string; acceptLanguage?: string }> = {
 	pdf: { accept: "application/pdf" },
@@ -111,6 +116,12 @@ async function main() {
 	}
 	const pin = argv.includes("--pin");
 	const refresh = argv.includes("--refresh");
+	const repinCnsc = argv.includes("--repin-cnsc");
+	if (repinCnsc && refresh) {
+		throw new Error(
+			"--repin-cnsc re-pins the cached, already-reviewed page-data only; it cannot be combined with --refresh",
+		);
+	}
 	const only = parseOnly(argv);
 	const register = await readRegisterRaw();
 	await ensureDirs();
@@ -179,9 +190,18 @@ async function main() {
 				);
 			}
 		} else if (e.checksum_sha256 !== sha) {
+			const cachedCnsc = e.format === "cnsc-json" && !refresh;
+			if (cachedCnsc && repinCnsc) {
+				e.checksum_sha256 = sha;
+				pinned += 1;
+				console.log(`↻ ${id}: re-pinned text hash ${sha.slice(0, 12)}…`);
+				continue;
+			}
 			failures += 1;
 			console.error(
-				`✗ ${id}: CHECKSUM DRIFT — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. Re-check edition and rights, then update the entry by hand.`,
+				cachedCnsc
+					? `✗ ${id}: CNSC TEXT-HASH MISMATCH on the cached page-data — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. No download happened, so this usually means the CNSC parser changed (adapters/cnsc-html.ts): review the extracted-text diff, then rerun with --repin-cnsc.`
+					: `✗ ${id}: CHECKSUM DRIFT — pinned ${e.checksum_sha256.slice(0, 12)}…, got ${sha.slice(0, 12)}…. Re-check edition and rights, then update the entry by hand.`,
 			);
 		} else {
 			console.log(`✓ ${id}`);

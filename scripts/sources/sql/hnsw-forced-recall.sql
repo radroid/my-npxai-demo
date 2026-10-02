@@ -15,10 +15,12 @@
 -- LIMIT, so its statement may be planned generically and stay on a seq scan
 -- at any size — then the risk is latency, not recall. Re-check both with
 -- EXPLAIN whenever the corpus grows.
--- Bar: recall-bench.ts uses mean recall@8 >= 0.95; at the time of writing the
--- "mixed" probes are 0.935-0.943 on the cnsc/all scopes, i.e. the CURRENT
--- index settings would FAIL that bar if the index were used — raise
--- hnsw.ef_search (e.g. 200) before relying on the index path. Probes: 25 stored chunk vectors per collection
+-- Bar: recall-bench.ts uses mean recall@8 >= 0.95 and no question below
+-- 0.75. Latest run (corpus/reports/hnsw-forced-recall.txt): "mixed" probes
+-- 0.955 overall with a 0/8 worst case inside NRC (and the sample shifts as
+-- chunk ids change) — the tail fails, which is why match_source_chunks is
+-- exact by design. Tune (hnsw.ef_search, iterative scan) and re-run this
+-- before allowing the index path. Probes: 25 stored chunk vectors per collection
 -- ("chunk", easy — each is its own nearest neighbour) and the same vectors
 -- summed with a chunk from another collection ("mixed", farther from every
 -- stored vector, closer to how a question embeds). Dynamic SQL so every call

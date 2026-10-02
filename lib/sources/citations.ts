@@ -177,6 +177,71 @@ export function scoreSnippetCitations(
 	};
 }
 
+// Obligation language only a binding source (or a requirement-tagged
+// snippet) can carry. "requirement(s)" as a noun is fine ("RG 1.21 explains
+// the requirements of 10 CFR 50.36a"), and so is a negation.
+const OBLIGATION_RE =
+	/\b(?:requires?|required|must|mandatory|obligat(?:ed|ion|ions|ory)|prohibit(?:s|ed)?)\b/i;
+// A sentence that itself says the text is not binding ("voluntary guidance
+// … not a requirement") is the right answer, not a violation.
+const NEGATED_OBLIGATION_RE =
+	/\b(?:not|never|no|non-?binding)\b[^.]{0,40}\b(?:requires?|required|must|mandatory|obligat\w*)\b|\b(?:voluntary|non-?binding|not (?:a |an )?(?:legal )?requirements?)\b/i;
+// "the required safety functions" — an adjective, not an obligation.
+const ADJECTIVAL_REQUIRED_RE = /\bthe required\b/gi;
+
+export interface AuthorityFlag {
+	sentence: string;
+	cited: string[];
+}
+
+/**
+ * Deterministic wrong-authority lint: a sentence that uses obligation
+ * language ("required", "must", "obligation") while EVERY snippet it cites
+ * is nonbinding (a guide, report, principle or TAG) — the "expected" →
+ * "required" upgrade. A heuristic for review and logging, not a grader: it
+ * misses wrong authority phrased without those words ("the NRC limits…")
+ * and can flag a sentence that quotes a duty the guide itself attributes to
+ * a regulation.
+ */
+export function lintAuthority(
+	text: string,
+	sources: Pick<SourceRecord, "sid" | "chip" | "legal_force">[],
+): AuthorityFlag[] {
+	const flags: AuthorityFlag[] = [];
+	for (const raw of text.split(/(?<=[.!?])\s+|\n+/)) {
+		const sentence = raw.trim();
+		if (
+			!OBLIGATION_RE.test(sentence.replace(ADJECTIVAL_REQUIRED_RE, "")) ||
+			NEGATED_OBLIGATION_RE.test(sentence)
+		)
+			continue;
+		const cited = extractSnippetIds(sentence)
+			.map((id) => sources.find((s) => s.sid === id))
+			.filter((s) => s !== undefined);
+		if (cited.length > 0 && cited.every((s) => s.legal_force === "nonbinding"))
+			flags.push({
+				sentence: sentence.slice(0, 300),
+				cited: [...new Set(cited.map((s) => s.chip))],
+			});
+	}
+	return flags;
+}
+
+/**
+ * The deterministic backstop for lintAuthority(): appended to a chat answer
+ * when a sentence states an obligation on nonbinding authority alone. The
+ * prompt and the envelope's LEGAL FORCE cue already forbid that; gpt-4o-mini
+ * still does it (usually restating a regulation's duty but citing only the
+ * guide that explains it). The note names the guidance and points at the
+ * binding source instead of leaving "required" unqualified.
+ */
+export function authorityNote(flags: AuthorityFlag[]): string | null {
+	if (flags.length === 0) return null;
+	const chips = [...new Set(flags.flatMap((f) => f.cited))].slice(0, 4);
+	const many = chips.length > 1;
+	return `\n\n_Legal-force note: ${chips.join("; ")} ${many ? "are" : "is"} non-binding guidance. Where this answer says "required" or "must" citing only ${many ? "them" : "it"}, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._`;
+}
+
 function escapeHtml(raw: string): string {
 	return raw
 		.replace(/&/g, "&amp;")

@@ -18,6 +18,9 @@
 // Gate 5 checks per answered case: every [[S#]] resolves to a snippet the
 // server handed out, at least one is cited, and every cited snippet belongs
 // to the expected collection(s) — a wrong-jurisdiction citation fails.
+// Wrong authority is reported, not graded: lintAuthority() lists sentences
+// with obligation language that cite only nonbinding sources, and the
+// answers are kept in the report for a reviewed sample.
 
 import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -27,10 +30,10 @@ import { NextRequest } from "next/server";
 import { type GuardedHandlerArgs, withGuard } from "../../lib/guard";
 import { knowledgeHubQueryHandler } from "../../lib/knowledge-hub/query-handler";
 import { isLowConfidenceText, isRefusalText } from "../../lib/prompts";
-import { extractSnippetIds } from "../../lib/sources/citations";
+import { extractSnippetIds, lintAuthority } from "../../lib/sources/citations";
 import { isSourcesPayloadV2 } from "../../lib/sources/payload";
-import { isLocalSupabaseUrl } from "../lib/embed";
 import { type EvalCase, grade, loadCases, parseStream } from "../eval-kb";
+import { isLocalSupabaseUrl } from "../lib/embed";
 import { REPO_ROOT, REPORTS_DIR } from "./register-io";
 
 const CORPUS = process.argv.includes("--corpus")
@@ -41,8 +44,14 @@ process.env.EVAL_BYPASS_KEY = crypto.randomUUID();
 // No Redis locally: the cache and the spend counter fail open by design and
 // log each miss with a stack. Keep the report readable.
 const consoleError = console.error;
+// A failed side search (e.g. a stale local DB whose match_source_chunks
+// predates the doc_refs parameter) is only logged by retrieval — count it,
+// so the eval fails instead of silently measuring a degraded pipeline.
+let retrievalErrors = 0;
 console.error = (...args: unknown[]) => {
 	if (/redis|_cache_|accounting|UPSTASH/i.test(String(args[0]))) return;
+	if (/_(?:named_doc|expansion)_error$/.test(String(args[0])))
+		retrievalErrors += 1;
 	consoleError(...args);
 };
 process.env.KH_COLLECTIONS ??= "cnsc,nrc,onr,eu";
@@ -69,16 +78,40 @@ interface V2Case {
 		decline?: boolean;
 		/** The answer must say a named document is not covered. */
 		notes_absent?: boolean;
+		/**
+		 * With `decline` / `notes_absent`: a "not covered" statement only counts
+		 * in a sentence that names one of these (the uncovered document or
+		 * topic) — not any sentence that happens to say "does not include".
+		 */
+		absent_terms?: string[];
 		/** Notice must link at least one of these reference documents. */
 		references_any?: string[];
 	};
-	/** Added after the 2026-10-01 prompt fixes — never tuned against. */
+	/**
+	 * Provenance, reported separately so tuned-on cases never pass for
+	 * generalisation:
+	 *   (none)      the prompt and cue fixes were tuned against these
+	 *   regression  this branch's own fixtures / motivating examples
+	 *   held_out    written after the fixes, never tuned against — but by
+	 *               the author of the fixes
+	 *   blind       written by a separate author who saw only the register
+	 *               (never the prompts, cues or code), never tuned against
+	 */
+	regression?: boolean;
 	held_out?: boolean;
+	blind?: boolean;
+}
+
+function splitOf(c: V2Case): "tuned_on" | "regression" | "held_out" | "blind" {
+	if (c.blind) return "blind";
+	if (c.held_out) return "held_out";
+	if (c.regression) return "regression";
+	return "tuned_on";
 }
 
 // "The indexed sources do not cover 10 CFR 73.54", "no snippet comes from…"
 const NOT_COVERED_RE =
-	/\b(?:not (?:covered|included|addressed|indexed|available|among)|(?:does|do|did) not (?:contain|cover|include|address|mention|provide)|doesn't (?:contain|cover|include|address)|don't (?:contain|cover|include|address)|no (?:snippets?|information|indexed)|outside the selected sources|isn't covered|aren't covered)\b/;
+	/\b(?:not (?:covered|included|addressed|indexed|available|among)|(?:does|do|did) not (?:contain|cover|include|address|mention|provide)|doesn't (?:contain|cover|include|address)|don't (?:contain|cover|include|address)|no (?:snippets?|information|indexed)|outside the selected sources|isn't covered|aren't covered|(?:do not|don't) have enough)\b/;
 
 let handler: ((req: NextRequest) => Promise<Response>) | null = null;
 
@@ -152,6 +185,18 @@ function norm(s: string): string {
 		.replace(/[‘’]/g, "'");
 }
 
+/** A sentence that says something is not covered AND names one of `terms`. */
+function saysNotCovered(text: string, terms: string[] | undefined): boolean {
+	if (!terms || terms.length === 0) return false;
+	return text
+		.split(/(?<=[.!?])\s+|\n+/)
+		.some(
+			(sentence) =>
+				NOT_COVERED_RE.test(sentence) &&
+				terms.some((t) => sentence.includes(t.toLowerCase())),
+		);
+}
+
 function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 	if (r.status !== 200) return `http_${r.status}`;
 	const e = c.expect;
@@ -163,8 +208,15 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 			: isRefusalText(r.text)
 				? "oos"
 				: "unknown";
-	// A decline case may also be declined by the refusal gate itself.
-	if (e.decline && kind === "oos") return null;
+	// A decline case may also be declined by the refusal gate itself — but
+	// only after routing to the right collection (the request log's scope).
+	if (e.decline && kind === "oos") {
+		const want = e.collections?.length
+			? `single:${e.collections[0]}`
+			: undefined;
+		const got = String(r.log.scope_key ?? "");
+		return want && !got.startsWith(want) ? `oos_wrong_scope:${got}` : null;
+	}
 	if (e.kind !== "any" && kind !== e.kind) return `kind:${kind}≠${e.kind}`;
 	if (
 		e.notice_reason &&
@@ -200,10 +252,8 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 	const cited = ids.map((id) => payload.sources.find((s) => s.sid === id));
 	if (cited.some((s) => !s))
 		return `unresolved:${ids.filter((_, i) => !cited[i]).join(",")}`;
-	const declined =
-		isRefusalText(r.text) ||
-		isLowConfidenceText(r.text) ||
-		NOT_COVERED_RE.test(text);
+	const refused = isRefusalText(r.text) || isLowConfidenceText(r.text);
+	const declined = refused || saysNotCovered(text, e.absent_terms);
 	if (e.decline) {
 		// The model must not present uncovered material as answered: a decline,
 		// and nothing attributed to a document outside the envelope (checked
@@ -213,11 +263,12 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 		// An answer case passes only on a cited answer — a refusal or a
 		// "not covered" line with no citation is a failure, not a pass.
 		if (ids.length === 0)
-			return isLowConfidenceText(r.text) || isRefusalText(r.text)
-				? "declined_answerable"
-				: "no_citations";
+			return refused ? "declined_answerable" : "no_citations";
+	} else if (ids.length === 0 && !refused) {
+		// kind "any": refusing is fine, an uncited answer is not.
+		return "no_citations";
 	}
-	if (e.notes_absent && !NOT_COVERED_RE.test(text))
+	if (e.notes_absent && !saysNotCovered(text, e.absent_terms))
 		return "absent_doc_not_flagged";
 	const allowed = new Set(payload.scope.collections);
 	const wrong = cited.filter((s) => s && !allowed.has(s.collection));
@@ -304,6 +355,8 @@ async function main() {
 				console.log(
 					`${v.pass ? "✅" : "❌"} ${String(c.id).padStart(2)} [${c.category}] ${c.question.slice(0, 70)}${v.pass ? "" : `  — ${v.reason}`}`,
 				);
+				if (!v.pass && argv.includes("--debug"))
+					console.log(`   ${r.text.slice(0, 900).replace(/\n/g, "\n   ")}`);
 			}
 			const ship = rows.filter((r) => r.suite !== "hard");
 			const hard = rows.filter((r) => r.suite === "hard");
@@ -353,7 +406,7 @@ async function main() {
 				category: c.category,
 				pass: fail === null,
 				reason: fail ?? "ok",
-				held_out: c.held_out === true,
+				split: splitOf(c),
 				scope_key: r.log.scope_key,
 				cited: [
 					...new Set(
@@ -363,6 +416,7 @@ async function main() {
 					),
 				],
 				per_collection: r.log.retrieval_per_collection,
+				authority_flags: lintAuthority(r.text, payload?.sources ?? []),
 				ms: r.ms,
 				// Kept for the wrong-authority / wrong-jurisdiction review.
 				answer: r.text,
@@ -374,16 +428,24 @@ async function main() {
 				console.log(`   ${r.text.slice(0, 600).replace(/\n/g, "\n   ")}`);
 		}
 		const passed = rows.filter((r) => r.pass).length;
-		const held = rows.filter((r) => r.held_out);
-		const heldPassed = held.filter((r) => r.pass).length;
-		const tuned = rows.length - held.length;
+		const authorityFlags = rows.flatMap(
+			(r) => r.authority_flags as unknown[],
+		).length;
+		const splits = Object.fromEntries(
+			(["tuned_on", "regression", "held_out", "blind"] as const).map((k) => {
+				const xs = rows.filter((r) => r.split === k);
+				return [k, `${xs.filter((r) => r.pass).length}/${xs.length}`];
+			}),
+		);
 		console.log(
-			`sources: ${passed}/${rows.length}  (tuned-on ${passed - heldPassed}/${tuned} · held-out ${heldPassed}/${held.length})`,
+			`sources: ${passed}/${rows.length}  (${Object.entries(splits)
+				.map(([k, v]) => `${k} ${v}`)
+				.join(" · ")}) · authority flags ${authorityFlags}`,
 		);
 		report.sources = {
 			summary: `${passed}/${rows.length}`,
-			tuned_on: `${passed - heldPassed}/${tuned}`,
-			held_out: `${heldPassed}/${held.length}`,
+			...splits,
+			authority_flags: authorityFlags,
 			rows,
 		};
 	}
@@ -394,6 +456,12 @@ async function main() {
 		`${JSON.stringify(report, null, "\t")}\n`,
 	);
 	console.log(`\nreport → corpus/reports/${name}`);
+	if (retrievalErrors > 0) {
+		consoleError(
+			`\n✗ ${retrievalErrors} retrieval side-search error(s) — the numbers above are from a degraded pipeline (is the local DB migrated?).`,
+		);
+		process.exit(1);
+	}
 }
 
 await main();

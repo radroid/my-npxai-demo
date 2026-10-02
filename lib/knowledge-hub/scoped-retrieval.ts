@@ -117,15 +117,19 @@ export async function retrieveForScope(
 	const results = await Promise.all(
 		collections.map(async (collection) => {
 			const t = thresholdsFor(collection);
-			const docRefs = (refsByCollection.get(collection) ?? []).filter((ref) =>
-				named.some((m) => refMatchesMention(ref, m)),
-			);
+			// One group per named mention, in the order the question names
+			// them — not register order, which would let one family ("10 CFR
+			// 20", six provisions) take every slot.
+			const refs = refsByCollection.get(collection) ?? [];
+			const docRefGroups = named
+				.map((m) => refs.filter((ref) => refMatchesMention(ref, m)))
+				.filter((g) => g.length > 0);
 			const r = await retrieveChunks(query, deps, {
 				envelopeChunks: share,
 				source: {
 					collections: [collection],
 					includeHistorical: scope.historical,
-					docRefs,
+					docRefGroups,
 				},
 				thresholds: t,
 				precomputedEmbeddings,
@@ -166,23 +170,28 @@ export async function retrieveForScope(
 	};
 }
 
-/** Pinned scope: the regimes a question names that were NOT searched. */
+/**
+ * The regimes a question names that this answer does NOT search: a pin's
+ * other regimes, or — Auto and compare — named collections that are not
+ * searchable here (IAEA, a disabled collection, a fourth regime past the
+ * three-way compare cap).
+ */
 export function unsearchedMentions(
 	scope: SearchScope,
 	query: string,
 ): CollectionId[] {
-	if (scope.kind !== "single" || scope.via !== "pinned") return [];
+	const searched =
+		scope.kind === "single" ? [scope.collection] : scope.collections;
 	return detectMentions(query).collections.filter(
-		(id) => id !== scope.collection,
+		(id) => !searched.includes(id),
 	);
 }
 
 /**
  * The scope part of an answer-cache key. scopeKey() alone is not enough: the
  * same "single:nrc" scope reached via Auto and via a pin builds a different
- * envelope (the pinned one carries the "other regime was not searched" cue
- * for the regimes the question names) and a different Sources-panel label,
- * so both — plus the cue's regimes — are part of the key.
+ * envelope (a different "other regime was not searched" cue) and a different
+ * Sources-panel label, so both — plus the cue's regimes — are part of the key.
  */
 export function cacheScopeMaterial(scope: SearchScope, query: string): string {
 	const via = scope.kind === "single" ? scope.via : "compare";
