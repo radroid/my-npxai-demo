@@ -2054,6 +2054,26 @@ check(
 			CNSC_ONLY,
 			"single:cnsc",
 		],
+		// Answered (round-10 review): transport phrasings and a Canadian
+		// origin with a foreign destination.
+		[
+			"Compare Type A and Type B packages when transporting to the US.",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Compare the A1 and A2 values for the transport of sources to the UK.",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Compare Type A and Type B packages certified in Canada for shipment to the US.",
+			AUTO,
+			ALL,
+			"single:cnsc",
+		],
 		// Answered (round-9 review): the partner's rules as an attribute of
 		// the item or shipment.
 		[
@@ -2246,6 +2266,20 @@ check(
 			AUTO,
 			CNSC_ONLY,
 			"notice:reference_only",
+		],
+		// Declined (round-10 review): the US's own rules to comply with, and
+		// transport compared.
+		[
+			"How do I comply with US export controls?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"What are the differences in transport between Canada and the US?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
 		],
 		// Declined or compared (round-9 review): transport itself compared.
 		[

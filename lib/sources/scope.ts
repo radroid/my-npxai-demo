@@ -233,9 +233,10 @@ const RULE_NOUNS =
 // Topic words between a country and a rule noun: "US transport
 // requirements", "UK export controls", "US dose limits" — the country's
 // own rules, unless they only describe the item or shipment ("subject to
-// US export controls", "shipped under US transport rules").
+// US export controls", "shipped under US transport rules"). "Comply
+// with / meet US export controls" asks about those rules.
 const ATTRIBUTE_FRAMES =
-	"subject\\s+to|(?:ship(?:s|ped|ping)?|sent|moved|approved|certified|licensed|transported|packaged|exported|imported|made|built)\\s+under|meets?|meeting|follows?|following|bound\\s+by|covered\\s+by|compl(?:y|ies|iant)\\s+with|with|ha(?:s|ve|ving)|holds?|holding";
+	"subject\\s+to|(?:ship(?:s|ped|ping)?|sent|moved|approved|certified|licensed|transported|packaged|exported|imported|made|built)\\s+under|bound\\s+by|covered\\s+by|ha(?:s|ve|ving)|holds?|holding";
 const TOPIC_WORDS =
 	"transport\\w*|import\\w*|export\\w*|shipping|packag\\w*|licens\\w*|safety|security|radiation|dose|nuclear|safeguards|emergency|waste|federal";
 // A country as the SUBJECT of the question — its own rules: "Finland's",
@@ -278,10 +279,17 @@ const PARTNER_NOUNS =
 // Also an origin ("a package certified in the UK") or one end of a moved
 // pair ("shipments between Canada and the US").
 const MOVED = `(?:${TRADE_CORE}|transport\\w*)(?:\\s+(?!(?:${RULE_NOUNS})\\b)[\\w-]+){0,3}?\\s+between\\s+`;
+const ORIGIN_VERBS =
+	"built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed|approved";
+const originRe = (names: string) =>
+	new RegExp(
+		`\\b(?:${ORIGIN_VERBS})\\s+in\\s+(?:the\\s+)?(?:${names})(?![\\w-])`,
+		"i",
+	);
 function farEndRe(names: string): RegExp {
 	const c = `(?:${names})(?![\\w-])`;
 	return new RegExp(
-		`\\b(?:to|from|into|via|through|across|out\\s+of)\\s+(?:the\\s+|an?\\s+)?${c}|\\b${c}\\s+(?:${PARTNER_NOUNS})\\b|\\b(?:${PARTNER_NOUNS})\\s+(?:in|from)\\s+(?:the\\s+)?${c}|\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed|approved)\\s+in\\s+(?:the\\s+)?${c}|\\b${MOVED}(?:the\\s+)?(?:[\\w-]+\\s+){0,2}?and\\s+(?:the\\s+)?${c}|\\b${MOVED}(?:the\\s+)?${c}\\s+and\\b`,
+		`\\b(?:to|from|into|via|through|across|out\\s+of)\\s+(?:the\\s+|an?\\s+)?${c}|\\b${c}\\s+(?:${PARTNER_NOUNS})\\b|\\b(?:${PARTNER_NOUNS})\\s+(?:in|from)\\s+(?:the\\s+)?${c}|\\b(?:${ORIGIN_VERBS})\\s+in\\s+(?:the\\s+)?${c}|\\b${MOVED}(?:the\\s+)?(?:[\\w-]+\\s+){0,2}?and\\s+(?:the\\s+)?${c}|\\b${MOVED}(?:the\\s+)?${c}\\s+and\\b`,
 		"i",
 	);
 }
@@ -295,7 +303,17 @@ const INDEXED_COUNTRY_TRADED = Object.fromEntries(
 // US site and a Canadian site" — compares two regimes; a destination
 // alone does not.
 const CANADA_FAR_END_RE =
-	/\b(?:to|from|into|via|through|across|out\s+of)\s+(?:the\s+)?Canada\b(?!-)|\bCanadian\s+(?:sites?|facilit(?:y|ies))\b|\b(?:sites?|facilit(?:y|ies))\s+in\s+Canada\b|\b(?:built|made|manufactured|fabricated|produced|designed|certified|licensed|approved)\s+in\s+Canada\b/i;
+	/\b(?:to|from|into|via|through|across|out\s+of)\s+(?:the\s+)?Canada\b(?!-)|\bCanadian\s+(?:sites?|facilit(?:y|ies))\b|\b(?:sites?|facilit(?:y|ies))\s+in\s+Canada\b/i;
+// A Canadian origin compares only with another origin: "certified in the
+// US … certified in Canada", not "certified in Canada for shipment to the
+// US".
+const CANADA_ORIGIN_RE = originRe("Canada");
+const INDEXED_COUNTRY_ORIGIN = Object.fromEntries(
+	Object.entries(INDEXED_COUNTRY_NAMES).map(([id, names]) => [
+		id,
+		originRe(names as string),
+	]),
+) as Partial<Record<CollectionId, RegExp>>;
 
 // The names that put a collection's regime into a comparison slot (below).
 // `regulators` always count. `countries` count in a "between/both/compare
@@ -403,7 +421,13 @@ function slotSources(
 	// For countries: not a pair a trade word governs ("shipments between
 	// Canada and the US", "for shipments to the US and France").
 	const notTraded = tradeGuard
-		? `(?<!\\b(?:${TRADE_CORE}|(?:for|of)\\s+transport\\w*)(?:\\s+(?!(?:${RULE_NOUNS}|${COMPARISON_WORDS})\\b)[\\w-]+){0,2}\\s+(?:(?:to|from|into|via|for)\\s+)?(?:the\\s+)?)`
+		? `(?<!\\b(?:${TRADE_CORE}|(?:for|of)\\s+(?:the\\s+)?transport\\w*)(?:\\s+(?!(?:${RULE_NOUNS}|${COMPARISON_WORDS})\\b)[\\w-]+){0,2}\\s+(?:(?:to|from|into|via|for)\\s+)?(?:the\\s+)?)`
+		: "";
+	// "Compare Type A and Type B packages when transporting to the US":
+	// the "to" belongs to the transport, not to "compare". Only for that
+	// slot — "differences in transport between Canada and the US" compares.
+	const notTransportedTo = tradeGuard
+		? `(?<!\\b(?:(?:when|in|during)\\s+(?:the\\s+)?transport\\w*|transported)(?:\\s+(?!(?:${RULE_NOUNS}|${COMPARISON_WORDS})\\b)[\\w-]+){0,2}\\s+)`
 		: "";
 	const pairLead = `${notTraded}\\b(?:[Bb]etween|[Bb]oth|[Cc]ompar(?:e[ds]?|ing))\\s+`;
 	const gap = `(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?;:]){0,60}?`;
@@ -419,7 +443,7 @@ function slotSources(
 		].join("|"),
 		direct: [
 			`\\b(?:[Dd]iffer(?:s|ed|ent|ence|ences)?|[Ss]imilar(?:ity|ities)?|[Cc]ompared?|[Cc]omparison|[Cc]ontrast(?:s|ed)?)\\s+(?:from|to|with|between)\\s+${LEAD}${r}`,
-			`\\b[Cc]ompar(?:e[ds]?|ing)\\b[^,.?;:]{0,60}?${notTraded}\\b(?:with|to|against)\\s+${LEAD}${r}`,
+			`\\b[Cc]ompar(?:e[ds]?|ing)\\b[^,.?;:]{0,60}?${notTraded}${notTransportedTo}\\b(?:with|to|against)\\s+${LEAD}${r}`,
 			`(?<!\\b(?:[Oo]ther|[Rr]ather)\\s)\\b[Tt]han\\s+${LEAD}${r}`,
 			`\\b(?:vs\\.?|versus)\\s+${LEAD}${r}`,
 			`${notTraded}${r}\\s+(?:vs\\b|versus\\b)`,
@@ -521,6 +545,10 @@ export function detectMentions(query: string): Mentions {
 		const country = rule.countries?.some((re) => re.test(query)) === true;
 		const farEnd =
 			INDEXED_COUNTRY_TRADED[rule.collection]?.test(query) === true;
+		const canadaHere =
+			canadaCompared ||
+			(CANADA_ORIGIN_RE.test(query) &&
+				INDEXED_COUNTRY_ORIGIN[rule.collection]?.test(query) === true);
 		const regime =
 			rule.res.some((re) => re.test(stripped)) ||
 			(country &&
@@ -528,7 +556,7 @@ export function detectMentions(query: string): Mentions {
 					INDEXED_COUNTRY_SUBJECT[rule.collection]?.test(query) === true ||
 					COLLECTION_SLOT[rule.collection](query) ||
 					(!trade && !farEnd) ||
-					(comparing && (!farEnd || canadaCompared))));
+					(comparing && (!farEnd || canadaHere))));
 		if (
 			regime ||
 			country ||
