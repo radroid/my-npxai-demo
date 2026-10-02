@@ -16,7 +16,13 @@ import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button
 import {
 	findCitationMatch,
 	useCitationSources,
+	useSnippetSources,
 } from "@/components/knowledge-hub/citation-sources";
+import {
+	DOCUMENT_KIND_LABELS,
+	isAllowedSourceUrl,
+} from "@/lib/sources/catalog";
+import type { SourceRecord } from "@/lib/sources/citations";
 import { cn } from "@/lib/utils";
 
 const MarkdownTextImpl = () => {
@@ -72,20 +78,33 @@ const useCopyToClipboard = ({
 
 // Matches Appendix D.5 citation regex. Used to find inline [REGDOC-X.X.X]
 // or [REGDOC-X.X.X §Y.Z] patterns in the streamed markdown and render them
-// as pill chips instead of plain text.
+// as pill chips instead of plain text. Kept for saved (pre-Phase-12) threads.
 const CITATION_RE = /\[REGDOC-\d+(?:\.\d+){1,3}(?:\s+§[\d.]+)?\]/g;
+// v2 snippet-id citations — the grammar of lib/sources/citations.ts
+// SNIPPET_CITATION_RE ([[S1]], [[S1, S3]], and the [S1] slip).
+const SNIPPET_RE =
+	/\[\[\s*(S\d{1,2}(?:\s*[,;]\s*S\d{1,2})*)\s*\]\]|\[(S\d{1,2})\]/g;
+const ANY_CITATION_RE = new RegExp(
+	`${SNIPPET_RE.source}|${CITATION_RE.source}`,
+	"g",
+);
+
+const CHIP_BASE =
+	"mx-0.5 inline-flex items-center rounded-full border px-1.5 py-0 font-mono text-[0.7em] leading-[1.4] align-baseline";
+const CHIP_REQUIREMENT =
+	"border-requirement/40 bg-requirement/10 text-requirement";
+const CHIP_GUIDANCE = "border-guidance/40 bg-guidance/10 text-guidance";
 
 function CitationChip({ label }: { label: string }) {
 	const sources = useCitationSources();
 	const match = findCitationMatch(sources, label);
 	const inner = label.slice(1, -1);
-	const baseClass =
-		"mx-0.5 inline-flex items-center rounded-full border border-requirement/40 bg-requirement/10 px-1.5 py-0 font-mono text-[0.7em] text-requirement leading-[1.4] align-baseline";
+	const baseClass = `${CHIP_BASE} ${CHIP_REQUIREMENT}`;
 	const tooltip = match?.section_title
 		? `${inner} — ${match.section_title}`
 		: `CNSC citation: ${inner}`;
 
-	if (match?.url) {
+	if (match?.url && isAllowedSourceUrl(match.url)) {
 		return (
 			<a
 				href={match.url}
@@ -107,8 +126,79 @@ function CitationChip({ label }: { label: string }) {
 	);
 }
 
-// Walks component children, splits any string node on the citation regex,
-// and wraps matches in <CitationChip />. Non-string nodes pass through.
+function snippetTooltip(s: SourceRecord): string {
+	const kind = DOCUMENT_KIND_LABELS[s.document_kind] ?? s.document_kind;
+	const parts = [
+		s.title + (s.section_title ? ` — ${s.section_title}` : ""),
+		[s.publisher, kind, s.edition].filter(Boolean).join(" · "),
+	];
+	if (s.status !== "current") parts.push(`${s.status} edition`);
+	if (s.legal_force === "nonbinding") parts.push("Not binding");
+	return parts.join("\n");
+}
+
+// One [[S…]] group → one chip per id. Everything shown comes from the
+// server's data-sources payload; an id it did not hand out renders as an
+// explicit "unverified" marker, never as a guess.
+function SnippetCitation({ ids }: { ids: string[] }) {
+	const sources = useSnippetSources();
+	return (
+		<>
+			{ids.map((sid, i) => {
+				const key = `${sid}-${i}`;
+				const s = sources?.find((x) => x.sid === sid);
+				if (!s) {
+					return (
+						<span
+							key={key}
+							data-citation="unresolved"
+							className={`${CHIP_BASE} border-dashed border-border text-fg-muted`}
+							title={
+								sources
+									? "This citation does not match a retrieved source"
+									: "Source details unavailable"
+							}
+						>
+							{sources ? "unverified" : sid}
+						</span>
+					);
+				}
+				const requirement =
+					s.requirement_type === "requirement" &&
+					s.legal_force !== "nonbinding";
+				const cls = `${CHIP_BASE} ${requirement ? CHIP_REQUIREMENT : CHIP_GUIDANCE}`;
+				if (isAllowedSourceUrl(s.url)) {
+					return (
+						<a
+							key={key}
+							href={s.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							data-citation="true"
+							className={`${cls} cursor-pointer no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+							title={snippetTooltip(s)}
+						>
+							{s.chip}
+						</a>
+					);
+				}
+				return (
+					<span
+						key={key}
+						data-citation="true"
+						className={cls}
+						title={snippetTooltip(s)}
+					>
+						{s.chip}
+					</span>
+				);
+			})}
+		</>
+	);
+}
+
+// Walks component children, splits any string node on the citation
+// grammars, and wraps matches in chips. Non-string nodes pass through.
 function renderWithCitations(children: ReactNode): ReactNode {
 	const out: ReactNode[] = [];
 	let chipKey = 0;
@@ -117,16 +207,24 @@ function renderWithCitations(children: ReactNode): ReactNode {
 			out.push(child);
 			return;
 		}
-		const parts = child.split(CITATION_RE);
-		const matches = child.match(CITATION_RE) ?? [];
-		parts.forEach((segment, i) => {
-			if (segment) out.push(segment);
-			const m = matches[i];
-			if (m) {
-				// biome-ignore lint/suspicious/noArrayIndexKey: chips are generated in render order and the chip text itself is not unique within a single message
-				out.push(<CitationChip key={`c-${idx}-${chipKey++}-${m}`} label={m} />);
+		let last = 0;
+		for (const m of child.matchAll(ANY_CITATION_RE)) {
+			const at = m.index ?? 0;
+			if (at > last) out.push(child.slice(last, at));
+			const group = m[1] ?? m[2];
+			const key = `c-${idx}-${chipKey++}`;
+			if (group) {
+				const ids = group
+					.split(/[,;]/)
+					.map((x) => x.trim())
+					.filter(Boolean);
+				out.push(<SnippetCitation key={key} ids={ids} />);
+			} else {
+				out.push(<CitationChip key={key} label={m[0]} />);
 			}
-		});
+			last = at + m[0].length;
+		}
+		if (last < child.length) out.push(child.slice(last));
 	});
 	return out;
 }
@@ -257,14 +355,22 @@ const defaultComponents = memoizeMarkdownComponents({
 			{...props}
 		/>
 	),
-	td: ({ className, ...props }) => (
+	td: ({ className, children, ...props }) => (
 		<td
 			className={cn(
 				"aui-md-td border-muted-foreground/20 border-b border-l px-2 py-1 text-left last:border-r [[align=center]]:text-center [[align=right]]:text-right",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</td>
+	),
+	strong: ({ children, ...props }) => (
+		<strong {...props}>{renderWithCitations(children)}</strong>
+	),
+	em: ({ children, ...props }) => (
+		<em {...props}>{renderWithCitations(children)}</em>
 	),
 	tr: ({ className, ...props }) => (
 		<tr

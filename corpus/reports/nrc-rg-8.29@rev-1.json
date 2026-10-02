@@ -1,0 +1,43 @@
+{
+	"id": "nrc-rg-8.29@rev-1",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "c0807bd6774a9a4141ba403952804076237707204cf317667add2f2b6881b584",
+	"chunks": 47,
+	"requirement_chunks": 11,
+	"chunks_with_page": 47,
+	"sections_sample": [
+		"Front matter",
+		"A INTRODUCTION",
+		"B DISCUSSION",
+		"B.2 Research and Test Reactors 7, Transportation",
+		"C REGULATORY POSITION",
+		"D IMPLEMENTATION",
+		"D.1 National Research Council, Health Effects of Ex-",
+		"D.2 United Nations Scientific Committee on the Ef-",
+		"D.2 U.S. Environmental Protection Agency, Manual",
+		"D.3 International Commission on Radiological Pro-",
+		"D.4 National Research Council, Health Effects of Ex-",
+		"D.5 United Nations Scientific Committee on the Ef-",
+		"D.6 United Nations Scientific Committee on the Ef-",
+		"D.7 National Council on Radiation Protection and",
+		"D.8 National Council on Radiation Protection .and",
+		"D.11 National Council on Radiation Protection and",
+		"D.13 International Commission on Radiological Pro-",
+		"D.14 National Council on Radiation Protection and"
+	],
+	"report": {
+		"adapter": "pdf",
+		"parser_version": "pdf-lines@1",
+		"pages": 19,
+		"boilerplate_lines_removed": 17,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 18,
+		"paragraphs": 198,
+		"chars": 68719,
+		"alpha_ratio": 0.788,
+		"word_like_ratio": 0.981
+	},
+	"published_at": "2026-10-01T23:47:06.371Z"
+}

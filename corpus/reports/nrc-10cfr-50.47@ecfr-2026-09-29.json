@@ -1,0 +1,31 @@
+{
+	"id": "nrc-10cfr-50.47@ecfr-2026-09-29",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "229a1699c97e7bed1720e42b465b6ead5cb2a08777a05d1be7cd0db76fe44f70",
+	"chunks": 11,
+	"requirement_chunks": 6,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"(a)",
+		"(b)",
+		"(c)",
+		"(d)",
+		"(e)",
+		"(f)"
+	],
+	"report": {
+		"adapter": "ecfr-xml",
+		"parser_version": "ecfr-xml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 6,
+		"paragraphs": 40,
+		"chars": 14449,
+		"alpha_ratio": 0.811,
+		"word_like_ratio": 0.98
+	},
+	"published_at": "2026-10-01T23:22:14.018Z"
+}

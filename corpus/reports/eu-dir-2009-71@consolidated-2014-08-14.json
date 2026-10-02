@@ -1,0 +1,42 @@
+{
+	"id": "eu-dir-2009-71@consolidated-2014-08-14",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "3e08380a76e1016fd853212d6a3897dd585b5fe48a0971c8cc2270fcf2558ab8",
+	"chunks": 17,
+	"requirement_chunks": 16,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"Art. 1 Objectives",
+		"Art. 2 Scope",
+		"Art. 3 Definitions",
+		"Art. 4 Legislative, regulatory and organisational framework",
+		"Art. 5 Competent regulatory authority",
+		"Art. 6 Licence holders",
+		"Art. 7 Expertise and skills in nuclear safety",
+		"Art. 8 Transparency",
+		"Art. 8a Nuclear safety objective for nuclear installations",
+		"Art. 8b Implementation of the nuclear safety objective for nuclear installations",
+		"Art. 8c Initial assessment and periodic safety reviews",
+		"Art. 8d On-site emergency preparedness and response",
+		"Art. 8e Peer reviews",
+		"Art. 9 Reporting",
+		"Art. 10 Transposition",
+		"Art. 11 Entry into force",
+		"Art. 12 Addressees"
+	],
+	"report": {
+		"adapter": "eu-xhtml",
+		"parser_version": "eu-xhtml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 17,
+		"paragraphs": 57,
+		"chars": 19163,
+		"alpha_ratio": 0.825,
+		"word_like_ratio": 0.999
+	},
+	"published_at": "2026-10-01T23:22:33.956Z"
+}

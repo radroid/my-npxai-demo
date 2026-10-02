@@ -15,12 +15,18 @@
 
 import { ArrowUpIcon, DownloadIcon, SquareIcon } from "lucide-react";
 import { type FC, type ReactNode, useEffect, useRef, useState } from "react";
-import { SourcesPanel } from "@/components/knowledge-hub/SourcesPanel";
+import {
+	type SourceChunk,
+	SourcesPanel,
+} from "@/components/knowledge-hub/SourcesPanel";
 import {
 	type ArtifactError,
 	type ArtifactResult,
 	useArtifactStream,
 } from "@/hooks/use-artifact-stream";
+import type { SourceRecord } from "@/lib/sources/citations";
+import type { ScopeNoticePayload } from "@/lib/sources/payload";
+import { useSourceScope } from "@/lib/sources/scope-store";
 
 // Starter TOPICS tuned for explainer strength (deeper than the chat starters
 // in components/assistant-ui/thread.tsx — an artifact spans more sections).
@@ -322,7 +328,17 @@ const ArtifactViewer: FC<{
 					</span>
 				) : null}
 			</div>
-			<SourcesPanel data={{ chunks: artifact.sources }} />
+			<SourcesPanel
+				data={
+					artifact.scope
+						? {
+								version: 2,
+								scope: artifact.scope,
+								sources: artifact.sources as SourceRecord[],
+							}
+						: { chunks: artifact.sources as SourceChunk[] }
+				}
+			/>
 		</div>
 	);
 };
@@ -331,6 +347,7 @@ const ERROR_TITLES: Record<ArtifactError["kind"], string> = {
 	validation: "That query can't be processed",
 	rate_limit: "Rate limit reached",
 	out_of_scope: "Outside the indexed corpus",
+	scope_notice: "Outside the selected sources",
 	output_guard: "Generation discarded",
 	generation_failed: "Generation failed",
 	server: "Something went wrong",
@@ -362,13 +379,64 @@ const ErrorState: FC<{
 				Retry
 			</button>
 		</div>
+		{error.kind === "scope_notice" && error.notice ? (
+			<ScopeSuggestions
+				notice={error.notice}
+				onRetry={onRetry}
+				disabled={disabled}
+			/>
+		) : null}
 		{error.kind === "out_of_scope" ? (
 			<>
 				<p className="mt-4 text-fg-muted text-sm">
-					The explainer only covers the indexed CNSC corpus. Try one of these:
+					The explainer only covers the indexed regulatory documents. Try one of
+					these:
 				</p>
 				<StarterTopics onStarter={onStarter} disabled={disabled} />
 			</>
 		) : null}
 	</div>
 );
+
+// Scope decline → one-click switch, then regenerate with the new scope (the
+// request reads the selector at send time).
+const ScopeSuggestions: FC<{
+	notice: ScopeNoticePayload;
+	onRetry: () => void;
+	disabled: boolean;
+}> = ({ notice, onRetry, disabled }) => {
+	const pin = useSourceScope((s) => s.pin);
+	const setAuto = useSourceScope((s) => s.setAuto);
+	const mode = useSourceScope((s) => s.scope.mode);
+	return (
+		<div className="mt-3 flex flex-wrap gap-2">
+			{notice.suggestions.map((s) => (
+				<button
+					key={s.id}
+					type="button"
+					disabled={disabled}
+					onClick={() => {
+						pin(s.id);
+						onRetry();
+					}}
+					className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+				>
+					Use {s.label} instead
+				</button>
+			))}
+			{mode === "pinned" ? (
+				<button
+					type="button"
+					disabled={disabled}
+					onClick={() => {
+						setAuto();
+						onRetry();
+					}}
+					className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+				>
+					Switch to Auto and retry
+				</button>
+			) : null}
+		</div>
+	);
+};

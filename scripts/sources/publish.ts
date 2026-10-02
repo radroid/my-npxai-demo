@@ -1,0 +1,419 @@
+// Phase 12 publisher: one register entry → one atomically published edition.
+//
+//   bun run sources:publish --dry-run             # parse + quality + chunk, no API/DB
+//   bun run sources:publish                       # everything in the register
+//   bun run sources:publish --only nrc-rg-1.21    # one document (all its editions)
+//   bun run sources:publish --force               # allow a non-local Supabase URL
+//
+// Per entry, in register order (superseded editions before current ones):
+//   • not ingestible (metadata-only, draft, fetch-blocked) → register_source_document
+//     (metadata row, zero chunks — the DB refuses chunks for it anyway)
+//   • backfill_from_regdoc → backfill_source_document_from_regdoc (legacy rows
+//     copied with their embeddings, no API cost)
+//   • otherwise → verify the cached bytes against the pinned sha256, parse
+//     with the format's adapter, refuse on the quality gate, chunk, embed,
+//     stage, and publish_source_document (atomic: the edition's metadata and
+//     exactly N chunks land, or nothing changes; reruns replace, never
+//     duplicate; other documents are never touched).
+// Evidence for every text entry is written to corpus/reports/<key@version>.json.
+
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import OpenAI from "openai";
+import { EMBEDDING_DIMENSIONS } from "../../lib/openai";
+import type { RegisterEntry, SourceRegister } from "../../lib/sources/register";
+import {
+	type ChunkingStats,
+	chunkDocPaged,
+	emptyStats,
+	freeEncoder,
+	type PagedChunk,
+} from "../lib/chunker";
+import {
+	EMBED_BATCH_SIZE,
+	EMBEDDING_MODEL,
+	embedBatch,
+	isLocalSupabaseUrl,
+} from "../lib/embed";
+import { parseCnscPageData } from "./adapters/cnsc-html";
+import { parseDocx } from "./adapters/docx";
+import { parseEcfrXml } from "./adapters/ecfr-xml";
+import { parseEuXhtml } from "./adapters/eu-xhtml";
+import { parsePdf } from "./adapters/pdf";
+import type { ParsedSource } from "./adapters/types";
+import { sha256Hex } from "./http";
+import { buildReport } from "./quality";
+import {
+	cachePath,
+	entryId,
+	loadRegister,
+	parseOnly,
+	REPORTS_DIR,
+	selected,
+	ensureDirs,
+} from "./register-io";
+
+const STAGE_BATCH = 200;
+// Regulations and directives are split per paragraph/article; keep short
+// ones ("(d) …", "This Directive is addressed to the Member States.").
+const LEGAL_TEXT_FORMATS = new Set(["ecfr-xml", "eu-xhtml"]);
+const LEGAL_TEXT_MIN_TOKENS = 8;
+const MAX_CHUNKS_PER_DOCUMENT = 3000;
+const argv = process.argv.slice(2);
+const DRY_RUN = argv.includes("--dry-run");
+const FORCE_REMOTE =
+	argv.includes("--force") || process.env.ALLOW_REMOTE_INGEST === "1";
+
+/** The jsonb shape _source_document_upsert reads (rights flattened). */
+export function docPayload(e: RegisterEntry): Record<string, unknown> {
+	return {
+		document_key: e.document_key,
+		version_key: e.version_key,
+		doc_ref: e.doc_ref,
+		label: e.label,
+		title: e.title,
+		edition: e.edition,
+		publisher: e.publisher,
+		jurisdiction: e.jurisdiction,
+		collection: e.collection,
+		document_kind: e.document_kind,
+		legal_force: e.legal_force,
+		status: e.status,
+		language: e.language,
+		canonical_url: e.canonical_url,
+		fetch_url: e.fetch_url,
+		published_date: e.published_date,
+		effective_date: e.effective_date,
+		as_of: e.as_of,
+		checksum_sha256: e.checksum_sha256,
+		rights_decision: e.rights.decision,
+		rights_basis: e.rights.basis,
+		rights_evidence_url: e.rights.evidence_url,
+		rights_reviewed_on: e.rights.reviewed_on,
+		attribution: e.rights.attribution,
+	};
+}
+
+function canIngestText(e: RegisterEntry): boolean {
+	return e.ingest && e.rights.decision === "full_text";
+}
+
+// Superseded editions first, so publishing the current one last leaves it
+// current (the upsert demotes any other current edition of the key).
+function publishOrder(entries: RegisterEntry[]): RegisterEntry[] {
+	const rank = (e: RegisterEntry) => (e.status === "current" ? 1 : 0);
+	return [...entries].sort((a, b) => rank(a) - rank(b));
+}
+
+async function parseEntry(
+	e: RegisterEntry,
+	bytes: Uint8Array,
+): Promise<ParsedSource> {
+	const meta = { ref: e.doc_ref, title: e.title };
+	switch (e.format) {
+		case "pdf":
+			return parsePdf(bytes, { ...meta, fetchUrl: e.fetch_url as string });
+		case "cnsc-json":
+			return parseCnscPageData(JSON.parse(new TextDecoder().decode(bytes)), {
+				...meta,
+				canonicalUrl: e.canonical_url,
+			});
+		case "ecfr-xml": {
+			const section = e.doc_ref.match(/^10 CFR (\d+\.\d+)$/)?.[1] ?? null;
+			return parseEcfrXml(new TextDecoder().decode(bytes), {
+				...meta,
+				canonicalUrl: e.canonical_url,
+				sectionId: section,
+			});
+		}
+		case "eu-xhtml":
+			return parseEuXhtml(new TextDecoder().decode(bytes), {
+				...meta,
+				canonicalUrl: e.canonical_url,
+			});
+		case "docx":
+			return parseDocx(bytes, { ...meta, canonicalUrl: e.canonical_url });
+		default:
+			throw new Error(`no adapter for format ${e.format}`);
+	}
+}
+
+/**
+ * Where a chunk's citation link points. PDFs: the PDF itself at the chunk's
+ * first page (#page=N works in every browser viewer). Anchored formats: the
+ * canonical page at the section anchor. Otherwise the canonical page.
+ */
+export function locatorFor(e: RegisterEntry, c: PagedChunk): string {
+	if (e.format === "pdf") {
+		const base = (e.fetch_url as string).split("#")[0];
+		return c.page_start ? `${base}#page=${c.page_start}` : base;
+	}
+	return c.url && c.url.startsWith("https://") ? c.url : e.canonical_url;
+}
+
+interface DocReport {
+	id: string;
+	register_version: string;
+	outcome: "published" | "dry-run" | "quality-blocked" | "error";
+	failures?: string[];
+	sha256: string;
+	chunks: number;
+	requirement_chunks: number;
+	chunks_with_page: number;
+	sections_sample: string[];
+	report: unknown;
+	published_at?: string;
+}
+
+async function writeReport(r: DocReport): Promise<void> {
+	await writeFile(
+		join(REPORTS_DIR, `${r.id}.json`),
+		`${JSON.stringify(r, null, "\t")}\n`,
+	);
+}
+
+async function stageAndPublish(
+	supabase: SupabaseClient,
+	openai: OpenAI,
+	register: SourceRegister,
+	e: RegisterEntry,
+	chunks: PagedChunk[],
+	parserVersion: string,
+): Promise<number> {
+	const publishId = crypto.randomUUID();
+	const rows: Record<string, unknown>[] = [];
+	for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
+		const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
+		const vectors = await embedBatch(
+			openai,
+			batch.map((c) => c.chunk_text),
+		);
+		for (let j = 0; j < batch.length; j++) {
+			const c = batch[j] as PagedChunk;
+			rows.push({
+				publish_id: publishId,
+				chunk_index: c.chunk_index,
+				section_number: c.section_number,
+				section_title: c.section_title,
+				page_start: c.page_start,
+				page_end: c.page_end,
+				locator_url: locatorFor(e, c),
+				chunk_text: c.chunk_text,
+				text_sha256: await sha256Hex(new TextEncoder().encode(c.chunk_text)),
+				requirement_type: c.requirement_type,
+				embedding: JSON.stringify(vectors[j]),
+			});
+		}
+	}
+	try {
+		for (let i = 0; i < rows.length; i += STAGE_BATCH) {
+			const { error } = await supabase
+				.from("source_chunks_staging")
+				.insert(rows.slice(i, i + STAGE_BATCH));
+			if (error) throw new Error(`staging insert failed: ${error.message}`);
+		}
+		const { data, error } = await supabase.rpc("publish_source_document", {
+			p_doc: docPayload(e),
+			p_register_version: register.version,
+			p_publish_id: publishId,
+			p_expected_count: rows.length,
+			p_parser_version: parserVersion,
+			p_embedding_model: EMBEDDING_MODEL,
+			p_embedding_dims: EMBEDDING_DIMENSIONS,
+		});
+		if (error)
+			throw new Error(`publish_source_document failed: ${error.message}`);
+		return data as number;
+	} finally {
+		// On failure the staged rows are scratch; on success the RPC already
+		// cleared them. Either way leave nothing behind.
+		await supabase
+			.from("source_chunks_staging")
+			.delete()
+			.eq("publish_id", publishId);
+	}
+}
+
+async function main() {
+	const only = parseOnly(argv);
+	const register = await loadRegister();
+	await ensureDirs();
+
+	const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+	const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+	const openaiKey = process.env.OPENAI_API_KEY;
+	let supabase: SupabaseClient | null = null;
+	let openai: OpenAI | null = null;
+	if (!DRY_RUN) {
+		if (!url || !serviceKey || !openaiKey) {
+			console.error(
+				"Missing env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY",
+			);
+			process.exit(1);
+		}
+		if (!isLocalSupabaseUrl(url) && !FORCE_REMOTE) {
+			console.error(
+				`Refusing to publish to ${url}: not a local Supabase URL. Hosted publishing follows docs/phase-12-sources.md and needs --force.`,
+			);
+			process.exit(1);
+		}
+		supabase = createClient(url, serviceKey, {
+			auth: { persistSession: false, autoRefreshToken: false },
+		});
+		openai = new OpenAI({ apiKey: openaiKey });
+	}
+
+	const entries = publishOrder(
+		register.entries.filter((e) => selected(e, only)),
+	);
+	const stats: ChunkingStats = emptyStats();
+	const summary = {
+		metadata: 0,
+		backfilled: 0,
+		published: 0,
+		blocked: 0,
+		errors: 0,
+		chunks: 0,
+	};
+
+	for (const e of entries) {
+		const id = entryId(e);
+		try {
+			if (!canIngestText(e)) {
+				if (supabase) {
+					const { error } = await supabase.rpc("register_source_document", {
+						p_doc: docPayload(e),
+						p_register_version: register.version,
+					});
+					if (error) throw new Error(error.message);
+				}
+				summary.metadata += 1;
+				console.log(
+					`○ ${id}: metadata only (${e.rights.decision}${e.ingest ? "" : ", ingest=false"})`,
+				);
+				continue;
+			}
+
+			if (e.backfill_from_regdoc) {
+				if (supabase) {
+					const { count, error: countErr } = await supabase
+						.from("regdoc_chunks")
+						.select("id", { count: "exact", head: true })
+						.eq("regdoc_id", e.backfill_from_regdoc)
+						.not("embedding", "is", null);
+					if (countErr) throw new Error(countErr.message);
+					const { error } = await supabase.rpc(
+						"backfill_source_document_from_regdoc",
+						{
+							p_doc: docPayload(e),
+							p_register_version: register.version,
+							p_regdoc_id: e.backfill_from_regdoc,
+							p_expected_count: count ?? 0,
+							p_embedding_model: EMBEDDING_MODEL,
+						},
+					);
+					if (error) throw new Error(error.message);
+					summary.chunks += count ?? 0;
+					console.log(
+						`⇢ ${id}: backfilled ${count} chunk(s) from regdoc_chunks:${e.backfill_from_regdoc}`,
+					);
+				} else {
+					console.log(
+						`⇢ ${id}: would backfill from regdoc_chunks:${e.backfill_from_regdoc}`,
+					);
+				}
+				summary.backfilled += 1;
+				continue;
+			}
+
+			const path = cachePath(e);
+			if (!existsSync(path))
+				throw new Error("not downloaded — run scripts/sources/fetch.ts first");
+			const bytes = new Uint8Array(await readFile(path));
+			const sha = await sha256Hex(bytes);
+			if (e.format !== "cnsc-json" && sha !== e.checksum_sha256) {
+				throw new Error(
+					`cached bytes ${sha.slice(0, 12)}… do not match pinned ${String(e.checksum_sha256).slice(0, 12)}…`,
+				);
+			}
+			const parsed = await parseEntry(e, bytes);
+			const { report, ok, failures } = buildReport(parsed);
+			const chunks = chunkDocPaged(parsed.doc, stats, {
+				minTokens: LEGAL_TEXT_FORMATS.has(e.format as string)
+					? LEGAL_TEXT_MIN_TOKENS
+					: undefined,
+				splitOversized: true,
+			});
+			const base: DocReport = {
+				id,
+				register_version: register.version,
+				outcome: "dry-run",
+				sha256: sha,
+				chunks: chunks.length,
+				requirement_chunks: chunks.filter(
+					(c) => c.requirement_type === "requirement",
+				).length,
+				chunks_with_page: chunks.filter((c) => c.page_start !== null).length,
+				sections_sample: parsed.doc.sections
+					.slice(0, 25)
+					.map((s) => `${s.section_number} ${s.section_title}`.trim()),
+				report,
+			};
+			if (
+				!ok ||
+				chunks.length === 0 ||
+				chunks.length > MAX_CHUNKS_PER_DOCUMENT
+			) {
+				const why = [...failures];
+				if (chunks.length === 0) why.push("no chunks");
+				if (chunks.length > MAX_CHUNKS_PER_DOCUMENT)
+					why.push(
+						`${chunks.length} chunks exceeds ${MAX_CHUNKS_PER_DOCUMENT}`,
+					);
+				await writeReport({
+					...base,
+					outcome: "quality-blocked",
+					failures: why,
+				});
+				summary.blocked += 1;
+				console.log(`⊘ ${id}: QUALITY-BLOCKED — ${why.join("; ")}`);
+				continue;
+			}
+			if (!supabase || !openai) {
+				await writeReport(base);
+				console.log(
+					`· ${id}: ${chunks.length} chunks (dry run) word_like=${report.word_like_ratio}`,
+				);
+				continue;
+			}
+			await stageAndPublish(
+				supabase,
+				openai,
+				register,
+				e,
+				chunks,
+				report.parser_version,
+			);
+			await writeReport({
+				...base,
+				outcome: "published",
+				published_at: new Date().toISOString(),
+			});
+			summary.published += 1;
+			summary.chunks += chunks.length;
+			console.log(`● ${id}: published ${chunks.length} chunks`);
+		} catch (err) {
+			summary.errors += 1;
+			console.error(`✗ ${id}: ${(err as Error).message}`);
+		}
+	}
+	freeEncoder();
+	console.log(
+		`\nmetadata-only ${summary.metadata} · backfilled ${summary.backfilled} · published ${summary.published} · quality-blocked ${summary.blocked} · errors ${summary.errors} · chunks ${summary.chunks}`,
+	);
+	if (summary.errors > 0) process.exit(1);
+}
+
+if (import.meta.main) await main();

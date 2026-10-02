@@ -1,0 +1,277 @@
+{
+	"ran_at": "2026-10-01T23:39:06.931Z",
+	"collections": "cnsc,nrc,onr,eu",
+	"sources": {
+		"summary": "24/24",
+		"rows": [
+			{
+				"id": "v2-auto-default-cnsc",
+				"category": "auto-default",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:cnsc",
+				"cited": [
+					"REGDOC-2.3.4 §3.2.3"
+				],
+				"ms": 2431
+			},
+			{
+				"id": "v2-auto-nrc-dose-limits",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 20.1201(a)"
+				],
+				"ms": 2334
+			},
+			{
+				"id": "v2-auto-nrc-rg834",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.34 §A",
+					"RG 8.34 §C.1.1"
+				],
+				"ms": 2885
+			},
+			{
+				"id": "v2-auto-nrc-appb",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 50 App. B §III"
+				],
+				"ms": 2827
+			},
+			{
+				"id": "v2-auto-nrc-rg121",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 1.21 §A",
+					"RG 1.21 §B"
+				],
+				"ms": 2097
+			},
+			{
+				"id": "v2-auto-nrc-marssim",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"NUREG-1575 Vol. 1 §2.1"
+				],
+				"ms": 1462
+			},
+			{
+				"id": "v2-auto-nrc-maint-rule",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 50.65(a)",
+					"10 CFR 50.65(b)"
+				],
+				"ms": 2864
+			},
+			{
+				"id": "v2-auto-nrc-legal-force",
+				"category": "legal-force",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.10 §D"
+				],
+				"ms": 1739
+			},
+			{
+				"id": "v2-pinned-nrc-fetus",
+				"category": "pinned-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.13 §D.2",
+					"10 CFR 20.1208(a)"
+				],
+				"ms": 1637
+			},
+			{
+				"id": "v2-auto-onr-alarp",
+				"category": "auto-onr",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:onr",
+				"cited": [
+					"NS-TAST-GD-005 §6.1",
+					"NS-TAST-GD-005 §5.1.4",
+					"NS-TAST-GD-005 §5.3.3"
+				],
+				"ms": 2170
+			},
+			{
+				"id": "v2-auto-onr-saps-did",
+				"category": "auto-onr",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:onr",
+				"cited": [
+					"ONR SAPs §23"
+				],
+				"ms": 3758
+			},
+			{
+				"id": "v2-auto-eu-psr",
+				"category": "auto-eu",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:eu",
+				"cited": [
+					"Directive 2009/71/Euratom §Art. 8c"
+				],
+				"ms": 956
+			},
+			{
+				"id": "v2-auto-eu-waste",
+				"category": "auto-eu",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:eu",
+				"cited": [
+					"Directive 2011/70/Euratom §Art. 12"
+				],
+				"ms": 3041
+			},
+			{
+				"id": "v2-compare-cnsc-nrc-dose",
+				"category": "compare",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "compare:cnsc+nrc",
+				"cited": [
+					"REGDOC-2.7.1 §14",
+					"RG 8.29 §D.2"
+				],
+				"ms": 3790
+			},
+			{
+				"id": "v2-compare-onr-cnsc-psr",
+				"category": "compare",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "compare:cnsc+onr",
+				"cited": [
+					"REGDOC-2.4.1 §4.6.2",
+					"REGDOC-3.5.3 §7.2",
+					"NS-TAST-GD-001 §5.8.5",
+					"NS-TAST-GD-001 §5.8.9",
+					"ONR SAPs §23"
+				],
+				"ms": 3283
+			},
+			{
+				"id": "v2-ambiguous-two-regimes",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "notice:ambiguous",
+				"cited": [],
+				"ms": 3
+			},
+			{
+				"id": "v2-pinned-mismatch",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "notice:pinned_mismatch",
+				"cited": [],
+				"ms": 2
+			},
+			{
+				"id": "v2-pinned-stays-fixed",
+				"category": "pinned-nrc",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.29 §D.2",
+					"RG 1.21 §C.5.3",
+					"RG 8.34 §B"
+				],
+				"ms": 2456
+			},
+			{
+				"id": "v2-iaea-reference-only",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "notice:reference_only",
+				"cited": [],
+				"ms": 2
+			},
+			{
+				"id": "v2-not-indexed",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "notice:not_indexed",
+				"cited": [],
+				"ms": 0
+			},
+			{
+				"id": "v2-fukushima-not-enabled",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "notice:not_enabled",
+				"cited": [],
+				"ms": 1
+			},
+			{
+				"id": "v2-aerb-not-enabled",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "notice:not_enabled",
+				"cited": [],
+				"ms": 1
+			},
+			{
+				"id": "v2-pinned-nrc-oos",
+				"category": "oos",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [],
+				"per_collection": [
+					{
+						"collection": "nrc",
+						"topSim": 0.1494,
+						"chunks": 20
+					}
+				],
+				"ms": 394
+			},
+			{
+				"id": "v2-fake-citation-injection",
+				"category": "adversarial",
+				"pass": true,
+				"reason": "ok",
+				"scope_key": "single:nrc",
+				"cited": [],
+				"ms": 1232
+			}
+		]
+	}
+}

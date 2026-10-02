@@ -404,6 +404,36 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] pre-item · **Fail loud on partial ingest** — `scripts/ingest.ts` now asserts the post-insert row count in `regdoc_chunks` matches the number of rows it intended to insert and exits non-zero with a clear message on mismatch, instead of printing `✅ Ingestion complete` over a table the non-transactional wipe-then-insert left half-populated by a timed-out batch (2026-07-14).
 - [ ] Build the **keep-alive Worker** (`npxai-keepalive`) — daily Cloudflare Cron Trigger pinging the hosted REST endpoint so the free project stops auto-pausing. Spec + `wrangler.jsonc` + handler in `supabase/LOCAL.md`. Free tier pauses after ~7 days idle; a *weekly* cron races that boundary, so the cron is daily. Blocked on the human item below (needs the project un-paused and the hosted anon key as a Worker secret).
 
+### Planned Phase 12 — source-aware regulatory expansion (not yet current)
+
+**Gate 0 · Inventory and rights**
+- [ ] Locate the 15 already fetched/PDF-validated NRC guides outside this worktree; record official URL, guide number, revision/status, file hash, parse quality, and rights evidence in a versioned source manifest. Revalidate against the current NRC listing before release.
+- [ ] Register the 16 IAEA safety standards as metadata-only references with official links and editions. Enforce zero text chunks and zero embeddings for these entries. Record document-specific rights decisions for every proposed ONR, EU/ENSREG/WENRA, AERB, and Fukushima report; leave uncertain items link-only.
+- [ ] Record rights and current-edition evidence for the existing CNSC documents before backfilling them into the new rights-gated table.
+
+**Gate 1 · Platform and CNSC parity**
+- [ ] Add `source_documents`/`source_chunks` migrations, RLS/grants, active-version metadata, rights gate, and bounded filtered search RPC; backfill CNSC without changing the live query path until counts and retrieval match. Use Supabase CLI and the local runbook before any hosted migration.
+- [ ] Build manifest-driven PDF/HTML parsers and an atomic per-document/version publish path with source hash, parser version, section/page locators, extraction checks, and idempotent reruns. Keep `scripts/ingest.ts` for the existing corpus until parity is proven.
+- [ ] Implement verified `[[S1]]`-style citation IDs end to end in chat, source chips/panel, artifact output, cache, and RAG evaluation. Keep legacy REGDOC citation rendering for saved threads; validate all outbound URLs against stored source metadata.
+- [ ] Preserve the existing untrusted-context, output-guard, and artifact-sanitizer protections for all newly parsed text; verify new source links cannot introduce unsafe URL schemes or hosts.
+- [ ] Add `auto` and pinned collection/jurisdiction selection. In `auto`, use CNSC for unqualified questions and route explicit source mentions; keep pinned scopes fixed and require explicit comparison intent. Recalibrate per-collection thresholds and compare filtered approximate search against exact recall.
+
+**Gate 2 · NRC release**
+- [ ] Publish the 15 held NRC regulatory guides after rights/version/parse checks; verify every displayed citation resolves to the correct NRC guide, revision, section/page, and official URL.
+- [ ] Add a curated set of current 10 CFR provisions and NUREG reports through the same pipeline, with distinct binding-regulation versus guidance/report labels and edition dates.
+
+**Gate 3 · Fukushima collection**
+- [ ] Register the eight report groups in the source plan and ingest each rights-cleared English report separately. Label IAEA, NAIIC, government, TEPCO, NRA, and review-mission perspectives and dates; keep blocked reports link-only.
+- [ ] Add questions testing accident findings versus post-accident regulatory changes, conflicting accounts, and historical/current status; verify citations never present an investigation report as binding regulation.
+
+**Gate 4 · ONR, EU/WENRA, and AERB**
+- [ ] Ingest ONR SAPs and a curated TAG batch with OGL attribution; ingest the relevant EUR-Lex directives using stable CELEX links; add ENSREG/WENRA only after individual rights checks; add priority AERB PHWR codes only after rights checks. Release each publisher independently.
+
+**Gate 5 · Evaluation and rollout**
+- [ ] Extend golden/citation/out-of-corpus evaluations for each collection and cross-jurisdiction comparison. Pin the existing CNSC questions to CNSC scope (including their NRC out-of-corpus case), adapt citation scoring to source IDs, and add an `auto`-scope NRC success case. Require zero unauthorized chunks/embeddings, zero unresolved citations, no wrong-jurisdiction or wrong-authority claims in reviewed samples, and no CNSC semantic baseline regression before enabling each collection.
+- [ ] Roll out behind a collection flag, smoke chat and artifact links on the deployed app, record corpus/manifest version in logs and cache keys, and retain the old CNSC RPC/table as the rollback path until the new path is stable.
+- [ ] Set a documented rights/revision recheck cadence and expose source as-of dates; verify source controls and citation chips in both light and dark themes.
+
 ---
 
 - [ ] Before advancing `Current phase`, verify the relevant Appendix H checklist is green

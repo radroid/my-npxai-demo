@@ -1,8 +1,9 @@
 "use client";
 
 // The assistant-ui runtime provider lives in (app)/layout.tsx now, so this
-// component is just the Knowledge Hub page body — header, SourcesDataUI, the
-// Thread, and a component that fires the post-first-turn autoTitle. Keeping
+// component is just the Knowledge Hub page body — header, the Thread, and a
+// component that fires the post-first-turn autoTitle. Sources panels render
+// from AssistantMessage itself (components/assistant-ui/thread.tsx). Keeping
 // the provider out of here avoids "requires an AuiProvider" errors in the
 // ThreadSidebar (which is rendered by AppShell, above this component).
 
@@ -14,10 +15,16 @@ import {
 	type HubMode,
 	ModeToggle,
 } from "@/components/knowledge-hub/ModeToggle";
-import { SourcesDataUI } from "@/components/knowledge-hub/SourcesDataUI";
+import { ScopePicker } from "@/components/knowledge-hub/ScopePicker";
 import { shouldSnapToChatOnThreadChange } from "@/lib/knowledge-hub-mode";
+import type { ScopeOptions } from "@/lib/sources/scope-options";
 
-export function KnowledgeHubShell() {
+export function KnowledgeHubShell({
+	sourceOptions = null,
+}: {
+	/** Phase 12 source selector options; null on the legacy CNSC corpus. */
+	sourceOptions?: ScopeOptions | null;
+}) {
 	// Chat ↔ Artifact mode (item-1 slice 1.2). BOTH surfaces stay mounted;
 	// the toggle flips CSS visibility only (`hidden`), never unmounts — this
 	// preserves the chat composer draft and the last generated artifact
@@ -27,7 +34,14 @@ export function KnowledgeHubShell() {
 	// which resets its scrollTop; a long transcript reopens at the top. That
 	// is a known, accepted limitation of this slice, not a promise.
 	const [mode, setMode] = useState<HubMode>("chat");
-	const modeToggle = <ModeToggle mode={mode} onModeChange={setMode} />;
+	// Mode toggle + (v2 only) the source selector, shown in BOTH surfaces so
+	// the controls never move when switching between chat and artifact.
+	const modeToggle = (
+		<div className="flex flex-wrap items-center gap-2">
+			<ModeToggle mode={mode} onModeChange={setMode} />
+			{sourceOptions ? <ScopePicker options={sourceOptions} /> : null}
+		</div>
+	);
 
 	// Fix round 1, ISSUE 1: the Knowledge Hub thread sidebar (rendered by
 	// AppShell, outside the mode-swapped surfaces below) stays live in
@@ -51,12 +65,13 @@ export function KnowledgeHubShell() {
 	return (
 		<>
 			<AutoTitle />
-			<SourcesDataUI />
 			<section className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-bg">
 				<div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
 					<span className="text-xs text-fg-muted">
 						{mode === "chat"
-							? "Ask a regulatory question — answers cite CNSC REGDOCs."
+							? sourceOptions
+								? "Ask a regulatory question — answers cite the exact source, edition and section."
+								: "Ask a regulatory question — answers cite CNSC REGDOCs."
 							: "Generate a self-contained HTML explainer — diagrams, citations, downloadable."}
 					</span>
 				</div>
@@ -65,7 +80,7 @@ export function KnowledgeHubShell() {
 						mode === "chat" ? "min-h-0 flex-1 overflow-hidden" : "hidden"
 					}
 				>
-					<Thread composerHeader={modeToggle} />
+					<Thread composerHeader={modeToggle} sourceOptions={sourceOptions} />
 				</div>
 				<div
 					className={

@@ -1,0 +1,27 @@
+{
+	"id": "nrc-10cfr-50-appendix-i@ecfr-2026-09-29",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "efe8fd63da1470a9bf4ba169a4b446e3bf3d7494bd9e14d8c337a757a7c9b713",
+	"chunks": 11,
+	"requirement_chunks": 8,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"Introduction",
+		"guides on design objectives for light-water-cooled nuclear power reactors"
+	],
+	"report": {
+		"adapter": "ecfr-xml",
+		"parser_version": "ecfr-xml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 2,
+		"paragraphs": 49,
+		"chars": 18425,
+		"alpha_ratio": 0.814,
+		"word_like_ratio": 0.991
+	},
+	"published_at": "2026-10-01T23:22:17.645Z"
+}

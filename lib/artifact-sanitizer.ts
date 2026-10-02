@@ -10,7 +10,10 @@
 // the second line of defense, not the only one.
 
 import { scanOutput } from "./output-guard";
-import { KNOWLEDGE_HUB_OUT_OF_SCOPE } from "./prompts";
+import {
+	KNOWLEDGE_HUB_OUT_OF_SCOPE,
+	KNOWLEDGE_HUB_OUT_OF_SCOPE_V2,
+} from "./prompts";
 
 // ---------------------------------------------------------------------------
 // Contract tables
@@ -182,9 +185,12 @@ const ATTR_RE =
 	/([a-zA-Z][a-zA-Z0-9_:-]*)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+))?/g;
 
 // The security-boundary refusal sentence is a prefix of
-// KNOWLEDGE_HUB_OUT_OF_SCOPE, so matching the prefix catches both.
-const REFUSAL_SENTENCE =
-	"This assistant only answers questions about the indexed CNSC regulatory documents";
+// KNOWLEDGE_HUB_OUT_OF_SCOPE, so matching the prefix catches both. The v2
+// (multi-source) prompt's sentence drops "CNSC" — match either.
+const REFUSAL_SENTENCES = [
+	"This assistant only answers questions about the indexed CNSC regulatory documents",
+	"This assistant only answers questions about the indexed regulatory documents",
+];
 const MIN_FRAGMENT_CHARS = 400;
 
 // ---------------------------------------------------------------------------
@@ -422,8 +428,9 @@ export function sanitizeArtifactFragment(raw: string): SanitizeResult {
 	// Step 7 — refusal detection: never assemble a branded refusal page.
 	if (
 		fragment.length < MIN_FRAGMENT_CHARS ||
-		fragment.includes(REFUSAL_SENTENCE) ||
-		fragment.includes(KNOWLEDGE_HUB_OUT_OF_SCOPE)
+		REFUSAL_SENTENCES.some((r) => fragment.includes(r)) ||
+		fragment.includes(KNOWLEDGE_HUB_OUT_OF_SCOPE) ||
+		fragment.includes(KNOWLEDGE_HUB_OUT_OF_SCOPE_V2)
 	) {
 		return {
 			ok: false,

@@ -1,0 +1,880 @@
+{
+	"run_at": "2026-10-01T23:49:37.952Z",
+	"bar": {
+		"mean_recall_at_8": 0.95,
+		"min_recall_at_8": 0.75
+	},
+	"scopes": {
+		"cnsc": {
+			"collections": [
+				"cnsc"
+			],
+			"include_historical": false,
+			"questions": 20,
+			"mean_recall_at_8": 1,
+			"mean_recall_at_20": 1,
+			"min_recall_at_8": 1,
+			"top1_agreement": 1,
+			"pass": true,
+			"per_question": [
+				{
+					"query": "What specific elements must be included in the characterization information for a site and its surrounding region potentially affected by a project, according to REGDOC-1.1.1 §C.7.1?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for management systems and quality assurance programs in applications for licences under the various regulations mentioned in REGDOC-2.1.1 §1.3?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the specific requirements for emergency response facilities for licensees of reactor facilities with a thermal capacity greater than 10 MW according to REGDOC-2.10.1 §2.2.6?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the key design requirements for a radioactive disposal facility according to REGDOC-2.11.1 §11.2.2?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the record-keeping requirements for licensees regarding nuclear substances and worker training under the General Nuclear Safety and Control Regulations and the Nuclear Substances and Radiation Devices Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What information must be included in an application for a licence to operate a Class I nuclear facility and in an application for the amendment, revocation, or replacement of a licence according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements and obligations for a licensee under the NSCA and its regulations when applying for a licence to construct, operate, or decommission a Class I nuclear facility?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the responsibilities of the licensee regarding operator rounds and routines according to REGDOC-2.3.4 §3.3.1, and what specific factors should shift staff note during verification rounds?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the specific requirements for a licence application for a Class I nuclear facility according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for an application for a licence to operate a Class I nuclear facility, and what records must a licensee keep according to the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "According to REGDOC-2.7.1 §4.2, what are the responsibilities of managers in ensuring the effectiveness of a radiation protection program?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the names of the occupational health and safety regulations applicable in Saskatchewan and Manitoba?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the CNSC's requirements for environmental risk assessments (ERAs) for nuclear facilities or activities, and how do these requirements differ based on the facility's interaction with the environment?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What additional information must be included in the final quarterly report of the calendar year for NPP personnel performance according to REGDOC-3.1.1 §3.3?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What criteria does the CNSC use to evaluate a licence application and its supporting documents?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the components included in management measures according to REGDOC-3.6 §M, and how is a management system defined in the context of the CNSC SCA Framework?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are some of the areas in which the Commission can make regulations with the approval of the Governor in Council according to NSCA §41?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What information must be included in an application for a licence to decommission a Class I nuclear facility according to the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the responsibilities of nuclear substance licensees, radiation device licensees, and Class II nuclear facility licensees in ensuring safety and management of licensed activities according to REGDOC-2.1.1 §4?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for licensees of reactor facilities with a thermal capacity greater than 10 MW regarding the submission of emergency exercise objectives and reports to the CNSC?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				}
+			]
+		},
+		"nrc": {
+			"collections": [
+				"nrc"
+			],
+			"include_historical": false,
+			"questions": 16,
+			"mean_recall_at_8": 1,
+			"mean_recall_at_20": 1,
+			"min_recall_at_8": 1,
+			"top1_agreement": 1,
+			"pass": true,
+			"per_question": [
+				{
+					"query": "What information should a licensee record on NRC Form 5 for an individual's occupational dose?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How should air sampling be used to estimate worker intakes of airborne radioactive material?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does an effective ALARA program at a materials licensee look like according to NRC guidance?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What should workers be told about the risks of occupational radiation exposure?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What is the annual dose limit for individual members of the public from a licensed operation?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "When must a licensee monitor an adult worker's external occupational dose?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What must a radiological environmental monitoring program for a nuclear power plant include?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What should a license termination plan for a power reactor contain?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How does MARSSIM define a final status survey and survey units?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What financial assurance methods are acceptable for decommissioning a materials licensee?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What planning standards must onsite and offsite emergency plans for a power reactor meet?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the numerical design objectives for limiting radioactive effluents from light-water reactors?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the standard review plan say about the thermal evaluation of dry storage casks?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How should bioassay measurements be interpreted to estimate a worker's intake?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does 10 CFR 73.54 require for cyber security at nuclear power plants?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does 10 CFR Part 55 require for reactor operator licensing examinations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				}
+			]
+		},
+		"onr": {
+			"collections": [
+				"onr"
+			],
+			"include_historical": false,
+			"questions": 12,
+			"mean_recall_at_8": 1,
+			"mean_recall_at_20": 1,
+			"min_recall_at_8": 1,
+			"top1_agreement": 1,
+			"pass": true,
+			"per_question": [
+				{
+					"query": "What does ONR expect a safety case to contain and how should it be structured?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How does ONR judge whether risks have been reduced so far as is reasonably practicable?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are ONR's expectations for examination, inspection, maintenance and testing of items important to safety?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How should a licensee assure the competence of personnel doing safety-related work?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are operating rules, limits and conditions for nuclear safety in ONR guidance?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What is a design authority and what capability must a licensee retain?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What numerical targets do the Safety Assessment Principles set for normal operation doses to workers?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What do the Safety Assessment Principles say about leadership and management for safety?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How do the Safety Assessment Principles describe design basis analysis of faults?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What engineering principles cover redundancy, diversity and segregation in the SAPs?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the Nuclear Industries Security Regulations require of a licensee?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How does ONR regulate the road transport of radioactive material?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				}
+			]
+		},
+		"eu": {
+			"collections": [
+				"eu"
+			],
+			"include_historical": false,
+			"questions": 10,
+			"mean_recall_at_8": 1,
+			"mean_recall_at_20": 1,
+			"min_recall_at_8": 1,
+			"top1_agreement": 1,
+			"pass": true,
+			"per_question": [
+				{
+					"query": "What does the Nuclear Safety Directive require for the independence of the national regulatory authority?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What is the high-level nuclear safety objective introduced by Directive 2014/87/Euratom?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for topical peer reviews under the amended Nuclear Safety Directive?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What must a national programme for spent fuel and radioactive waste management include?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What transparency obligations apply to nuclear safety information for the public under Euratom directives?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "Who bears prime responsibility for the safety of a nuclear installation under Euratom law?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How often must Member States report to the Commission on implementing the radioactive waste directive?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the Nuclear Safety Directive require for on-site emergency preparedness and response?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the Euratom Basic Safety Standards Directive say about radon in homes?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the EU rules on shipments of radioactive waste between Member States?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				}
+			]
+		},
+		"cnsc+historical": {
+			"collections": [
+				"cnsc"
+			],
+			"include_historical": true,
+			"questions": 10,
+			"mean_recall_at_8": 1,
+			"mean_recall_at_20": 1,
+			"min_recall_at_8": 1,
+			"top1_agreement": 1,
+			"pass": true,
+			"per_question": [
+				{
+					"query": "What specific elements must be included in the characterization information for a site and its surrounding region potentially affected by a project, according to REGDOC-1.1.1 §C.7.1?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for management systems and quality assurance programs in applications for licences under the various regulations mentioned in REGDOC-2.1.1 §1.3?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the specific requirements for emergency response facilities for licensees of reactor facilities with a thermal capacity greater than 10 MW according to REGDOC-2.10.1 §2.2.6?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the key design requirements for a radioactive disposal facility according to REGDOC-2.11.1 §11.2.2?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the record-keeping requirements for licensees regarding nuclear substances and worker training under the General Nuclear Safety and Control Regulations and the Nuclear Substances and Radiation Devices Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What information must be included in an application for a licence to operate a Class I nuclear facility and in an application for the amendment, revocation, or replacement of a licence according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements and obligations for a licensee under the NSCA and its regulations when applying for a licence to construct, operate, or decommission a Class I nuclear facility?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the responsibilities of the licensee regarding operator rounds and routines according to REGDOC-2.3.4 §3.3.1, and what specific factors should shift staff note during verification rounds?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the specific requirements for a licence application for a Class I nuclear facility according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for an application for a licence to operate a Class I nuclear facility, and what records must a licensee keep according to the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				}
+			]
+		},
+		"all-searchable": {
+			"collections": [
+				"cnsc",
+				"nrc",
+				"onr",
+				"eu"
+			],
+			"include_historical": false,
+			"questions": 44,
+			"mean_recall_at_8": 1,
+			"mean_recall_at_20": 1,
+			"min_recall_at_8": 1,
+			"top1_agreement": 1,
+			"pass": true,
+			"per_question": [
+				{
+					"query": "What information should a licensee record on NRC Form 5 for an individual's occupational dose?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How should air sampling be used to estimate worker intakes of airborne radioactive material?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does an effective ALARA program at a materials licensee look like according to NRC guidance?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What should workers be told about the risks of occupational radiation exposure?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What is the annual dose limit for individual members of the public from a licensed operation?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "When must a licensee monitor an adult worker's external occupational dose?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What must a radiological environmental monitoring program for a nuclear power plant include?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What should a license termination plan for a power reactor contain?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How does MARSSIM define a final status survey and survey units?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What financial assurance methods are acceptable for decommissioning a materials licensee?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What planning standards must onsite and offsite emergency plans for a power reactor meet?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the numerical design objectives for limiting radioactive effluents from light-water reactors?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the standard review plan say about the thermal evaluation of dry storage casks?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How should bioassay measurements be interpreted to estimate a worker's intake?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does ONR expect a safety case to contain and how should it be structured?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How does ONR judge whether risks have been reduced so far as is reasonably practicable?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are ONR's expectations for examination, inspection, maintenance and testing of items important to safety?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How should a licensee assure the competence of personnel doing safety-related work?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are operating rules, limits and conditions for nuclear safety in ONR guidance?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What is a design authority and what capability must a licensee retain?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What numerical targets do the Safety Assessment Principles set for normal operation doses to workers?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What do the Safety Assessment Principles say about leadership and management for safety?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How do the Safety Assessment Principles describe design basis analysis of faults?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What engineering principles cover redundancy, diversity and segregation in the SAPs?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the Nuclear Safety Directive require for the independence of the national regulatory authority?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What is the high-level nuclear safety objective introduced by Directive 2014/87/Euratom?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for topical peer reviews under the amended Nuclear Safety Directive?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What must a national programme for spent fuel and radioactive waste management include?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What transparency obligations apply to nuclear safety information for the public under Euratom directives?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "Who bears prime responsibility for the safety of a nuclear installation under Euratom law?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How often must Member States report to the Commission on implementing the radioactive waste directive?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the Nuclear Safety Directive require for on-site emergency preparedness and response?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does 10 CFR 73.54 require for cyber security at nuclear power plants?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does 10 CFR Part 55 require for reactor operator licensing examinations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the Nuclear Industries Security Regulations require of a licensee?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "How does ONR regulate the road transport of radioactive material?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What does the Euratom Basic Safety Standards Directive say about radon in homes?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the EU rules on shipments of radioactive waste between Member States?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What specific elements must be included in the characterization information for a site and its surrounding region potentially affected by a project, according to REGDOC-1.1.1 §C.7.1?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the requirements for management systems and quality assurance programs in applications for licences under the various regulations mentioned in REGDOC-2.1.1 §1.3?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the specific requirements for emergency response facilities for licensees of reactor facilities with a thermal capacity greater than 10 MW according to REGDOC-2.10.1 §2.2.6?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the key design requirements for a radioactive disposal facility according to REGDOC-2.11.1 §11.2.2?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What are the record-keeping requirements for licensees regarding nuclear substances and worker training under the General Nuclear Safety and Control Regulations and the Nuclear Substances and Radiation Devices Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				},
+				{
+					"query": "What information must be included in an application for a licence to operate a Class I nuclear facility and in an application for the amendment, revocation, or replacement of a licence according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
+					"recall@8": 1,
+					"recall@20": 1,
+					"returned": 20,
+					"top1_match": 1
+				}
+			]
+		}
+	}
+}

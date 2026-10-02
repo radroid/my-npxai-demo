@@ -62,3 +62,6 @@ scraped_regdocs/
 # (item-2: only the datasets evals/*.jsonl, the report, and the summary JSON are)
 evals/results/
 evals/.judge-cache/
+
+# Phase 12 source downloads (re-fetchable; hashes are pinned in corpus/register.json)
+/corpus/.cache/

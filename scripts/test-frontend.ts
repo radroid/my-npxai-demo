@@ -111,8 +111,10 @@ for (const file of khFiles) {
 // =============================================================================
 
 const threadSrc = readSrc("../components/assistant-ui/thread.tsx");
+// Phase 12 added a second optional prop (sourceOptions, default null =
+// legacy copy); composerHeader itself must stay optional with no default.
 const threadSig = threadSrc.match(
-	/export const Thread: FC<\{ composerHeader\?: ReactNode \}> = \(\{([^)]*)\}\) => \(/,
+	/export const Thread: FC<\{\s*composerHeader\?: ReactNode;\s*sourceOptions\?: ScopeOptions \| null;\s*\}> = \(\{([^)]*)\}\) => \(/,
 );
 check(
 	"Thread's composerHeader prop type is optional ReactNode",
@@ -120,7 +122,9 @@ check(
 );
 check(
 	"composerHeader destructured with NO default value",
-	threadSig !== null && !/=/.test(threadSig[1]),
+	threadSig !== null &&
+		/(^|,)\s*composerHeader\s*(,|$)/.test(threadSig[1]) &&
+		!/composerHeader\s*=/.test(threadSig[1]),
 	threadSig?.[1],
 );
 const footerBody = threadSrc.match(

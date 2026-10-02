@@ -1,0 +1,743 @@
+{
+	"ran_at": "2026-10-01T23:39:06.936Z",
+	"collections": "cnsc,nrc,onr,eu",
+	"cnsc": {
+		"corpus": "v2",
+		"repeat": 3,
+		"runs": [
+			{
+				"summary": {
+					"ship": "18/20",
+					"hard": "10/12",
+					"adversarial": "2/3"
+				},
+				"rows": [
+					{
+						"id": 1,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 2,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 3,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 4,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 5,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 6,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 7,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 8,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 9,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 10,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 11,
+						"suite": "ship",
+						"category": "multi-doc",
+						"pass": false,
+						"reason": "cite:missing_cite:REGDOC-2.2.2"
+					},
+					{
+						"id": 12,
+						"suite": "ship",
+						"category": "multi-doc",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 13,
+						"suite": "ship",
+						"category": "nuance",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 14,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 15,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 16,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 17,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 18,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 19,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": false,
+						"reason": "cite:missing_cite:REGDOC-2.3.4"
+					},
+					{
+						"id": 20,
+						"suite": "ship",
+						"category": "edge",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 21,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": false,
+						"reason": "cite_section:no_cite_section_match:7.3.4|7.6.2"
+					},
+					{
+						"id": 22,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 23,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 24,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 25,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 26,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": false,
+						"reason": "group_hits:group1_hits_0_of_3:[audits of the supplier|qualified, reputable and reliable vendors|inspection, test, and acceptance requirements|extend requirements to sub-suppliers|experience gained is identified and collected]"
+					},
+					{
+						"id": 27,
+						"suite": "hard",
+						"category": "hard-nuance",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 28,
+						"suite": "hard",
+						"category": "hard-multi-doc",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 29,
+						"suite": "hard",
+						"category": "hard-law",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 30,
+						"suite": "hard",
+						"category": "hard-law",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 31,
+						"suite": "hard",
+						"category": "hard-adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 32,
+						"suite": "hard",
+						"category": "hard-multi-doc",
+						"pass": true,
+						"reason": "ok"
+					}
+				]
+			},
+			{
+				"summary": {
+					"ship": "17/20",
+					"hard": "9/12",
+					"adversarial": "2/3"
+				},
+				"rows": [
+					{
+						"id": 1,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 2,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 3,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 4,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 5,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 6,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 7,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 8,
+						"suite": "ship",
+						"category": "core",
+						"pass": false,
+						"reason": "contain_any:missing_any:emergency response plan|ER plan"
+					},
+					{
+						"id": 9,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 10,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 11,
+						"suite": "ship",
+						"category": "multi-doc",
+						"pass": false,
+						"reason": "cite:missing_cite:REGDOC-2.2.2"
+					},
+					{
+						"id": 12,
+						"suite": "ship",
+						"category": "multi-doc",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 13,
+						"suite": "ship",
+						"category": "nuance",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 14,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 15,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 16,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 17,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 18,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 19,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": false,
+						"reason": "cite:missing_cite:REGDOC-2.3.4"
+					},
+					{
+						"id": 20,
+						"suite": "ship",
+						"category": "edge",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 21,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": false,
+						"reason": "cite_section:no_cite_section_match:7.3.4|7.6.2"
+					},
+					{
+						"id": 22,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 23,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 24,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 25,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": false,
+						"reason": "cite_section:no_cite_section_match:2.1|2.2"
+					},
+					{
+						"id": 26,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": false,
+						"reason": "group_hits:group1_hits_0_of_3:[audits of the supplier|qualified, reputable and reliable vendors|inspection, test, and acceptance requirements|extend requirements to sub-suppliers|experience gained is identified and collected]"
+					},
+					{
+						"id": 27,
+						"suite": "hard",
+						"category": "hard-nuance",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 28,
+						"suite": "hard",
+						"category": "hard-multi-doc",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 29,
+						"suite": "hard",
+						"category": "hard-law",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 30,
+						"suite": "hard",
+						"category": "hard-law",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 31,
+						"suite": "hard",
+						"category": "hard-adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 32,
+						"suite": "hard",
+						"category": "hard-multi-doc",
+						"pass": true,
+						"reason": "ok"
+					}
+				]
+			},
+			{
+				"summary": {
+					"ship": "18/20",
+					"hard": "10/12",
+					"adversarial": "2/3"
+				},
+				"rows": [
+					{
+						"id": 1,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 2,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 3,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 4,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 5,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 6,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 7,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 8,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 9,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 10,
+						"suite": "ship",
+						"category": "core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 11,
+						"suite": "ship",
+						"category": "multi-doc",
+						"pass": false,
+						"reason": "cite:missing_cite:REGDOC-2.2.2"
+					},
+					{
+						"id": 12,
+						"suite": "ship",
+						"category": "multi-doc",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 13,
+						"suite": "ship",
+						"category": "nuance",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 14,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 15,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 16,
+						"suite": "ship",
+						"category": "out-of-corpus",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 17,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 18,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 19,
+						"suite": "ship",
+						"category": "adversarial",
+						"pass": false,
+						"reason": "cite:missing_cite:REGDOC-2.3.4"
+					},
+					{
+						"id": 20,
+						"suite": "ship",
+						"category": "edge",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 21,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": false,
+						"reason": "cite_section:no_cite_section_match:7.3.4|7.6.2"
+					},
+					{
+						"id": 22,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 23,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 24,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 25,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 26,
+						"suite": "hard",
+						"category": "hard-core",
+						"pass": false,
+						"reason": "group_hits:group1_hits_0_of_3:[audits of the supplier|qualified, reputable and reliable vendors|inspection, test, and acceptance requirements|extend requirements to sub-suppliers|experience gained is identified and collected]"
+					},
+					{
+						"id": 27,
+						"suite": "hard",
+						"category": "hard-nuance",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 28,
+						"suite": "hard",
+						"category": "hard-multi-doc",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 29,
+						"suite": "hard",
+						"category": "hard-law",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 30,
+						"suite": "hard",
+						"category": "hard-law",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 31,
+						"suite": "hard",
+						"category": "hard-adversarial",
+						"pass": true,
+						"reason": "ok"
+					},
+					{
+						"id": 32,
+						"suite": "hard",
+						"category": "hard-multi-doc",
+						"pass": true,
+						"reason": "ok"
+					}
+				]
+			}
+		],
+		"pass_rate_by_case": {
+			"1": "3/3",
+			"2": "3/3",
+			"3": "3/3",
+			"4": "3/3",
+			"5": "3/3",
+			"6": "3/3",
+			"7": "3/3",
+			"8": "2/3",
+			"9": "3/3",
+			"10": "3/3",
+			"11": "0/3",
+			"12": "3/3",
+			"13": "3/3",
+			"14": "3/3",
+			"15": "3/3",
+			"16": "3/3",
+			"17": "3/3",
+			"18": "3/3",
+			"19": "0/3",
+			"20": "3/3",
+			"21": "0/3",
+			"22": "3/3",
+			"23": "3/3",
+			"24": "3/3",
+			"25": "2/3",
+			"26": "0/3",
+			"27": "3/3",
+			"28": "3/3",
+			"29": "3/3",
+			"30": "3/3",
+			"31": "3/3",
+			"32": "3/3"
+		}
+	}
+}

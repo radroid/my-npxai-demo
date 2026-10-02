@@ -1,0 +1,151 @@
+{
+	"run_at": "2026-10-01T23:49:00.384Z",
+	"summary": {
+		"register_version": "2026-10-01.2",
+		"entries": 103,
+		"db_documents": 103,
+		"chunks": {
+			"cnsc": 2609,
+			"eu": 86,
+			"nrc": 5307,
+			"onr": 559
+		},
+		"searchable": [
+			"cnsc",
+			"eu",
+			"nrc",
+			"onr"
+		],
+		"fails": 0,
+		"warns": 0
+	},
+	"pages": [
+		{
+			"id": "nrc-rg-1.21@rev-3",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-1.179@rev-2",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-3.61@rev-0",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-4.1@rev-2",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-8.7@rev-4",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-8.9@rev-1",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-8.10@rev-2",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-8.13@rev-3",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-8.25@rev-1",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-8.29@rev-1",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-rg-8.34@rev-1",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-nureg-2215@final-2020",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-nureg-1757-v1@rev-2",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-nureg-1757-v2@rev-2",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-nureg-1757-v3@rev-1",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-nureg-1575-v1@rev-2",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "nrc-nureg-1575-v2@rev-2",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		},
+		{
+			"id": "onr-saps@2014-rev1",
+			"sampled": 6,
+			"on_cited_page": 6,
+			"off_by_one": 0,
+			"not_found": 0
+		}
+	],
+	"findings": []
+}

@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SourceChunk } from "@/components/knowledge-hub/SourcesPanel";
+import type { SourceRecord } from "@/lib/sources/citations";
+import type { ScopeNoticePayload, ScopeSummary } from "@/lib/sources/payload";
+import { currentScopeBody } from "@/lib/sources/scope-store";
 
 // Parses the SSE frames /api/knowledge-hub/artifact streams into workbench
 // state (item-1 slice 1.2). Frame-parsing follows the useGenerateStream
@@ -13,6 +16,9 @@ import type { SourceChunk } from "@/components/knowledge-hub/SourcesPanel";
 //   artifact { html, sources, truncated, limitedCoverage, cached } → done;
 //   failures emit error { code, message } (jailbreak/OOS responses are
 //   one-shot SSE bodies carrying only the error frame).
+// Phase 12 (v2 corpus): the request carries the source scope; artifact adds
+// `scope` and SourceRecord sources; a scope decline is error
+// { code: "scope_notice", message, notice: { reason, suggestions } }.
 
 export type ArtifactStatus =
 	| "idle"
@@ -25,6 +31,7 @@ export type ArtifactErrorKind =
 	| "validation"
 	| "rate_limit"
 	| "out_of_scope"
+	| "scope_notice"
 	| "output_guard"
 	| "generation_failed"
 	| "server"
@@ -33,11 +40,14 @@ export type ArtifactErrorKind =
 export interface ArtifactError {
 	kind: ArtifactErrorKind;
 	message: string;
+	notice?: ScopeNoticePayload;
 }
 
 export interface ArtifactResult {
 	html: string;
-	sources: SourceChunk[];
+	sources: SourceChunk[] | SourceRecord[];
+	/** Present on the v2 corpus. */
+	scope?: ScopeSummary;
 	truncated: boolean;
 	limitedCoverage: boolean;
 	cached: boolean;
@@ -47,7 +57,8 @@ export interface ArtifactResult {
 
 interface ArtifactEventPayload {
 	html: string;
-	sources: SourceChunk[];
+	sources: SourceChunk[] | SourceRecord[];
+	scope?: ScopeSummary;
 	truncated: boolean;
 	limitedCoverage: boolean;
 	cached: boolean;
@@ -56,11 +67,13 @@ interface ArtifactEventPayload {
 interface ErrorEventPayload {
 	code?: string;
 	message?: string;
+	notice?: ScopeNoticePayload;
 }
 
 function errorKindFromCode(code: string | undefined): ArtifactErrorKind {
 	if (
 		code === "out_of_scope" ||
+		code === "scope_notice" ||
 		code === "output_guard" ||
 		code === "generation_failed"
 	) {
@@ -95,8 +108,12 @@ export function useArtifactStream() {
 		setTokens(0);
 		setArtifact(null);
 
-		const fail = (kind: ArtifactErrorKind, message: string) => {
-			setError({ kind, message });
+		const fail = (
+			kind: ArtifactErrorKind,
+			message: string,
+			notice?: ScopeNoticePayload,
+		) => {
+			setError({ kind, message, notice });
 			setStatus("error");
 		};
 
@@ -104,7 +121,7 @@ export function useArtifactStream() {
 			const res = await fetch("/api/knowledge-hub/artifact", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ query }),
+				body: JSON.stringify({ query, ...currentScopeBody() }),
 				signal: controller.signal,
 			});
 
@@ -163,6 +180,7 @@ export function useArtifactStream() {
 						setArtifact({
 							html: payload.html,
 							sources: payload.sources ?? [],
+							scope: payload.scope,
 							truncated: Boolean(payload.truncated),
 							limitedCoverage: Boolean(payload.limitedCoverage),
 							cached: Boolean(payload.cached),
@@ -175,6 +193,7 @@ export function useArtifactStream() {
 						fail(
 							errorKindFromCode(payload?.code),
 							payload?.message ?? "Artifact generation failed.",
+							payload?.notice,
 						);
 						return;
 					}

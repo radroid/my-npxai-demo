@@ -1,0 +1,1236 @@
+{
+	"run_at": "2026-10-01T23:51:06.813Z",
+	"envelope": 8,
+	"summary": {
+		"unchanged": {
+			"questions": 59,
+			"legacy_hit": 57,
+			"v2_hit": 57,
+			"v2_historical_hit": 56,
+			"lost": [],
+			"gained": [],
+			"gate_disagreements": []
+		},
+		"refreshed": {
+			"questions": 33,
+			"legacy_hit": 33,
+			"v2_hit": 29,
+			"v2_historical_hit": 31,
+			"lost": [
+				"s011",
+				"s029",
+				"s047",
+				"h006"
+			],
+			"gained": [],
+			"gate_disagreements": []
+		},
+		"refreshed_documents": [
+			"REGDOC-2.1.1",
+			"REGDOC-2.10.1",
+			"REGDOC-2.12.3",
+			"REGDOC-2.2.2",
+			"REGDOC-2.3.2",
+			"REGDOC-2.5.2",
+			"REGDOC-2.7.1"
+		]
+	},
+	"rows": [
+		{
+			"id": "s002",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-1.1.1"
+			],
+			"legacy_hit": false,
+			"v2_hit": false,
+			"v2_historical_hit": false,
+			"legacy_top": 0.678,
+			"v2_top": 0.678,
+			"gate_agrees": true
+		},
+		{
+			"id": "s003",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.738,
+			"v2_top": 0.747,
+			"gate_agrees": true
+		},
+		{
+			"id": "s004",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.10.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.79,
+			"v2_top": 0.79,
+			"gate_agrees": true
+		},
+		{
+			"id": "s005",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.11.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.753,
+			"v2_top": 0.753,
+			"gate_agrees": true
+		},
+		{
+			"id": "s006",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.12.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.739,
+			"v2_top": 0.739,
+			"gate_agrees": true
+		},
+		{
+			"id": "s007",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.2.5"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": false,
+			"legacy_top": 0.757,
+			"v2_top": 0.764,
+			"gate_agrees": true
+		},
+		{
+			"id": "s008",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.3.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.752,
+			"v2_top": 0.754,
+			"gate_agrees": true
+		},
+		{
+			"id": "s009",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.3.4"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.797,
+			"v2_top": 0.797,
+			"gate_agrees": true
+		},
+		{
+			"id": "s011",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.5.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": false,
+			"v2_historical_hit": true,
+			"legacy_top": 0.759,
+			"v2_top": 0.759,
+			"gate_agrees": true
+		},
+		{
+			"id": "s012",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.6.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.743,
+			"v2_top": 0.743,
+			"gate_agrees": true
+		},
+		{
+			"id": "s013",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.7.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.793,
+			"v2_top": 0.793,
+			"gate_agrees": true
+		},
+		{
+			"id": "s014",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.8.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.736,
+			"v2_top": 0.736,
+			"gate_agrees": true
+		},
+		{
+			"id": "s015",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.9.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.773,
+			"v2_top": 0.773,
+			"gate_agrees": true
+		},
+		{
+			"id": "s016",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.757,
+			"v2_top": 0.757,
+			"gate_agrees": true
+		},
+		{
+			"id": "s017",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.5.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.838,
+			"v2_top": 0.838,
+			"gate_agrees": true
+		},
+		{
+			"id": "s018",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.6"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.722,
+			"v2_top": 0.724,
+			"gate_agrees": true
+		},
+		{
+			"id": "s019",
+			"group": "unchanged",
+			"gold_docs": [
+				"NSCA"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.648,
+			"v2_top": 0.648,
+			"gate_agrees": true
+		},
+		{
+			"id": "s020",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-1.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.729,
+			"v2_top": 0.729,
+			"gate_agrees": true
+		},
+		{
+			"id": "s021",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.824,
+			"v2_top": 0.813,
+			"gate_agrees": true
+		},
+		{
+			"id": "s022",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.10.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.813,
+			"v2_top": 0.811,
+			"gate_agrees": true
+		},
+		{
+			"id": "s023",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.11.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.699,
+			"v2_top": 0.699,
+			"gate_agrees": true
+		},
+		{
+			"id": "s024",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.12.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.804,
+			"v2_top": 0.799,
+			"gate_agrees": true
+		},
+		{
+			"id": "s025",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.2.5"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.784,
+			"v2_top": 0.784,
+			"gate_agrees": true
+		},
+		{
+			"id": "s026",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.3.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.777,
+			"v2_top": 0.689,
+			"gate_agrees": true
+		},
+		{
+			"id": "s027",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.3.4"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.732,
+			"v2_top": 0.732,
+			"gate_agrees": true
+		},
+		{
+			"id": "s028",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.4.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.725,
+			"v2_top": 0.725,
+			"gate_agrees": true
+		},
+		{
+			"id": "s029",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.5.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": false,
+			"v2_historical_hit": true,
+			"legacy_top": 0.72,
+			"v2_top": 0.716,
+			"gate_agrees": true
+		},
+		{
+			"id": "s030",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.6.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.79,
+			"v2_top": 0.79,
+			"gate_agrees": true
+		},
+		{
+			"id": "s031",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.7.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.789,
+			"v2_top": 0.789,
+			"gate_agrees": true
+		},
+		{
+			"id": "s032",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.8.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.706,
+			"v2_top": 0.706,
+			"gate_agrees": true
+		},
+		{
+			"id": "s033",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.9.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.734,
+			"v2_top": 0.734,
+			"gate_agrees": true
+		},
+		{
+			"id": "s034",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.764,
+			"v2_top": 0.764,
+			"gate_agrees": true
+		},
+		{
+			"id": "s035",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.5.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.797,
+			"v2_top": 0.797,
+			"gate_agrees": true
+		},
+		{
+			"id": "s037",
+			"group": "unchanged",
+			"gold_docs": [
+				"NSCA"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.664,
+			"v2_top": 0.664,
+			"gate_agrees": true
+		},
+		{
+			"id": "s038",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-1.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.754,
+			"v2_top": 0.754,
+			"gate_agrees": true
+		},
+		{
+			"id": "s039",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.724,
+			"v2_top": 0.727,
+			"gate_agrees": true
+		},
+		{
+			"id": "s040",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.10.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.749,
+			"v2_top": 0.749,
+			"gate_agrees": true
+		},
+		{
+			"id": "s041",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.11.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.733,
+			"v2_top": 0.733,
+			"gate_agrees": true
+		},
+		{
+			"id": "s042",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.12.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.821,
+			"v2_top": 0.808,
+			"gate_agrees": true
+		},
+		{
+			"id": "s043",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.2.5"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.765,
+			"v2_top": 0.765,
+			"gate_agrees": true
+		},
+		{
+			"id": "s044",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.3.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.807,
+			"v2_top": 0.732,
+			"gate_agrees": true
+		},
+		{
+			"id": "s045",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.3.4"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.813,
+			"v2_top": 0.813,
+			"gate_agrees": true
+		},
+		{
+			"id": "s046",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.4.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.739,
+			"v2_top": 0.739,
+			"gate_agrees": true
+		},
+		{
+			"id": "s047",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.5.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": false,
+			"v2_historical_hit": true,
+			"legacy_top": 0.512,
+			"v2_top": 0.512,
+			"gate_agrees": true
+		},
+		{
+			"id": "s048",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.6.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.704,
+			"v2_top": 0.704,
+			"gate_agrees": true
+		},
+		{
+			"id": "s049",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.7.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.745,
+			"v2_top": 0.741,
+			"gate_agrees": true
+		},
+		{
+			"id": "s050",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.8.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.811,
+			"v2_top": 0.811,
+			"gate_agrees": true
+		},
+		{
+			"id": "s051",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.9.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.659,
+			"v2_top": 0.659,
+			"gate_agrees": true
+		},
+		{
+			"id": "s052",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.811,
+			"v2_top": 0.811,
+			"gate_agrees": true
+		},
+		{
+			"id": "s053",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.5.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.774,
+			"v2_top": 0.774,
+			"gate_agrees": true
+		},
+		{
+			"id": "s055",
+			"group": "unchanged",
+			"gold_docs": [
+				"NSCA"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.676,
+			"v2_top": 0.676,
+			"gate_agrees": true
+		},
+		{
+			"id": "s056",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-1.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.757,
+			"v2_top": 0.757,
+			"gate_agrees": true
+		},
+		{
+			"id": "s057",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.766,
+			"v2_top": 0.768,
+			"gate_agrees": true
+		},
+		{
+			"id": "s058",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.10.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": false,
+			"legacy_top": 0.687,
+			"v2_top": 0.687,
+			"gate_agrees": true
+		},
+		{
+			"id": "s059",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.11.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.761,
+			"v2_top": 0.761,
+			"gate_agrees": true
+		},
+		{
+			"id": "s060",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.12.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.769,
+			"v2_top": 0.754,
+			"gate_agrees": true
+		},
+		{
+			"id": "s061",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.2.5"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.752,
+			"v2_top": 0.752,
+			"gate_agrees": true
+		},
+		{
+			"id": "s062",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.3.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.688,
+			"v2_top": 0.689,
+			"gate_agrees": true
+		},
+		{
+			"id": "s063",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.3.4"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.679,
+			"v2_top": 0.679,
+			"gate_agrees": true
+		},
+		{
+			"id": "s064",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.4.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.745,
+			"v2_top": 0.745,
+			"gate_agrees": true
+		},
+		{
+			"id": "m001",
+			"group": "unchanged",
+			"gold_docs": [
+				"NSCA"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.613,
+			"v2_top": 0.613,
+			"gate_agrees": true
+		},
+		{
+			"id": "m002",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.10.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.752,
+			"v2_top": 0.752,
+			"gate_agrees": true
+		},
+		{
+			"id": "m003",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.4.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.749,
+			"v2_top": 0.749,
+			"gate_agrees": true
+		},
+		{
+			"id": "m004",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.7.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.795,
+			"v2_top": 0.795,
+			"gate_agrees": true
+		},
+		{
+			"id": "m005",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.9.1"
+			],
+			"legacy_hit": false,
+			"v2_hit": false,
+			"v2_historical_hit": false,
+			"legacy_top": 0.785,
+			"v2_top": 0.785,
+			"gate_agrees": true
+		},
+		{
+			"id": "m006",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.711,
+			"v2_top": 0.711,
+			"gate_agrees": true
+		},
+		{
+			"id": "m007",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.5.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.735,
+			"v2_top": 0.735,
+			"gate_agrees": true
+		},
+		{
+			"id": "m008",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.6"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.578,
+			"v2_top": 0.577,
+			"gate_agrees": true
+		},
+		{
+			"id": "m009",
+			"group": "unchanged",
+			"gold_docs": [
+				"NSCA"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.693,
+			"v2_top": 0.693,
+			"gate_agrees": true
+		},
+		{
+			"id": "m010",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.10.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.763,
+			"v2_top": 0.764,
+			"gate_agrees": true
+		},
+		{
+			"id": "m011",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.12.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.809,
+			"v2_top": 0.814,
+			"gate_agrees": true
+		},
+		{
+			"id": "m012",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.3.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.77,
+			"v2_top": 0.784,
+			"gate_agrees": true
+		},
+		{
+			"id": "m013",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.3.4"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.824,
+			"v2_top": 0.824,
+			"gate_agrees": true
+		},
+		{
+			"id": "m014",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.6.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.789,
+			"v2_top": 0.789,
+			"gate_agrees": true
+		},
+		{
+			"id": "m015",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.7.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.755,
+			"v2_top": 0.752,
+			"gate_agrees": true
+		},
+		{
+			"id": "m016",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.9.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.796,
+			"v2_top": 0.796,
+			"gate_agrees": true
+		},
+		{
+			"id": "m017",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.762,
+			"v2_top": 0.762,
+			"gate_agrees": true
+		},
+		{
+			"id": "m018",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.6"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.59,
+			"v2_top": 0.59,
+			"gate_agrees": true
+		},
+		{
+			"id": "m019",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-1.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.771,
+			"v2_top": 0.771,
+			"gate_agrees": true
+		},
+		{
+			"id": "m020",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.3.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.79,
+			"v2_top": 0.692,
+			"gate_agrees": true
+		},
+		{
+			"id": "m021",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.3.4"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.829,
+			"v2_top": 0.829,
+			"gate_agrees": true
+		},
+		{
+			"id": "m022",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.4.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.744,
+			"v2_top": 0.744,
+			"gate_agrees": true
+		},
+		{
+			"id": "h001",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.3.4"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.728,
+			"v2_top": 0.728,
+			"gate_agrees": true
+		},
+		{
+			"id": "h002",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.2.5"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.686,
+			"v2_top": 0.685,
+			"gate_agrees": true
+		},
+		{
+			"id": "h003",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.2.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.747,
+			"v2_top": 0.749,
+			"gate_agrees": true
+		},
+		{
+			"id": "h004",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.6.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.794,
+			"v2_top": 0.794,
+			"gate_agrees": true
+		},
+		{
+			"id": "h005",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.3.2"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.709,
+			"v2_top": 0.722,
+			"gate_agrees": true
+		},
+		{
+			"id": "h006",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.7.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": false,
+			"v2_historical_hit": false,
+			"legacy_top": 0.647,
+			"v2_top": 0.647,
+			"gate_agrees": true
+		},
+		{
+			"id": "h007",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-2.4.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.747,
+			"v2_top": 0.747,
+			"gate_agrees": true
+		},
+		{
+			"id": "h008",
+			"group": "refreshed",
+			"gold_docs": [
+				"REGDOC-2.10.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.728,
+			"v2_top": 0.728,
+			"gate_agrees": true
+		},
+		{
+			"id": "h009",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-1.1.1"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.774,
+			"v2_top": 0.774,
+			"gate_agrees": true
+		},
+		{
+			"id": "h010",
+			"group": "unchanged",
+			"gold_docs": [
+				"REGDOC-3.5.3"
+			],
+			"legacy_hit": true,
+			"v2_hit": true,
+			"v2_historical_hit": true,
+			"legacy_top": 0.827,
+			"v2_top": 0.827,
+			"gate_agrees": true
+		}
+	]
+}

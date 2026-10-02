@@ -6,9 +6,15 @@
 // shared pipeline lives here in lib/.
 
 import type OpenAI from "openai";
-import type { RetrievedChunk } from "./context-envelope";
+import type { RetrievedChunk, SourceMeta } from "./context-envelope";
 import { type GuardedHandlerArgs, recordOpenAICall } from "./guard";
 import { EMBEDDING_DIMENSIONS, OPENAI_MODELS } from "./openai";
+import type {
+	CollectionId,
+	DocumentKind,
+	DocumentStatus,
+	LegalForce,
+} from "./sources/catalog";
 
 // D.3 fallback thresholds. Calibrated 2026-04-17 against scripts/probe-sims.ts:
 // LOW_SIM_OOS=0.40 lets single-word corpus-relevant queries (Q20 "turnover" at
@@ -56,16 +62,101 @@ const CONCEPT_DOC_HINTS: Array<[RegExp, string]> = [
 // embeds very weakly against verbose natural-language questions.
 const QUERY_SECTION_RE = /(?:§|\bsection\s+|\bs\.\s*)(\d+(?:\.\d+){0,3})\b/gi;
 
-function extractMentionedDocs(query: string): Set<string> {
+// v2 (multi-source) document references, keyed by the collection whose
+// doc_ref grammar they produce. Each canonical form below is exactly the
+// `doc_ref` the source register stores for that document, so a mention can
+// boost its chunks the same way a REGDOC mention boosts CNSC chunks.
+//   NRC:  "RG 1.21", "NUREG-1575", "10 CFR 20.1201" — or a whole part,
+//         "10 CFR 20", which boosts every provision in that part.
+//   ONR:  "ONR SAPs", "NS-TAST-GD-005".
+//   EU:   "Directive 2009/71/Euratom".
+const V2_DOC_PATTERNS: Array<{
+	collection: CollectionId;
+	re: RegExp;
+	canon: (m: RegExpMatchArray) => string;
+}> = [
+	{
+		collection: "nrc",
+		re: /\b(?:RG|Reg(?:ulatory)?\.?\s+Guide)\s?(\d{1,2}\.\d{1,3})\b/gi,
+		canon: (m) => `RG ${m[1]}`,
+	},
+	{
+		collection: "nrc",
+		re: /\bNUREG[\s-]?(\d{3,4})\b/gi,
+		canon: (m) => `NUREG-${m[1]}`,
+	},
+	{
+		collection: "nrc",
+		re: /\b10\s*C\.?F\.?R\.?\s*(?:Part\s+|§\s*)?(\d{1,3})(?:\.(\d{1,4}))?\b/gi,
+		canon: (m) => (m[2] ? `10 CFR ${m[1]}.${m[2]}` : `10 CFR ${m[1]}`),
+	},
+	{
+		collection: "onr",
+		re: /\b(?:SAPs|Safety Assessment Principles)\b/gi,
+		canon: () => "ONR SAPs",
+	},
+	{
+		collection: "onr",
+		re: /\bNS-TAST-GD-(\d{3})\b/gi,
+		canon: (m) => `NS-TAST-GD-${m[1]}`,
+	},
+	{
+		collection: "eu",
+		re: /\bDirective\s+(\d{4})\/(\d{1,3})(?:\/Euratom)?\b/gi,
+		canon: (m) => `Directive ${m[1]}/${m[2]}/Euratom`,
+	},
+];
+
+// `collections` undefined = the legacy CNSC-only corpus: byte-identical to
+// the pre-Phase-12 extractor. Defined = the v2 corpus: CNSC grammar and CNSC
+// concept hints apply only when CNSC is in scope (an NRC-scoped answer must
+// never be told it "spans REGDOC-2.7.1"), and each other collection's
+// grammar only when that collection is in scope.
+function extractMentionedDocs(
+	query: string,
+	collections?: readonly CollectionId[],
+): Set<string> {
 	const out = new Set<string>();
-	for (const m of query.matchAll(QUERY_DOC_RE)) {
-		if (m[1]) out.add(`REGDOC-${m[1]}`);
-		else if (m[2]) out.add("NSCA");
+	const cnscInScope = !collections || collections.includes("cnsc");
+	if (cnscInScope) {
+		for (const m of query.matchAll(QUERY_DOC_RE)) {
+			if (m[1]) out.add(`REGDOC-${m[1]}`);
+			else if (m[2]) out.add("NSCA");
+		}
+		for (const [re, doc] of CONCEPT_DOC_HINTS) {
+			if (re.test(query)) out.add(doc);
+		}
 	}
-	for (const [re, doc] of CONCEPT_DOC_HINTS) {
-		if (re.test(query)) out.add(doc);
+	if (collections) {
+		for (const p of V2_DOC_PATTERNS) {
+			if (!collections.includes(p.collection)) continue;
+			for (const m of query.matchAll(p.re)) out.add(p.canon(m));
+		}
 	}
 	return out;
+}
+
+// Does a chunk's doc ref satisfy a mentioned ref? Exact match, plus one
+// widening: a CFR PART mention ("10 CFR 20") matches every provision in it
+// ("10 CFR 20.1201"). Legacy refs (REGDOC-*, NSCA) never start with "10 CFR",
+// so on the legacy path this is exactly the old Set.has() check.
+// A mention names a document or a family of them: "10 CFR 20" covers
+// "10 CFR 20.1201"; "10 CFR 50" also covers "10 CFR 50 App. B"; a
+// multi-volume "NUREG-1757" covers "NUREG-1757 Vol. 2".
+function refMatchesMention(ref: string, mention: string): boolean {
+	if (ref === mention) return true;
+	if (/^10 CFR \d+$/.test(mention)) {
+		return ref.startsWith(`${mention}.`) || ref.startsWith(`${mention} `);
+	}
+	return /^NUREG-\d+$/.test(mention) && ref.startsWith(`${mention} Vol.`);
+}
+
+function isMentioned(ref: string, mentioned: ReadonlySet<string>): boolean {
+	if (mentioned.has(ref)) return true;
+	for (const m of mentioned) {
+		if (refMatchesMention(ref, m)) return true;
+	}
+	return false;
 }
 
 function extractMentionedSections(query: string): string[] {
@@ -177,8 +268,11 @@ function buildExpansions(
 //
 // retrieveChunks builds its own inputs through this same function, so the eval's
 // count and production's call can never drift.
-export function embeddingInputsFor(query: string): string[] {
-	const docs = extractMentionedDocs(query);
+export function embeddingInputsFor(
+	query: string,
+	collections?: readonly CollectionId[],
+): string[] {
+	const docs = extractMentionedDocs(query, collections);
 	const sections = extractMentionedSections(query);
 	return [query, ...buildExpansions(query, docs, sections)];
 }
@@ -198,7 +292,9 @@ function selectDiverseEnvelope(
 	const out: RetrievedChunk[] = [];
 	const seen = new Set<number>();
 	for (const doc of mustInclude) {
-		const top = sorted.find((c) => c.regdoc_id === doc && !seen.has(c.id));
+		const top = sorted.find(
+			(c) => refMatchesMention(c.regdoc_id, doc) && !seen.has(c.id),
+		);
 		if (top) {
 			out.push(top);
 			seen.add(top.id);
@@ -288,6 +384,21 @@ export interface RetrievalDeps {
 	recordUsage?: (costUsd?: number) => Promise<void>;
 }
 
+// D.3 gate values as one bundle so the v2 corpus can calibrate them per
+// collection (lib/sources/thresholds.ts). Omitted = the CNSC-calibrated
+// constants above, i.e. exactly the legacy behaviour.
+export interface RetrievalThresholds {
+	oos: number;
+	disclaimer: number;
+	minChunk: number;
+}
+
+export const DEFAULT_THRESHOLDS: RetrievalThresholds = {
+	oos: LOW_SIM_OOS,
+	disclaimer: LOW_SIM_DISCLAIMER,
+	minChunk: MIN_CHUNK_SIM,
+};
+
 export interface RetrievalOptions {
 	// Envelope size is the ONLY caller-tunable knob: chat keeps its
 	// calibrated 8 (ENVELOPE_CHUNKS above); the artifact route passes 12
@@ -297,6 +408,74 @@ export interface RetrievalOptions {
 	// RetrievalTrace for eval instrumentation. Neither production route sets
 	// this, so their behavior and result shape are unchanged.
 	withTrace?: boolean;
+	// ADDITIVE (Phase 12): search the multi-source corpus (source_chunks via
+	// match_source_chunks) restricted to these collections. Omitted = the
+	// legacy CNSC table via match_regdoc_chunks, unchanged.
+	source?: {
+		collections: readonly CollectionId[];
+		includeHistorical?: boolean;
+	};
+	// ADDITIVE (Phase 12): per-collection gate values; see DEFAULT_THRESHOLDS.
+	thresholds?: RetrievalThresholds;
+}
+
+// One row of match_source_chunks (supabase/migrations/20261001000000_*).
+interface SourceMatchRow {
+	id: number;
+	document_key: string;
+	doc_ref: string;
+	label: string;
+	title: string;
+	publisher: string;
+	jurisdiction: string;
+	collection: CollectionId;
+	document_kind: DocumentKind;
+	legal_force: LegalForce;
+	edition: string | null;
+	status: DocumentStatus;
+	as_of: string;
+	canonical_url: string;
+	attribution: string | null;
+	section_number: string | null;
+	section_title: string | null;
+	page_start: number | null;
+	page_end: number | null;
+	locator_url: string | null;
+	chunk_text: string;
+	requirement_type: "requirement" | "guidance" | null;
+	similarity: number;
+}
+
+function fromSourceRow(r: SourceMatchRow): RetrievedChunk {
+	const source: SourceMeta = {
+		document_key: r.document_key,
+		ref: r.doc_ref,
+		label: r.label,
+		title: r.title,
+		publisher: r.publisher,
+		jurisdiction: r.jurisdiction,
+		collection: r.collection,
+		document_kind: r.document_kind,
+		legal_force: r.legal_force,
+		edition: r.edition,
+		status: r.status,
+		as_of: r.as_of,
+		canonical_url: r.canonical_url,
+		page_start: r.page_start,
+		page_end: r.page_end,
+		attribution: r.attribution,
+	};
+	return {
+		id: r.id,
+		regdoc_id: r.doc_ref,
+		section_number: r.section_number,
+		section_title: r.section_title,
+		chunk_text: r.chunk_text,
+		url: r.locator_url ?? r.canonical_url,
+		requirement_type: r.requirement_type,
+		similarity: r.similarity,
+		source,
+	};
 }
 
 // ADDITIVE (item-2 DELTA D1): one entry per candidate chunk in the merged
@@ -328,6 +507,10 @@ export interface RetrievalTrace {
 	pool: TracePoolEntry[];
 	// ADDITIVE (item-2 PR #8 fix round 2, issue 2).
 	stages: RetrievalStages;
+	// ADDITIVE (Phase 12): the gate values this retrieval ran with, so replays
+	// (deriveEnvelopeAtK et al.) use the same ones. Absent on traces captured
+	// before Phase 12 — readers fall back to DEFAULT_THRESHOLDS.
+	thresholds?: RetrievalThresholds;
 }
 
 // ADDITIVE (item-2 PR #8 fix round 2, issue 2): the pipeline's three DISTINCT
@@ -390,10 +573,11 @@ export function envelopeIdsAtK(trace: RetrievalTrace, k: number): number[] {
 // order, so restore cosine order via rankPreBoost before filtering.
 export function postFilterRankedIdsFromTrace(trace: RetrievalTrace): number[] {
 	if (trace.decision === "oos") return [];
+	const minChunk = (trace.thresholds ?? DEFAULT_THRESHOLDS).minChunk;
 	return trace.pool
 		.slice()
 		.sort((a, b) => a.rankPreBoost - b.rankPreBoost)
-		.filter((e) => e.similarity >= MIN_CHUNK_SIM)
+		.filter((e) => e.similarity >= minChunk)
 		.map((e) => e.chunk.id);
 }
 
@@ -406,10 +590,11 @@ export function deriveEnvelopeAtK(
 	trace: RetrievalTrace,
 	k: number,
 ): RetrievedChunk[] {
+	const t = trace.thresholds ?? DEFAULT_THRESHOLDS;
 	const ranked = trace.pool.map((e) => e.chunk);
-	if (trace.topSim < LOW_SIM_OOS) return ranked;
+	if (trace.topSim < t.oos) return ranked;
 	return selectDiverseEnvelope(
-		ranked.filter((c) => c.similarity >= MIN_CHUNK_SIM),
+		ranked.filter((c) => c.similarity >= t.minChunk),
 		new Set(trace.mentionedDocs),
 		k,
 	);
@@ -439,8 +624,10 @@ export async function retrieveChunks(
 	opts: RetrievalOptions,
 ): Promise<RetrievalResult> {
 	const { supabase, openai } = deps;
+	const t = opts.thresholds ?? DEFAULT_THRESHOLDS;
+	const collections = opts.source?.collections;
 
-	const mentionedDocs = extractMentionedDocs(query);
+	const mentionedDocs = extractMentionedDocs(query, collections);
 	const mentionedSections = extractMentionedSections(query);
 
 	// Build the list of embedding inputs. The primary input is always the
@@ -452,7 +639,7 @@ export async function retrieveChunks(
 	// Routed through embeddingInputsFor() (fix round 2, issue 3) so the eval
 	// cost accountant charges the SAME list this call actually sends — one
 	// source of truth, no drift, no guessed multiplier.
-	const embedInputs = embeddingInputsFor(query);
+	const embedInputs = embeddingInputsFor(query, collections);
 	const expansions = embedInputs.slice(1);
 
 	let embeddings: number[][];
@@ -498,20 +685,45 @@ export async function retrieveChunks(
 		console.error("retrieval_accounting_unavailable", err);
 	}
 
+	// One vector search. Legacy: match_regdoc_chunks over the CNSC table,
+	// call shape unchanged. v2: match_source_chunks, which filters to the
+	// requested, publicly searchable, rights-cleared, current documents
+	// BEFORE ranking (supabase/migrations/20261001000000_*).
+	const match = async (
+		embedding: number[],
+		count: number,
+	): Promise<{ rows: RetrievedChunk[]; error: unknown }> => {
+		if (!opts.source) {
+			const { data, error } = await supabase.rpc("match_regdoc_chunks", {
+				query_embedding: embedding,
+				match_count: count,
+				min_similarity: 0, // D.3 thresholds applied handler-side; keep RPC permissive
+			});
+			return { rows: (data ?? []) as RetrievedChunk[], error };
+		}
+		const { data, error } = await supabase.rpc("match_source_chunks", {
+			query_embedding: embedding,
+			collection_ids: [...opts.source.collections],
+			match_count: count,
+			min_similarity: 0,
+			include_historical: opts.source.includeHistorical === true,
+		});
+		return {
+			rows: ((data ?? []) as SourceMatchRow[]).map(fromSourceRow),
+			error,
+		};
+	};
+	const rpcName = opts.source ? "match_source_chunks" : "match_regdoc_chunks";
+
 	// Primary retrieval: 20 chunks by open cosine sim.
-	const { data: primaryMatches, error: rpcErr } = await supabase.rpc(
-		"match_regdoc_chunks",
-		{
-			query_embedding: embeddings[0],
-			match_count: MATCH_COUNT,
-			min_similarity: 0, // D.3 thresholds applied handler-side; keep RPC permissive
-		},
+	const { rows: primaryPool, error: rpcErr } = await match(
+		embeddings[0],
+		MATCH_COUNT,
 	);
 	if (rpcErr) {
-		console.error("match_regdoc_chunks_error", rpcErr);
+		console.error(`${rpcName}_error`, rpcErr);
 		throw new RetrievalError("match", rpcErr);
 	}
-	const primaryPool = (primaryMatches ?? []) as RetrievedChunk[];
 
 	// Secondary retrieval: one RPC per mentioned doc, using the expansion
 	// embedding. Merged into the pool below. We pull the max allowed (20)
@@ -519,19 +731,15 @@ export async function retrieveChunks(
 	// narrower queries — NSCA §48 is a known example.
 	const expansionPools: RetrievedChunk[][] = [];
 	for (let i = 0; i < expansions.length; i++) {
-		const { data: expMatches, error: expErr } = await supabase.rpc(
-			"match_regdoc_chunks",
-			{
-				query_embedding: embeddings[i + 1],
-				match_count: 20,
-				min_similarity: 0,
-			},
+		const { rows: expMatches, error: expErr } = await match(
+			embeddings[i + 1],
+			20,
 		);
 		if (expErr) {
-			console.error("match_regdoc_chunks_expansion_error", expErr);
+			console.error(`${rpcName}_expansion_error`, expErr);
 			continue;
 		}
-		expansionPools.push((expMatches ?? []) as RetrievedChunk[]);
+		expansionPools.push(expMatches);
 	}
 
 	// Merge + dedupe by chunk.id, keeping the highest observed similarity.
@@ -556,16 +764,17 @@ export async function retrieveChunks(
 		.map((c) => ({
 			chunk: c,
 			score:
-				c.similarity + (mentionedDocs.has(c.regdoc_id) ? NAMED_DOC_BOOST : 0),
+				c.similarity +
+				(isMentioned(c.regdoc_id, mentionedDocs) ? NAMED_DOC_BOOST : 0),
 		}))
 		.sort((a, b) => b.score - a.score)
 		.map((r) => r.chunk);
 
 	const chunks =
-		topSim < LOW_SIM_OOS
+		topSim < t.oos
 			? ranked
 			: selectDiverseEnvelope(
-					ranked.filter((c) => c.similarity >= MIN_CHUNK_SIM),
+					ranked.filter((c) => c.similarity >= t.minChunk),
 					mentionedDocs,
 					opts.envelopeChunks,
 				);
@@ -590,24 +799,21 @@ export async function retrieveChunks(
 		const preBoostRank = new Map<number, number>(
 			rawPool.map((c, i) => [c.id, i + 1]),
 		);
-		const oos = topSim < LOW_SIM_OOS;
+		const oos = topSim < t.oos;
 		trace = {
 			query,
 			expansions,
 			mentionedDocs: Array.from(mentionedDocs),
 			mentionedSections,
 			topSim,
-			decision: oos
-				? "oos"
-				: avgSim < LOW_SIM_DISCLAIMER
-					? "disclaimer"
-					: "normal",
+			decision: oos ? "oos" : avgSim < t.disclaimer ? "disclaimer" : "normal",
 			pool: ranked.map((c, i) => ({
 				chunk: c,
 				similarity: c.similarity,
-				boosted: mentionedDocs.has(c.regdoc_id),
+				boosted: isMentioned(c.regdoc_id, mentionedDocs),
 				score:
-					c.similarity + (mentionedDocs.has(c.regdoc_id) ? NAMED_DOC_BOOST : 0),
+					c.similarity +
+					(isMentioned(c.regdoc_id, mentionedDocs) ? NAMED_DOC_BOOST : 0),
 				rankPreBoost: preBoostRank.get(c.id) ?? 0,
 				rankPostBoost: i + 1,
 			})),
@@ -621,11 +827,10 @@ export async function retrieveChunks(
 				rawRankedIds: rawPool.map((c) => c.id),
 				postFilterRankedIds: oos
 					? []
-					: rawPool
-							.filter((c) => c.similarity >= MIN_CHUNK_SIM)
-							.map((c) => c.id),
+					: rawPool.filter((c) => c.similarity >= t.minChunk).map((c) => c.id),
 				envelopeIds: oos ? [] : chunks.map((c) => c.id),
 			},
+			...(opts.thresholds ? { thresholds: opts.thresholds } : {}),
 		};
 	}
 

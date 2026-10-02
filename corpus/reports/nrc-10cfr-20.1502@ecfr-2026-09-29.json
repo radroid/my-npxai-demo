@@ -1,0 +1,28 @@
+{
+	"id": "nrc-10cfr-20.1502@ecfr-2026-09-29",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "40cc90b86ed2b6074c9cf8a1572d1afbcb791e4b7f57c7a57d3112abed768b13",
+	"chunks": 3,
+	"requirement_chunks": 3,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"§ 20.1502 Conditions requiring individual monitoring of external and internal occupational dose.",
+		"(a)",
+		"(b)"
+	],
+	"report": {
+		"adapter": "ecfr-xml",
+		"parser_version": "ecfr-xml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 3,
+		"paragraphs": 10,
+		"chars": 1648,
+		"alpha_ratio": 0.742,
+		"word_like_ratio": 0.929
+	},
+	"published_at": "2026-10-01T23:22:13.288Z"
+}

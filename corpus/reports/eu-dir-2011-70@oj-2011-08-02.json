@@ -1,0 +1,43 @@
+{
+	"id": "eu-dir-2011-70@oj-2011-08-02",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "82a8d4886c8f2e6bce81d79625a47efe0dd9d995facc4c540e96f83ff8cc2cc1",
+	"chunks": 29,
+	"requirement_chunks": 18,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"Recitals",
+		"Art. 1 Subject-matter",
+		"Art. 2 Scope",
+		"Art. 3 Definitions",
+		"Art. 4 General principles",
+		"Art. 5 National framework",
+		"Art. 6 Competent regulatory authority",
+		"Art. 7 Licence holders",
+		"Art. 8 Expertise and skills",
+		"Art. 9 Financial resources",
+		"Art. 10 Transparency",
+		"Art. 11 National programmes",
+		"Art. 12 Contents of national programmes",
+		"Art. 13 Notification",
+		"Art. 14 Reporting",
+		"Art. 15 Transposition",
+		"Art. 16 Entry into force",
+		"Art. 17 Addressees"
+	],
+	"report": {
+		"adapter": "eu-xhtml",
+		"parser_version": "eu-xhtml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 18,
+		"paragraphs": 146,
+		"chars": 38552,
+		"alpha_ratio": 0.818,
+		"word_like_ratio": 0.985
+	},
+	"published_at": "2026-10-01T23:22:34.883Z"
+}

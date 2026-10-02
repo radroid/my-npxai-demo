@@ -1,0 +1,939 @@
+{
+	"run_at": "2026-10-01T23:55:11.846Z",
+	"legacy": {
+		"oos": 0.4,
+		"disclaimer": 0.35,
+		"minChunk": 0.35
+	},
+	"collections": {
+		"cnsc": {
+			"current": {
+				"oos": 0.4,
+				"disclaimer": 0.35,
+				"minChunk": 0.35,
+				"basis": "legacy D.3 calibration (2026-04-17), unchanged"
+			},
+			"in_scope": {
+				"n": 14,
+				"min_top": 0.678,
+				"refused_at_legacy_gate": 0
+			},
+			"off_topic": {
+				"n": 12,
+				"max_top": 0.375,
+				"answered_at_legacy_gate": 0
+			},
+			"margin": 0.303,
+			"near": [],
+			"recommendation": "keep legacy values: the 0.4 gate answers 14/14 in-scope and refuses 12/12 off-topic",
+			"proposed_oos": null,
+			"measured": [
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the melting point of uranium-235?",
+					"topSim": 0.375,
+					"avgSim": 0.273,
+					"poolAvgSim": 0.273
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How should I handle my manager being unreasonable?",
+					"topSim": 0.256,
+					"avgSim": 0.195,
+					"poolAvgSim": 0.195
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's a good recipe for sourdough bread?",
+					"topSim": 0.099,
+					"avgSim": 0.084,
+					"poolAvgSim": 0.084
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Who won the 2018 FIFA World Cup?",
+					"topSim": 0.049,
+					"avgSim": 0.039,
+					"poolAvgSim": 0.039
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I reverse a linked list in Python?",
+					"topSim": 0.056,
+					"avgSim": 0.045,
+					"poolAvgSim": 0.045
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the income tax brackets in Ontario?",
+					"topSim": 0.269,
+					"avgSim": 0.203,
+					"poolAvgSim": 0.203
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Explain how a car's automatic transmission works.",
+					"topSim": 0.195,
+					"avgSim": 0.145,
+					"poolAvgSim": 0.145
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the capital of Australia?",
+					"topSim": 0.112,
+					"avgSim": 0.091,
+					"poolAvgSim": 0.091
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I treat a sprained ankle?",
+					"topSim": 0.183,
+					"avgSim": 0.102,
+					"poolAvgSim": 0.102
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the best practices for search engine optimization?",
+					"topSim": 0.231,
+					"avgSim": 0.204,
+					"poolAvgSim": 0.204
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Translate 'good morning' into Japanese.",
+					"topSim": 0.128,
+					"avgSim": 0.1,
+					"poolAvgSim": 0.1
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's the difference between a Roth IRA and a traditional IRA?",
+					"topSim": 0.144,
+					"avgSim": 0.118,
+					"poolAvgSim": 0.118
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What specific elements must be included in the characterization information for a site and its surrounding region potentially affected by a project, according to REGDOC-1.1.1 §C.7.1?",
+					"topSim": 0.678,
+					"avgSim": 0.632,
+					"poolAvgSim": 0.609
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the requirements for management systems and quality assurance programs in applications for licences under the various regulations mentioned in REGDOC-2.1.1 §1.3?",
+					"topSim": 0.747,
+					"avgSim": 0.638,
+					"poolAvgSim": 0.574
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the specific requirements for emergency response facilities for licensees of reactor facilities with a thermal capacity greater than 10 MW according to REGDOC-2.10.1 §2.2.6?",
+					"topSim": 0.79,
+					"avgSim": 0.69,
+					"poolAvgSim": 0.586
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the key design requirements for a radioactive disposal facility according to REGDOC-2.11.1 §11.2.2?",
+					"topSim": 0.753,
+					"avgSim": 0.662,
+					"poolAvgSim": 0.579
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the record-keeping requirements for licensees regarding nuclear substances and worker training under the General Nuclear Safety and Control Regulations and the Nuclear Substances and Radiation Devices Regulations?",
+					"topSim": 0.739,
+					"avgSim": 0.687,
+					"poolAvgSim": 0.641
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What information must be included in an application for a licence to operate a Class I nuclear facility and in an application for the amendment, revocation, or replacement of a licence according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
+					"topSim": 0.764,
+					"avgSim": 0.74,
+					"poolAvgSim": 0.694
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the requirements and obligations for a licensee under the NSCA and its regulations when applying for a licence to construct, operate, or decommission a Class I nuclear facility?",
+					"topSim": 0.754,
+					"avgSim": 0.728,
+					"poolAvgSim": 0.692
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the responsibilities of the licensee regarding operator rounds and routines according to REGDOC-2.3.4 §3.3.1, and what specific factors should shift staff note during verification rounds?",
+					"topSim": 0.796,
+					"avgSim": 0.623,
+					"poolAvgSim": 0.541
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the specific requirements for a licence application for a Class I nuclear facility according to the General Nuclear Safety and Control Regulations and the Class I Nuclear Facilities Regulations?",
+					"topSim": 0.759,
+					"avgSim": 0.72,
+					"poolAvgSim": 0.684
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the requirements for an application for a licence to operate a Class I nuclear facility, and what records must a licensee keep according to the Class I Nuclear Facilities Regulations?",
+					"topSim": 0.743,
+					"avgSim": 0.708,
+					"poolAvgSim": 0.667
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "According to REGDOC-2.7.1 §4.2, what are the responsibilities of managers in ensuring the effectiveness of a radiation protection program?",
+					"topSim": 0.793,
+					"avgSim": 0.684,
+					"poolAvgSim": 0.561
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the names of the occupational health and safety regulations applicable in Saskatchewan and Manitoba?",
+					"topSim": 0.736,
+					"avgSim": 0.541,
+					"poolAvgSim": 0.473
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What are the CNSC's requirements for environmental risk assessments (ERAs) for nuclear facilities or activities, and how do these requirements differ based on the facility's interaction with the environment?",
+					"topSim": 0.773,
+					"avgSim": 0.733,
+					"poolAvgSim": 0.689
+				},
+				{
+					"collection": "cnsc",
+					"kind": "in",
+					"query": "What additional information must be included in the final quarterly report of the calendar year for NPP personnel performance according to REGDOC-3.1.1 §3.3?",
+					"topSim": 0.757,
+					"avgSim": 0.632,
+					"poolAvgSim": 0.556
+				}
+			]
+		},
+		"nrc": {
+			"current": {
+				"oos": 0.44,
+				"disclaimer": 0.35,
+				"minChunk": 0.35,
+				"basis": "calibrated 2026-10-01: 14 in-scope (min top-1 0.681) vs 12 off-topic (max 0.401); refusal gate raised 0.40→0.44, floors legacy"
+			},
+			"in_scope": {
+				"n": 14,
+				"min_top": 0.681,
+				"refused_at_legacy_gate": 0
+			},
+			"off_topic": {
+				"n": 12,
+				"max_top": 0.401,
+				"answered_at_legacy_gate": 1
+			},
+			"margin": 0.28,
+			"near": [
+				{
+					"query": "What does 10 CFR 73.54 require for cyber security at nuclear power plants?",
+					"topSim": 0.563,
+					"avgSim": 0.537
+				},
+				{
+					"query": "What does 10 CFR Part 55 require for reactor operator licensing examinations?",
+					"topSim": 0.632,
+					"avgSim": 0.588
+				}
+			],
+			"recommendation": "legacy gate misclassifies (0 in-scope refused, 1 off-topic answered); separable — propose oos 0.44 (smallest move with a 0.03 margin), legacy disclaimer/minChunk",
+			"proposed_oos": 0.44,
+			"measured": [
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What information should a licensee record on NRC Form 5 for an individual's occupational dose?",
+					"topSim": 0.747,
+					"avgSim": 0.706,
+					"poolAvgSim": 0.662
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "How should air sampling be used to estimate worker intakes of airborne radioactive material?",
+					"topSim": 0.783,
+					"avgSim": 0.719,
+					"poolAvgSim": 0.684
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What does an effective ALARA program at a materials licensee look like according to NRC guidance?",
+					"topSim": 0.75,
+					"avgSim": 0.707,
+					"poolAvgSim": 0.684
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What should workers be told about the risks of occupational radiation exposure?",
+					"topSim": 0.685,
+					"avgSim": 0.646,
+					"poolAvgSim": 0.606
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What is the annual dose limit for individual members of the public from a licensed operation?",
+					"topSim": 0.687,
+					"avgSim": 0.648,
+					"poolAvgSim": 0.617
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "When must a licensee monitor an adult worker's external occupational dose?",
+					"topSim": 0.75,
+					"avgSim": 0.71,
+					"poolAvgSim": 0.67
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What must a radiological environmental monitoring program for a nuclear power plant include?",
+					"topSim": 0.681,
+					"avgSim": 0.663,
+					"poolAvgSim": 0.642
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What should a license termination plan for a power reactor contain?",
+					"topSim": 0.73,
+					"avgSim": 0.678,
+					"poolAvgSim": 0.647
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "How does MARSSIM define a final status survey and survey units?",
+					"topSim": 0.74,
+					"avgSim": 0.725,
+					"poolAvgSim": 0.702
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What financial assurance methods are acceptable for decommissioning a materials licensee?",
+					"topSim": 0.782,
+					"avgSim": 0.763,
+					"poolAvgSim": 0.742
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What planning standards must onsite and offsite emergency plans for a power reactor meet?",
+					"topSim": 0.718,
+					"avgSim": 0.637,
+					"poolAvgSim": 0.609
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What are the numerical design objectives for limiting radioactive effluents from light-water reactors?",
+					"topSim": 0.763,
+					"avgSim": 0.694,
+					"poolAvgSim": 0.645
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "What does the standard review plan say about the thermal evaluation of dry storage casks?",
+					"topSim": 0.77,
+					"avgSim": 0.719,
+					"poolAvgSim": 0.698
+				},
+				{
+					"collection": "nrc",
+					"kind": "in",
+					"query": "How should bioassay measurements be interpreted to estimate a worker's intake?",
+					"topSim": 0.763,
+					"avgSim": 0.735,
+					"poolAvgSim": 0.705
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the melting point of uranium-235?",
+					"topSim": 0.401,
+					"avgSim": 0.392,
+					"poolAvgSim": 0.375
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How should I handle my manager being unreasonable?",
+					"topSim": 0.251,
+					"avgSim": 0.2,
+					"poolAvgSim": 0.2
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's a good recipe for sourdough bread?",
+					"topSim": 0.13,
+					"avgSim": 0.11,
+					"poolAvgSim": 0.11
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Who won the 2018 FIFA World Cup?",
+					"topSim": 0.099,
+					"avgSim": 0.067,
+					"poolAvgSim": 0.067
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I reverse a linked list in Python?",
+					"topSim": 0.081,
+					"avgSim": 0.058,
+					"poolAvgSim": 0.058
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the income tax brackets in Ontario?",
+					"topSim": 0.24,
+					"avgSim": 0.212,
+					"poolAvgSim": 0.212
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Explain how a car's automatic transmission works.",
+					"topSim": 0.168,
+					"avgSim": 0.144,
+					"poolAvgSim": 0.144
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the capital of Australia?",
+					"topSim": 0.132,
+					"avgSim": 0.102,
+					"poolAvgSim": 0.102
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I treat a sprained ankle?",
+					"topSim": 0.16,
+					"avgSim": 0.11,
+					"poolAvgSim": 0.11
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the best practices for search engine optimization?",
+					"topSim": 0.222,
+					"avgSim": 0.196,
+					"poolAvgSim": 0.196
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Translate 'good morning' into Japanese.",
+					"topSim": 0.113,
+					"avgSim": 0.09,
+					"poolAvgSim": 0.09
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's the difference between a Roth IRA and a traditional IRA?",
+					"topSim": 0.197,
+					"avgSim": 0.155,
+					"poolAvgSim": 0.155
+				},
+				{
+					"collection": "nrc",
+					"kind": "near",
+					"query": "What does 10 CFR 73.54 require for cyber security at nuclear power plants?",
+					"topSim": 0.563,
+					"avgSim": 0.537,
+					"poolAvgSim": 0.515
+				},
+				{
+					"collection": "nrc",
+					"kind": "near",
+					"query": "What does 10 CFR Part 55 require for reactor operator licensing examinations?",
+					"topSim": 0.632,
+					"avgSim": 0.588,
+					"poolAvgSim": 0.556
+				}
+			]
+		},
+		"onr": {
+			"current": {
+				"oos": 0.4,
+				"disclaimer": 0.35,
+				"minChunk": 0.35,
+				"basis": "calibrated 2026-10-01: 10 in-scope (min top-1 0.616) vs 12 off-topic (max 0.292); legacy values classify all"
+			},
+			"in_scope": {
+				"n": 10,
+				"min_top": 0.616,
+				"refused_at_legacy_gate": 0
+			},
+			"off_topic": {
+				"n": 12,
+				"max_top": 0.292,
+				"answered_at_legacy_gate": 0
+			},
+			"margin": 0.324,
+			"near": [
+				{
+					"query": "What does the Nuclear Industries Security Regulations require of a licensee?",
+					"topSim": 0.616,
+					"avgSim": 0.575
+				},
+				{
+					"query": "How does ONR regulate the road transport of radioactive material?",
+					"topSim": 0.608,
+					"avgSim": 0.548
+				}
+			],
+			"recommendation": "keep legacy values: the 0.4 gate answers 10/10 in-scope and refuses 12/12 off-topic",
+			"proposed_oos": null,
+			"measured": [
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "What does ONR expect a safety case to contain and how should it be structured?",
+					"topSim": 0.767,
+					"avgSim": 0.715,
+					"poolAvgSim": 0.668
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "How does ONR judge whether risks have been reduced so far as is reasonably practicable?",
+					"topSim": 0.71,
+					"avgSim": 0.672,
+					"poolAvgSim": 0.647
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "What are ONR's expectations for examination, inspection, maintenance and testing of items important to safety?",
+					"topSim": 0.668,
+					"avgSim": 0.615,
+					"poolAvgSim": 0.592
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "How should a licensee assure the competence of personnel doing safety-related work?",
+					"topSim": 0.691,
+					"avgSim": 0.663,
+					"poolAvgSim": 0.634
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "What are operating rules, limits and conditions for nuclear safety in ONR guidance?",
+					"topSim": 0.758,
+					"avgSim": 0.707,
+					"poolAvgSim": 0.678
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "What is a design authority and what capability must a licensee retain?",
+					"topSim": 0.702,
+					"avgSim": 0.641,
+					"poolAvgSim": 0.586
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "What numerical targets do the Safety Assessment Principles set for normal operation doses to workers?",
+					"topSim": 0.738,
+					"avgSim": 0.709,
+					"poolAvgSim": 0.676
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "What do the Safety Assessment Principles say about leadership and management for safety?",
+					"topSim": 0.751,
+					"avgSim": 0.69,
+					"poolAvgSim": 0.643
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "How do the Safety Assessment Principles describe design basis analysis of faults?",
+					"topSim": 0.76,
+					"avgSim": 0.739,
+					"poolAvgSim": 0.711
+				},
+				{
+					"collection": "onr",
+					"kind": "in",
+					"query": "What engineering principles cover redundancy, diversity and segregation in the SAPs?",
+					"topSim": 0.616,
+					"avgSim": 0.578,
+					"poolAvgSim": 0.551
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the melting point of uranium-235?",
+					"topSim": 0.264,
+					"avgSim": 0.23,
+					"poolAvgSim": 0.23
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How should I handle my manager being unreasonable?",
+					"topSim": 0.219,
+					"avgSim": 0.197,
+					"poolAvgSim": 0.197
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's a good recipe for sourdough bread?",
+					"topSim": 0.089,
+					"avgSim": 0.068,
+					"poolAvgSim": 0.068
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Who won the 2018 FIFA World Cup?",
+					"topSim": 0.054,
+					"avgSim": 0.02,
+					"poolAvgSim": 0.02
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I reverse a linked list in Python?",
+					"topSim": 0.062,
+					"avgSim": 0.035,
+					"poolAvgSim": 0.035
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the income tax brackets in Ontario?",
+					"topSim": 0.15,
+					"avgSim": 0.128,
+					"poolAvgSim": 0.128
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Explain how a car's automatic transmission works.",
+					"topSim": 0.148,
+					"avgSim": 0.113,
+					"poolAvgSim": 0.113
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the capital of Australia?",
+					"topSim": 0.088,
+					"avgSim": 0.064,
+					"poolAvgSim": 0.064
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I treat a sprained ankle?",
+					"topSim": 0.081,
+					"avgSim": 0.069,
+					"poolAvgSim": 0.069
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the best practices for search engine optimization?",
+					"topSim": 0.292,
+					"avgSim": 0.212,
+					"poolAvgSim": 0.212
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Translate 'good morning' into Japanese.",
+					"topSim": 0.109,
+					"avgSim": 0.072,
+					"poolAvgSim": 0.072
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's the difference between a Roth IRA and a traditional IRA?",
+					"topSim": 0.119,
+					"avgSim": 0.101,
+					"poolAvgSim": 0.101
+				},
+				{
+					"collection": "onr",
+					"kind": "near",
+					"query": "What does the Nuclear Industries Security Regulations require of a licensee?",
+					"topSim": 0.616,
+					"avgSim": 0.575,
+					"poolAvgSim": 0.554
+				},
+				{
+					"collection": "onr",
+					"kind": "near",
+					"query": "How does ONR regulate the road transport of radioactive material?",
+					"topSim": 0.608,
+					"avgSim": 0.548,
+					"poolAvgSim": 0.522
+				}
+			]
+		},
+		"eu": {
+			"current": {
+				"oos": 0.4,
+				"disclaimer": 0.35,
+				"minChunk": 0.35,
+				"basis": "calibrated 2026-10-01: 8 in-scope (min top-1 0.616) vs 12 off-topic (max 0.175); legacy values classify all"
+			},
+			"in_scope": {
+				"n": 8,
+				"min_top": 0.616,
+				"refused_at_legacy_gate": 0
+			},
+			"off_topic": {
+				"n": 12,
+				"max_top": 0.175,
+				"answered_at_legacy_gate": 0
+			},
+			"margin": 0.441,
+			"near": [
+				{
+					"query": "What does the Euratom Basic Safety Standards Directive say about radon in homes?",
+					"topSim": 0.529,
+					"avgSim": 0.481
+				},
+				{
+					"query": "What are the EU rules on shipments of radioactive waste between Member States?",
+					"topSim": 0.627,
+					"avgSim": 0.568
+				}
+			],
+			"recommendation": "keep legacy values: the 0.4 gate answers 8/8 in-scope and refuses 12/12 off-topic",
+			"proposed_oos": null,
+			"measured": [
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "What does the Nuclear Safety Directive require for the independence of the national regulatory authority?",
+					"topSim": 0.702,
+					"avgSim": 0.633,
+					"poolAvgSim": 0.57
+				},
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "What is the high-level nuclear safety objective introduced by Directive 2014/87/Euratom?",
+					"topSim": 0.733,
+					"avgSim": 0.636,
+					"poolAvgSim": 0.618
+				},
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "What are the requirements for topical peer reviews under the amended Nuclear Safety Directive?",
+					"topSim": 0.659,
+					"avgSim": 0.571,
+					"poolAvgSim": 0.515
+				},
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "What must a national programme for spent fuel and radioactive waste management include?",
+					"topSim": 0.716,
+					"avgSim": 0.638,
+					"poolAvgSim": 0.577
+				},
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "What transparency obligations apply to nuclear safety information for the public under Euratom directives?",
+					"topSim": 0.674,
+					"avgSim": 0.607,
+					"poolAvgSim": 0.559
+				},
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "Who bears prime responsibility for the safety of a nuclear installation under Euratom law?",
+					"topSim": 0.616,
+					"avgSim": 0.581,
+					"poolAvgSim": 0.556
+				},
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "How often must Member States report to the Commission on implementing the radioactive waste directive?",
+					"topSim": 0.769,
+					"avgSim": 0.602,
+					"poolAvgSim": 0.552
+				},
+				{
+					"collection": "eu",
+					"kind": "in",
+					"query": "What does the Nuclear Safety Directive require for on-site emergency preparedness and response?",
+					"topSim": 0.733,
+					"avgSim": 0.61,
+					"poolAvgSim": 0.567
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the melting point of uranium-235?",
+					"topSim": 0.175,
+					"avgSim": 0.136,
+					"poolAvgSim": 0.136
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How should I handle my manager being unreasonable?",
+					"topSim": 0.141,
+					"avgSim": 0.096,
+					"poolAvgSim": 0.096
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's a good recipe for sourdough bread?",
+					"topSim": 0.051,
+					"avgSim": 0.036,
+					"poolAvgSim": 0.036
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Who won the 2018 FIFA World Cup?",
+					"topSim": 0.121,
+					"avgSim": 0.047,
+					"poolAvgSim": 0.047
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I reverse a linked list in Python?",
+					"topSim": 0.03,
+					"avgSim": 0.011,
+					"poolAvgSim": 0.011
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the income tax brackets in Ontario?",
+					"topSim": 0.067,
+					"avgSim": 0.05,
+					"poolAvgSim": 0.05
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Explain how a car's automatic transmission works.",
+					"topSim": 0.08,
+					"avgSim": 0.056,
+					"poolAvgSim": 0.056
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What is the capital of Australia?",
+					"topSim": 0.083,
+					"avgSim": 0.048,
+					"poolAvgSim": 0.048
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "How do I treat a sprained ankle?",
+					"topSim": 0.048,
+					"avgSim": 0.027,
+					"poolAvgSim": 0.027
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What are the best practices for search engine optimization?",
+					"topSim": 0.149,
+					"avgSim": 0.13,
+					"poolAvgSim": 0.13
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "Translate 'good morning' into Japanese.",
+					"topSim": 0.074,
+					"avgSim": 0.052,
+					"poolAvgSim": 0.052
+				},
+				{
+					"collection": "*",
+					"kind": "oos",
+					"query": "What's the difference between a Roth IRA and a traditional IRA?",
+					"topSim": 0.079,
+					"avgSim": 0.059,
+					"poolAvgSim": 0.059
+				},
+				{
+					"collection": "eu",
+					"kind": "near",
+					"query": "What does the Euratom Basic Safety Standards Directive say about radon in homes?",
+					"topSim": 0.529,
+					"avgSim": 0.481,
+					"poolAvgSim": 0.453
+				},
+				{
+					"collection": "eu",
+					"kind": "near",
+					"query": "What are the EU rules on shipments of radioactive waste between Member States?",
+					"topSim": 0.627,
+					"avgSim": 0.568,
+					"poolAvgSim": 0.522
+				}
+			]
+		}
+	}
+}
