@@ -59,7 +59,14 @@ export function wrapSourceSnippet(
 		attr("section", chunk.section_number) +
 		attr("section_title", chunk.section_title) +
 		attr("page", page) +
-		attr("requirement_type", chunk.requirement_type ?? "guidance");
+		// A "shall" in a guide binds nobody: nonbinding snippets are always
+		// guidance to the model, whatever the wording classifier tagged.
+		attr(
+			"requirement_type",
+			s?.legal_force === "nonbinding"
+				? "guidance"
+				: (chunk.requirement_type ?? "guidance"),
+		);
 	return `<context_snippet${attrs}>\n${htmlEscape(chunk.chunk_text)}\n</context_snippet>`;
 }
 
@@ -126,12 +133,32 @@ export function buildSourceEnvelope(input: SourceEnvelopeInput): string {
 		);
 	}
 	if (unsearchedMentions.length > 0) {
-		const others = unsearchedMentions.map(collectionLabel).join(", ");
-		cues.push(
-			scope.kind === "single" && scope.via === "pinned"
-				? `PINNED SCOPE: the user selected ${searched.map(collectionLabel).join(", ")} only. The question also mentions ${others}, which is outside the selected sources — answer the ${searched.map((id) => COLLECTIONS[id].label).join("/")} part from the snippets and state in one sentence that the other regime was not searched.`
-				: `NOT SEARCHED: the question also mentions ${others}, whose text is not searchable here — answer from the snippets, state in one sentence that ${others} was not searched, and never attribute anything to it.`,
-		);
+		if (scope.kind === "single" && scope.via === "pinned") {
+			const others = unsearchedMentions.map(collectionLabel).join(", ");
+			cues.push(
+				`PINNED SCOPE: the user selected ${searched.map(collectionLabel).join(", ")} only. The question also mentions ${others}, which is outside the selected sources — answer the ${searched.map((id) => COLLECTIONS[id].label).join("/")} part from the snippets and state in one sentence that the other regime was not searched.`,
+			);
+		} else {
+			// Say WHY, truthfully: reference-only text is not stored at all; a
+			// collection with text was simply not part of this search (not
+			// enabled here, or past the three-way comparison cap).
+			const refOnly = unsearchedMentions.filter(
+				(id) => !COLLECTIONS[id].searchable,
+			);
+			const notSearched = unsearchedMentions.filter(
+				(id) => COLLECTIONS[id].searchable,
+			);
+			if (refOnly.length > 0) {
+				cues.push(
+					`REFERENCE ONLY: ${refOnly.map(collectionLabel).join(", ")} ${refOnly.length === 1 ? "is" : "are"} catalogued as titles and links only — no text is stored here. Do not state what ${refOnly.length === 1 ? "it says" : "they say"} beyond what the snippets themselves quote, and say so in one sentence if the question asks.`,
+				);
+			}
+			if (notSearched.length > 0) {
+				cues.push(
+					`NOT SEARCHED: ${notSearched.map(collectionLabel).join(", ")} ${notSearched.length === 1 ? "was" : "were"} not part of this search. Answer from the snippets and state in one sentence that ${notSearched.length === 1 ? "it was" : "they were"} not searched.`,
+				);
+			}
+		}
 	}
 	// A country or regulator with no collection at all ("… and Finland").
 	// Phrased conditionally: the name may be incidental ("exports to France").

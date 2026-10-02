@@ -117,6 +117,18 @@ async function main() {
 		resp.data.forEach((d, j) => vectors.set(batch[j]!, d.embedding));
 	}
 
+	// One untimed call first, so a cold connection is not charged to the
+	// first question. (Timed through the service-role client: the same RPC
+	// and plan as the app's anon calls, minus the anon statement timeout.)
+	const warm = await admin.rpc("match_source_chunks", {
+		query_embedding: vectors.get(distinct[0] as string),
+		collection_ids: ["cnsc"],
+		match_count: 1,
+		min_similarity: -1,
+		include_historical: false,
+	});
+	if (warm.error) throw warm.error;
+
 	const out: Record<string, unknown> = {};
 	let pass = true;
 	for (const s of scopes) {

@@ -158,9 +158,20 @@ const MENTION_RULES: Array<{ collection: CollectionId; res: RegExp[] }> = [
 
 // Regulators/jurisdictions with no collection at all. Country names and
 // regulator acronyms only — never language adjectives ("in French" is an
-// ordinary question about a bilingual CNSC document).
-const NOT_INDEXED_RE =
-	/\b(?:Rostechnadzor|Russia|France|ASN|China|Korea|NSSC|KINS|Finland|STUK|Sweden|Germany|Switzerland|ENSI|Spain|Belgium|FANC|Ukraine|SNRIU|South Africa|Pakistan|PNRA|UAE|FANR|Australia|ARPANSA|Argentina|Brazil)\b/;
+// ordinary question about a bilingual CNSC document). Acronyms match
+// case-sensitively like MENTION_RULES; country names in any case.
+const UNINDEXED_REGULATOR_RE =
+	/\b(?:Rostechnadzor|ASN|NSSC|KINS|STUK|ENSI|FANC|SNRIU|PNRA|FANR|ARPANSA)\b/;
+const COUNTRIES =
+	"Russia|France|China|Korea|Finland|Sweden|Germany|Switzerland|Spain|Belgium|Ukraine|South Africa|Pakistan|UAE|Australia|Argentina|Brazil";
+const UNINDEXED_COUNTRY_RE = new RegExp(`\\b(?:${COUNTRIES})\\b`, "i");
+// A country named AS a regime ("Finland's", "France's requirements",
+// "rules in Germany", "what Korea requires") — not one named in passing
+// ("a vendor from Korea", "exports to France", "built in China").
+const COUNTRY_AS_REGIME_RE = new RegExp(
+	`\\b(?:${COUNTRIES})(?:['’]s\\b|\\s+(?:\\w+\\s+){0,2}?(?:requirements?|regulations?|regulators?|rules|limits?|standards?|laws?|approach|requires?|regulates?|mandates?)\\b)|\\b(?:requirements?|regulations?|regulators?|rules|limits?|standards?|laws?)\\s+(?:in|of)\\s+(?:${COUNTRIES})\\b`,
+	"i",
+);
 
 const COMPARE_RE =
 	/\b(?:compare[ds]?|comparing|comparison|versus|vs\.?|differ(?:s|ent|ence|ences)?|contrast(?:s|ing)?|similar(?:ity|ities)?|both|between)\b/i;
@@ -174,7 +185,13 @@ const EXPLICIT_COMPARE_RE =
 
 export interface Mentions {
 	collections: CollectionId[];
+	/** Any mention of a regulator/country with no collection. */
 	notIndexed: boolean;
+	/**
+	 * …named as a regime: an unindexed regulator's acronym, or a country
+	 * named as the source of rules. A country in passing does not count.
+	 */
+	unindexedRegime: boolean;
 }
 
 export function detectMentions(query: string): Mentions {
@@ -183,7 +200,12 @@ export function detectMentions(query: string): Mentions {
 		if (rule.res.some((re) => re.test(query)))
 			collections.push(rule.collection);
 	}
-	return { collections, notIndexed: NOT_INDEXED_RE.test(query) };
+	const regulator = UNINDEXED_REGULATOR_RE.test(query);
+	return {
+		collections,
+		notIndexed: regulator || UNINDEXED_COUNTRY_RE.test(query),
+		unindexedRegime: regulator || COUNTRY_AS_REGIME_RE.test(query),
+	};
 }
 
 export function hasComparisonIntent(query: string): boolean {
@@ -257,7 +279,7 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 		}
 		const others = mentions.collections.filter((id) => id !== pinned);
 		const namesPinned = mentions.collections.includes(pinned);
-		if (!namesPinned && (others.length > 0 || mentions.notIndexed)) {
+		if (!namesPinned && (others.length > 0 || mentions.unindexedRegime)) {
 			const suggestions = others.filter(
 				(id) => isEnabled(id) && COLLECTIONS[id].searchable,
 			);
@@ -280,7 +302,9 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 	const indexed = searchableMentions.filter(isEnabled);
 
 	if (indexed.length === 0) {
-		if (mentions.collections.length === 0 && !mentions.notIndexed) {
+		// A country in passing ("shipments to France") is an ordinary
+		// question for the default collection; a regime named is not.
+		if (mentions.collections.length === 0 && !mentions.unindexedRegime) {
 			const fallback = isEnabled(defaultCollection)
 				? defaultCollection
 				: enabled[0];
@@ -316,16 +340,20 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 		};
 	}
 
-	// An explicit comparison that names a regime we cannot search must say
-	// so, not quietly answer one side of it. A looser cue word falls through
-	// to the indexed side; the envelope then tells the model the other
-	// regulator was not searched (unsearchedOthers in scoped-retrieval).
+	// A comparison that names a regime we cannot search must say so, not
+	// quietly answer one side of it. Any comparison word counts when the
+	// other side is NAMED AS A REGIME (a catalogued body like IAEA, an
+	// unindexed regulator's acronym, "Finland's"); an explicit comparison
+	// also counts with a bare country. A loose word ("difference", "both",
+	// "between") next to a country in passing ("built in China") is an
+	// ordinary single-regulator question — the envelope's UNINDEXED cue
+	// covers it.
 	const unsearchable = mentions.collections.filter(
 		(id) => !isEnabled(id) || !COLLECTIONS[id].searchable,
 	);
 	const comparing = hasComparisonIntent(query);
 	const explicit = hasExplicitComparison(query);
-	if (explicit && unsearchable.length > 0) {
+	if (comparing && unsearchable.length > 0) {
 		return {
 			kind: "notice",
 			reason: unsearchable.includes("iaea") ? "reference_only" : "not_enabled",
@@ -334,7 +362,10 @@ export function resolveScope(input: ResolveScopeInput): ResolvedScope {
 		};
 	}
 	// "Compare CNSC and Finland …": the other side has no collection at all.
-	if (explicit && mentions.notIndexed) {
+	if (
+		(explicit && mentions.notIndexed) ||
+		(comparing && mentions.unindexedRegime)
+	) {
 		return {
 			kind: "notice",
 			reason: "not_indexed",

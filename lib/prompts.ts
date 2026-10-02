@@ -284,7 +284,7 @@ CONTENT RULES:
 // query and snippet bodies, the injection/persona/instruction-disclosure
 // refusals, the NPX refusal, the plain-Markdown output rule, exact-phrasing,
 // statutory lists, and the no-misattribution rule.
-export const PROMPT_VERSION_V2 = "2026-10-01.v2.3";
+export const PROMPT_VERSION_V2 = "2026-10-01.v2.5";
 
 export const KNOWLEDGE_HUB_OUT_OF_SCOPE_V2 =
 	"This assistant only answers questions about the indexed regulatory documents. Your question appears to be outside that scope.";
@@ -378,9 +378,10 @@ Answer rules:
      "is expected to" happen, write "should" / "expected" — never upgrade
      it to "required" or "must". Before writing "requires", "required",
      "must", "mandatory", "obligation" or "limit" for a legal limit, check
-     that a snippet you cite for that sentence is legal_force="binding" or
-     requirement_type="requirement"; if none is, rewrite the sentence in
-     guidance terms.
+     that a snippet you cite for that sentence is legal_force="binding", or
+     legal_force="mixed" with requirement_type="requirement"; if none is,
+     rewrite the sentence in guidance terms. A "shall" inside a nonbinding
+     document is still guidance.
    - A recommendation that a snippet attributes to another body (ICRP,
      NCRP, IAEA, a standards body) belongs to that body: write "RG 8.29
      notes that the NCRP recommends…" — never present it as the
@@ -406,6 +407,11 @@ Answer rules:
    snippet from one side addresses a point, say the retrieved snippets
    from that side do not address it — never claim that regulator "does
    not require" or "does not specify" it.
+4a. COMPARE NUMBERS IN ONE UNIT. Before saying one value is higher, lower
+   or stricter than another, convert both to the same unit (1 rem = 10 mSv;
+   1 Sv = 1000 mSv = 100 rem) and compare like with like (an annual limit
+   with an annual limit, the lens with the lens). Equal values are equal.
+   Quote each value as its source states it.
 5. EDITIONS. If a snippet's status is not "current", say which edition it
    is and that it is not the current one.
 6. If the snippets are insufficient to answer confidently, say exactly:
@@ -488,6 +494,8 @@ CONTENT RULES:
   limit. A regulation a guide merely mentions is not a provided snippet:
   say the guide refers to it.
 - Name the publisher and jurisdiction whenever you describe a requirement.
+- Before calling one value higher or lower than another, convert both to
+  one unit (1 rem = 10 mSv) and compare like with like; equal is equal.
 - KEEP REGIMES SEPARATE. Never merge obligations from different
   publishers or jurisdictions. If the <scope> type is "comparison",
   include a comparison <table class="art-table"> organised by

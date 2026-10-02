@@ -135,6 +135,36 @@ export function namedReferenceLinks(
 }
 
 /**
+ * Binding doc_refs for the binding-presence pass (RetrievalOptions.source.
+ * bindingRefs) — only for a collection whose text mixes binding documents
+ * with NONBINDING ones and has no mixed-force documents. NRC qualifies
+ * (10 CFR + RGs/NUREGs). CNSC does not (its REGDOCs carry their own "shall"
+ * requirements; forcing an NSCA chunk into every answer would only crowd
+ * them), and neither do all-binding EU or all-guidance ONR.
+ */
+export function bindingPresenceRefs(
+	collection: CollectionId,
+	includeHistorical: boolean,
+): string[] {
+	const register = getRegister();
+	if (!register) return [];
+	const editions = textEntries(register).filter(
+		(e) =>
+			e.collection === collection &&
+			(e.status === "current" ||
+				(includeHistorical && e.status === "superseded")),
+	);
+	const force = new Set(editions.map((e) => e.legal_force));
+	if (!force.has("binding") || !force.has("nonbinding") || force.has("mixed"))
+		return [];
+	return [
+		...new Set(
+			editions.filter((e) => e.legal_force === "binding").map((e) => e.doc_ref),
+		),
+	];
+}
+
+/**
  * doc_refs of the searchable text editions in `collection` (current, plus
  * superseded when `includeHistorical`) — what a named-document search may
  * target and what "is this named document indexed?" is decided against.

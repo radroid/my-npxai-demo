@@ -145,8 +145,13 @@ async function main() {
 				? cnscPageDataUrl(e.fetch_url as string)
 				: (e.fetch_url as string);
 		let bytes: Uint8Array;
+		// True only for bytes read from an existing cache file — the reviewed
+		// copy. A missing cache file is downloaded even without --refresh, and
+		// freshly downloaded text must never be re-pinned silently.
+		let fromCache = false;
 		if (existsSync(path) && !refresh) {
 			bytes = new Uint8Array(await readFile(path));
+			fromCache = true;
 		} else {
 			const host = new URL(url).hostname;
 			if (host === lastHost) await sleep(SPACING_MS);
@@ -190,7 +195,7 @@ async function main() {
 				);
 			}
 		} else if (e.checksum_sha256 !== sha) {
-			const cachedCnsc = e.format === "cnsc-json" && !refresh;
+			const cachedCnsc = e.format === "cnsc-json" && fromCache;
 			if (cachedCnsc && repinCnsc) {
 				e.checksum_sha256 = sha;
 				pinned += 1;

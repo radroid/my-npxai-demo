@@ -30,6 +30,14 @@ export function getArtifactModel(): string {
 	return process.env.OPENAI_ARTIFACT_MODEL || OPENAI_MODELS.artifact;
 }
 
+// Multi-source (KH_SOURCE_CORPUS=v2) chat model, overridable the same way.
+// The legacy CNSC path always uses OPENAI_MODELS.chat. Separate because the
+// v2 answers carry legal-force and cross-jurisdiction discipline that the
+// default model follows unreliably (docs/phase-12-sources.md §4).
+export function getSourceChatModel(): string {
+	return process.env.KH_V2_CHAT_MODEL || OPENAI_MODELS.chat;
+}
+
 // Full-dimension text-embedding-3-large. The 3072-dim vectors measurably beat
 // -small@1536 on the golden set (brute-force cosine: hit@8 92.4%→96.7%,
 // recall@8 79.2%→85.8%, MRR 0.782→0.816). Matryoshka-truncating -large back to

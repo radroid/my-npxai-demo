@@ -12,7 +12,8 @@
 //     (data-sources v2) is written BEFORE the text so chips resolve live
 //   • citation validity is measured on every answer and logged; answers
 //     with an unresolved id are never cached
-//   • the cache key carries prompt version, corpus version and scope
+//   • the cache key carries prompt version, chat model, corpus version and
+//     scope
 
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { NextResponse } from "next/server";
@@ -24,7 +25,7 @@ import {
 	recordOpenAICall,
 } from "../guard";
 import { logGuardEvent, logStreamEnd } from "../logger";
-import { getOpenAIClient, OPENAI_MODELS } from "../openai";
+import { getOpenAIClient, getSourceChatModel } from "../openai";
 import { StreamingGuard } from "../output-guard";
 import {
 	KNOWLEDGE_HUB_LIMITED_CONTEXT,
@@ -85,6 +86,7 @@ async function cacheKeyV2(
 	const material = [
 		"kh2",
 		PROMPT_VERSION_V2,
+		getSourceChatModel(),
 		corpusVersion(),
 		cacheScopeMaterial(scope, query),
 		enabled.join(","),
@@ -212,6 +214,8 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 	ctx.logFields.cache = "miss";
 
 	const openai = args.openai ?? getOpenAIClient();
+	const model = getSourceChatModel();
+	ctx.logFields.model = model;
 	let retrieval: Awaited<ReturnType<typeof retrieveForScope>>;
 	try {
 		retrieval = await retrieveForScope(
@@ -303,7 +307,7 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 
 			try {
 				const completion = await openai.chat.completions.create({
-					model: OPENAI_MODELS.chat,
+					model,
 					stream: true,
 					max_tokens: ctx.outputMaxTokens,
 					temperature: 0.2,
@@ -328,6 +332,8 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 					delta: "\n\n_[error generating response]_",
 				});
 			}
+			// The stub check below measures the MODEL's answer, not the note.
+			const answerLength = accumulated.trim().length;
 			const authority = lintAuthority(accumulated, sources);
 			const note =
 				outputGuardTripped || streamFailed ? null : authorityNote(authority);
@@ -342,7 +348,7 @@ export async function answerV2(args: AnswerV2Args): Promise<Response> {
 				!outputGuardTripped &&
 				!streamFailed &&
 				citations.unresolved.length === 0 &&
-				accumulated.trim().length > 400;
+				answerLength > 400;
 			if (cacheable) {
 				void cacheWrite(
 					cKey,

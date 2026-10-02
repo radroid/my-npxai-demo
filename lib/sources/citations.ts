@@ -184,31 +184,52 @@ const OBLIGATION_RE =
 	/\b(?:requires?|required|must|mandatory|obligat(?:ed|ion|ions|ory)|prohibit(?:s|ed)?)\b/i;
 // A sentence that itself says the text is not binding ("voluntary guidance
 // … not a requirement") is the right answer, not a violation.
+// Scoped to the clause: "The NRC does not believe that additional
+// reductions … are required" is a negation 60+ characters wide.
 const NEGATED_OBLIGATION_RE =
-	/\b(?:not|never|no|non-?binding)\b[^.]{0,40}\b(?:requires?|required|must|mandatory|obligat\w*)\b|\b(?:voluntary|non-?binding|not (?:a |an )?(?:legal )?requirements?)\b/i;
+	/\b(?:not|never|no|non-?binding)\b[^.;:]{0,120}\b(?:requires?|required|must|mandatory|obligat\w*)\b|\b(?:voluntary|non-?binding|not (?:a |an )?(?:legal )?requirements?)\b/i;
 // "the required safety functions" — an adjective, not an obligation.
 const ADJECTIVAL_REQUIRED_RE = /\bthe required\b/gi;
 
 export interface AuthorityFlag {
 	sentence: string;
+	/** Chip labels of the cited snippets (for the report). */
 	cited: string[];
+	/** Their document refs (for the note: one entry per document). */
+	refs: string[];
+}
+
+type LintSource = Pick<
+	SourceRecord,
+	"sid" | "chip" | "ref" | "legal_force" | "requirement_type"
+>;
+
+// No obligation to cite: a nonbinding document, or a guidance-tagged
+// snippet of a mixed-force one (a CNSC REGDOC section whose text has no
+// "shall"/"must"/"required" — the chunker's tag means exactly that).
+function carriesNoObligation(s: LintSource): boolean {
+	return (
+		s.legal_force === "nonbinding" ||
+		(s.legal_force === "mixed" && s.requirement_type !== "requirement")
+	);
 }
 
 /**
  * Deterministic wrong-authority lint: a sentence that uses obligation
  * language ("required", "must", "obligation") while EVERY snippet it cites
- * is nonbinding (a guide, report, principle or TAG) — the "expected" →
- * "required" upgrade. A heuristic for review and logging, not a grader: it
+ * carries no obligation (a guide, report, principle or TAG, or a REGDOC
+ * guidance section) — the "should"/"expected" → "required" upgrade. A heuristic for review and logging, not a grader: it
  * misses wrong authority phrased without those words ("the NRC limits…")
  * and can flag a sentence that quotes a duty the guide itself attributes to
  * a regulation.
  */
 export function lintAuthority(
 	text: string,
-	sources: Pick<SourceRecord, "sid" | "chip" | "legal_force">[],
+	sources: LintSource[],
 ): AuthorityFlag[] {
 	const flags: AuthorityFlag[] = [];
-	for (const raw of text.split(/(?<=[.!?])\s+|\n+/)) {
+	// Never split before a citation: "…must do X. [[S1]]" cites S1.
+	for (const raw of text.split(/(?<=[.!?])\s+(?!\[\[|\[S\d)|\n+/)) {
 		const sentence = raw.trim();
 		if (
 			!OBLIGATION_RE.test(sentence.replace(ADJECTIVAL_REQUIRED_RE, "")) ||
@@ -218,10 +239,11 @@ export function lintAuthority(
 		const cited = extractSnippetIds(sentence)
 			.map((id) => sources.find((s) => s.sid === id))
 			.filter((s) => s !== undefined);
-		if (cited.length > 0 && cited.every((s) => s.legal_force === "nonbinding"))
+		if (cited.length > 0 && cited.every(carriesNoObligation))
 			flags.push({
 				sentence: sentence.slice(0, 300),
 				cited: [...new Set(cited.map((s) => s.chip))],
+				refs: [...new Set(cited.map((s) => s.ref))],
 			});
 	}
 	return flags;
@@ -237,9 +259,9 @@ export function lintAuthority(
  */
 export function authorityNote(flags: AuthorityFlag[]): string | null {
 	if (flags.length === 0) return null;
-	const chips = [...new Set(flags.flatMap((f) => f.cited))].slice(0, 4);
-	const many = chips.length > 1;
-	return `\n\n_Legal-force note: ${chips.join("; ")} ${many ? "are" : "is"} non-binding guidance. Where this answer says "required" or "must" citing only ${many ? "them" : "it"}, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._`;
+	const refs = [...new Set(flags.flatMap((f) => f.refs))].slice(0, 4);
+	const many = refs.length > 1;
+	return `\n\n_Legal-force note: the passages cited from ${refs.join("; ")} are guidance, not legal requirements. Where this answer says "required" or "must" citing only ${many ? "them" : "it"}, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._`;
 }
 
 function escapeHtml(raw: string): string {

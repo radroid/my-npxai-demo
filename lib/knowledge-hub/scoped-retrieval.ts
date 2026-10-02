@@ -21,6 +21,7 @@ import {
 } from "../retrieval";
 import { COLLECTIONS, type CollectionId } from "../sources/catalog";
 import {
+	bindingPresenceRefs,
 	collectionsWithText,
 	namedReferenceLinks,
 	textDocRefs,
@@ -121,15 +122,24 @@ export async function retrieveForScope(
 			// them — not register order, which would let one family ("10 CFR
 			// 20", six provisions) take every slot.
 			const refs = refsByCollection.get(collection) ?? [];
-			const docRefGroups = named
+			const groups = named
 				.map((m) => refs.filter((ref) => refMatchesMention(ref, m)))
 				.filter((g) => g.length > 0);
+			// "10 CFR 20" next to "10 CFR 20.1201" would spend two fetch slots
+			// on one family: the specific mention already guarantees presence.
+			const docRefGroups = groups.filter(
+				(g) =>
+					!groups.some(
+						(o) => o.length < g.length && o.every((r) => g.includes(r)),
+					),
+			);
 			const r = await retrieveChunks(query, deps, {
 				envelopeChunks: share,
 				source: {
 					collections: [collection],
 					includeHistorical: scope.historical,
 					docRefGroups,
+					bindingRefs: bindingPresenceRefs(collection, scope.historical),
 				},
 				thresholds: t,
 				precomputedEmbeddings,
@@ -191,11 +201,14 @@ export function unsearchedMentions(
  * The scope part of an answer-cache key. scopeKey() alone is not enough: the
  * same "single:nrc" scope reached via Auto and via a pin builds a different
  * envelope (a different "other regime was not searched" cue) and a different
- * Sources-panel label, so both — plus the cue's regimes — are part of the key.
+ * Sources-panel label, so both — plus the cues' inputs — are part of the key.
  */
 export function cacheScopeMaterial(scope: SearchScope, query: string): string {
 	const via = scope.kind === "single" ? scope.via : "compare";
-	return `${scopeKeyOf(scope)}|${via}|${unsearchedMentions(scope, query).join("+")}`;
+	// The UNINDEXED cue keys on case-sensitive acronyms ("STUK"), while the
+	// cache key lowercases the query — so the cue's flag is keyed itself.
+	const unindexed = detectMentions(query).notIndexed ? "unindexed" : "";
+	return `${scopeKeyOf(scope)}|${via}|${unsearchedMentions(scope, query).join("+")}|${unindexed}`;
 }
 
 /**

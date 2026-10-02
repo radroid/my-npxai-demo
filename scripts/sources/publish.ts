@@ -392,11 +392,23 @@ async function main() {
 		const { data, error } = await supabase
 			.from("source_documents")
 			.select(
-				"id,document_key,version_key,checksum_sha256,parser_version,embedding_model,embedding_dims,chunk_count",
+				"id,document_key,version_key,checksum_sha256,parser_version,embedding_model,embedding_dims,chunk_count,register_version",
 			);
 		if (error) throw new Error(error.message);
 		for (const d of data ?? []) {
 			publishedRows.set(`${d.document_key}@${d.version_key}`, d);
+		}
+		// A stale checkout must not write at all: every upsert overwrites the
+		// row's status/rights/register_version, and a "current" edition from
+		// this older register would demote a newer one. Checked BEFORE any write.
+		const newer = (data ?? []).find(
+			(d) => compareRegisterVersions(d.register_version, register.version) > 0,
+		);
+		if (newer) {
+			console.error(
+				`Refusing to publish: the database was published from register ${newer.register_version}, newer than this checkout's ${register.version}. Pull first.`,
+			);
+			process.exit(1);
 		}
 	}
 	const summary = {
@@ -590,19 +602,13 @@ async function main() {
 			.from("source_documents")
 			.select("document_key,version_key,chunk_count,register_version");
 		if (error) throw new Error(error.message);
-		// Prune only from a clean run on an up-to-date register. After a
-		// failure, a re-keyed edition's old copy may be the only searchable one
-		// left; and a stale checkout would delete editions a newer register
-		// added.
-		const newer = (data ?? []).filter(
-			(d) => compareRegisterVersions(d.register_version, register.version) > 0,
-		);
+		// Prune only after a clean run. After a failure, a re-keyed edition's
+		// old copy may be the only searchable one left. (A newer DB register
+		// already stopped the run before any write.)
 		const pruneBlocked =
 			summary.errors + summary.blocked > 0
 				? `this run had ${summary.errors} error(s) and ${summary.blocked} quality-blocked edition(s)`
-				: newer.length > 0
-					? `the database was published from register ${newer[0].register_version}, newer than this checkout's ${register.version} — pull first`
-					: null;
+				: null;
 		if (PRUNE && pruneBlocked) {
 			console.error(`✗ --prune refused: ${pruneBlocked}. Nothing deleted.`);
 		}
@@ -625,7 +631,7 @@ async function main() {
 			} else {
 				orphans += 1;
 				console.error(
-					`✗ ${id}: in the database but not in the register (${d.chunk_count} chunks still searchable) — rerun with --prune to delete`,
+					`✗ ${id}: in the database but not in the register (${d.chunk_count} chunks still searchable) — ${pruneBlocked ? "fix the errors above, then rerun with --prune" : "rerun with --prune to delete"}`,
 				);
 			}
 		}

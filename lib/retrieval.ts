@@ -41,10 +41,16 @@ export const NAMED_DOC_BOOST = 0.2;
 const NAMED_DOC_FETCH_DOCS = 4;
 const NAMED_DOC_FETCH_PER_DOC = 2;
 // Expansion searches per question. Every eval question in the repo (333,
-// legacy and v2) produces at most 4; the cap only bounds a crafted query
-// that names dozens of documents, which would otherwise mean one embedding
-// input and one exact vector scan per mention.
+// legacy and v2) produces at most 4, and for those the expansion list is
+// unchanged; the cap only bounds a crafted query that names dozens of
+// documents, which would otherwise mean one embedding input and one vector
+// scan per mention (legacy included — it is the same cost surface).
 export const MAX_EXPANSIONS = 6;
+// The binding-presence pass (source.bindingRefs): admit the best binding
+// chunk only when it is this close to the top match.
+const BINDING_PRESENCE_GAP = 0.2;
+// match_source_chunks reads at most doc_refs[1:10].
+const DOC_REFS_PER_CALL = 10;
 
 // Recognizes "REGDOC-X.X", "REGDOC-X.X.X", "REGDOC 2.5.2", "NSCA" in user
 // query text. Returns the canonical regdoc_id form.
@@ -157,7 +163,23 @@ export function extractNamedDocs(
 	query: string,
 	collections: readonly CollectionId[],
 ): string[] {
-	return [...extractMentionedDocs(query, collections, false)];
+	// The same grammar as extractMentionedDocs (without concept hints), but
+	// ordered by where each document appears in the question: the named-doc
+	// fetch is capped, and the cap must drop the LAST-named documents, not
+	// whichever pattern happens to be checked last.
+	const found: Array<{ doc: string; at: number }> = [];
+	if (collections.includes("cnsc")) {
+		for (const m of query.matchAll(QUERY_DOC_RE)) {
+			if (m[1]) found.push({ doc: `REGDOC-${m[1]}`, at: m.index ?? 0 });
+			else if (m[2]) found.push({ doc: "NSCA", at: m.index ?? 0 });
+		}
+	}
+	for (const p of V2_DOC_PATTERNS) {
+		if (!collections.includes(p.collection)) continue;
+		for (const m of query.matchAll(p.re))
+			found.push({ doc: p.canon(m), at: m.index ?? 0 });
+	}
+	return [...new Set(found.sort((a, b) => a.at - b.at).map((f) => f.doc))];
 }
 
 // Does a chunk's doc ref satisfy a mentioned ref? Exact match, plus one
@@ -261,17 +283,34 @@ function buildExpansions(
 	const conceptSeeds = CONCEPT_EXPANSIONS.filter((c) => c.re.test(query)).map(
 		(c) => c.seed,
 	);
-	const out: string[] = [];
+	const perDoc: Array<{ focused: string[]; broad: string }> = [];
 	for (const doc of docs) {
+		const focused: string[] = [];
 		if (sections.length > 0) {
 			for (const s of sections) {
-				out.push(noun ? `${doc} section ${s} ${noun}` : `${doc} section ${s}`);
+				focused.push(
+					noun ? `${doc} section ${s} ${noun}` : `${doc} section ${s}`,
+				);
 			}
 		}
-		for (const seed of conceptSeeds) out.push(`${doc} ${seed}`);
-		out.push(`${doc} ${query}`);
+		for (const seed of conceptSeeds) focused.push(`${doc} ${seed}`);
+		perDoc.push({ focused, broad: `${doc} ${query}` });
 	}
-	return out;
+	const out = perDoc.flatMap((d) => [...d.focused, d.broad]);
+	// Under the cap (every real question): exactly the historical list. Over
+	// it (a crafted or very long multi-document query): each document's
+	// BROAD expansion first, then focused ones round-robin, so no named
+	// document is left with nothing.
+	if (out.length <= MAX_EXPANSIONS) return out;
+	const capped = perDoc.map((d) => d.broad).slice(0, MAX_EXPANSIONS);
+	for (let i = 0; capped.length < MAX_EXPANSIONS; i++) {
+		const round = perDoc.flatMap((d) =>
+			i < d.focused.length ? [d.focused[i]] : [],
+		);
+		if (round.length === 0) break;
+		capped.push(...round.slice(0, MAX_EXPANSIONS - capped.length));
+	}
+	return capped;
 }
 
 // ADDITIVE (item-2 PR #8 fix round 2, issue 3 — WALLET): the EXACT list of
@@ -298,10 +337,7 @@ export function embeddingInputsFor(
 ): string[] {
 	const docs = extractMentionedDocs(query, collections);
 	const sections = extractMentionedSections(query);
-	return [
-		query,
-		...buildExpansions(query, docs, sections).slice(0, MAX_EXPANSIONS),
-	];
+	return [query, ...buildExpansions(query, docs, sections)];
 }
 
 // Doc-diversity pass: when multiple docs are mentioned, seed the envelope
@@ -450,6 +486,17 @@ export interface RetrievalOptions {
 		 * own text.
 		 */
 		docRefGroups?: readonly (readonly string[])[];
+		/**
+		 * The collection's binding documents, set only for a collection that
+		 * mixes binding regulations with nonbinding guidance (NRC: 10 CFR +
+		 * RGs/NUREGs). A guide's paraphrase of a rule usually out-ranks the
+		 * rule's own short text — "compare NRC dose limits" retrieves four
+		 * RG 8.29 chunks and no 10 CFR 20.1201 — and the model then states a
+		 * "limit" from the guide's ICRP discussion. When the envelope has no
+		 * binding chunk, the best one within BINDING_PRESENCE_GAP of the top
+		 * match takes the last slot.
+		 */
+		bindingRefs?: readonly string[];
 	};
 	// ADDITIVE (Phase 12): per-collection gate values; see DEFAULT_THRESHOLDS.
 	thresholds?: RetrievalThresholds;
@@ -717,6 +764,31 @@ export async function embedTexts(
 	return embeddings;
 }
 
+// See RetrievalOptions.source.bindingRefs. Pure; a no-op on the legacy path
+// (no binding rows are ever fetched there).
+export function withBindingPresence(
+	envelope: RetrievedChunk[],
+	bindingRows: readonly RetrievedChunk[],
+	topSim: number,
+	t: RetrievalThresholds,
+	size: number,
+): RetrievedChunk[] {
+	if (bindingRows.length === 0) return envelope;
+	if (envelope.some((c) => c.source?.legal_force === "binding"))
+		return envelope;
+	const best = [...bindingRows].sort((a, b) => b.similarity - a.similarity)[0];
+	if (
+		!best ||
+		best.similarity < t.minChunk ||
+		best.similarity < topSim - BINDING_PRESENCE_GAP ||
+		envelope.some((c) => c.id === best.id)
+	)
+		return envelope;
+	return envelope.length >= size
+		? [...envelope.slice(0, size - 1), best]
+		: [...envelope, best];
+}
+
 export async function retrieveChunks(
 	query: string,
 	deps: RetrievalDeps,
@@ -816,17 +888,30 @@ export async function retrieveChunks(
 	// Two per named mention, at most four mentions, searched in parallel.
 	const namedGroups = (opts.source?.docRefGroups ?? [])
 		.filter((g) => g.length > 0)
-		.slice(0, NAMED_DOC_FETCH_DOCS);
+		.slice(0, NAMED_DOC_FETCH_DOCS)
+		.map((g) => g.slice(0, DOC_REFS_PER_CALL));
+	const bindingRefs = opts.source?.bindingRefs ?? [];
+	const bindingGroups: (readonly string[])[] = [];
+	for (let i = 0; i < bindingRefs.length; i += DOC_REFS_PER_CALL)
+		bindingGroups.push(bindingRefs.slice(i, i + DOC_REFS_PER_CALL));
 	const namedPools: RetrievedChunk[][] = [];
-	if (namedGroups.length > 0) {
-		const named = await Promise.all(
-			namedGroups.map((refs) =>
-				match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, refs),
+	const bindingRows: RetrievedChunk[] = [];
+	if (namedGroups.length + bindingGroups.length > 0) {
+		const [named, binding] = await Promise.all([
+			Promise.all(
+				namedGroups.map((refs) =>
+					match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, refs),
+				),
 			),
-		);
+			Promise.all(bindingGroups.map((refs) => match(embeddings[0], 1, refs))),
+		]);
 		for (const { rows, error } of named) {
 			if (error) console.error(`${rpcName}_named_doc_error`, error);
 			else namedPools.push(rows);
+		}
+		for (const { rows, error } of binding) {
+			if (error) console.error(`${rpcName}_binding_error`, error);
+			else bindingRows.push(...rows);
 		}
 	}
 
@@ -865,12 +950,22 @@ export async function retrieveChunks(
 		.sort((a, b) => b.score - a.score)
 		.map((r) => r.chunk);
 
-	const chunks =
+	const selected =
 		topSim < t.oos
 			? ranked
 			: selectDiverseEnvelope(
 					ranked.filter((c) => c.similarity >= t.minChunk),
 					mentionedDocs,
+					opts.envelopeChunks,
+				);
+	const chunks =
+		topSim < t.oos
+			? selected
+			: withBindingPresence(
+					selected,
+					bindingRows,
+					topSim,
+					t,
 					opts.envelopeChunks,
 				);
 	const avgSim =

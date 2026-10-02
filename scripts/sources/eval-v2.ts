@@ -29,7 +29,13 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 import { type GuardedHandlerArgs, withGuard } from "../../lib/guard";
 import { knowledgeHubQueryHandler } from "../../lib/knowledge-hub/query-handler";
-import { isLowConfidenceText, isRefusalText } from "../../lib/prompts";
+import { getSourceChatModel, OPENAI_MODELS } from "../../lib/openai";
+import {
+	isLowConfidenceText,
+	isRefusalText,
+	PROMPT_VERSION,
+	PROMPT_VERSION_V2,
+} from "../../lib/prompts";
 import { extractSnippetIds, lintAuthority } from "../../lib/sources/citations";
 import { isSourcesPayloadV2 } from "../../lib/sources/payload";
 import { type EvalCase, grade, loadCases, parseStream } from "../eval-kb";
@@ -188,12 +194,17 @@ function norm(s: string): string {
 /** A sentence that says something is not covered AND names one of `terms`. */
 function saysNotCovered(text: string, terms: string[] | undefined): boolean {
 	if (!terms || terms.length === 0) return false;
+	// "Part 26" is also written "10 CFR 26" / "10 CFR 26.205".
+	const wanted = terms.flatMap((t) => {
+		const part = /^part (\d+)$/i.exec(t.trim());
+		return part ? [t, `10 cfr ${part[1]}`] : [t];
+	});
 	return text
 		.split(/(?<=[.!?])\s+|\n+/)
 		.some(
 			(sentence) =>
 				NOT_COVERED_RE.test(sentence) &&
-				terms.some((t) => sentence.includes(t.toLowerCase())),
+				wanted.some((t) => sentence.includes(t.toLowerCase())),
 		);
 }
 
@@ -252,7 +263,11 @@ function gradeV2(c: V2Case, r: Awaited<ReturnType<typeof run>>): string | null {
 	const cited = ids.map((id) => payload.sources.find((s) => s.sid === id));
 	if (cited.some((s) => !s))
 		return `unresolved:${ids.filter((_, i) => !cited[i]).join(",")}`;
-	const refused = isRefusalText(r.text) || isLowConfidenceText(r.text);
+	// A refusal, or the low-confidence line with nothing cited. A cited
+	// answer that ALSO contains the low-confidence line somewhere is a
+	// partial answer: it must say what is not covered (saysNotCovered).
+	const refused =
+		isRefusalText(r.text) || (isLowConfidenceText(r.text) && ids.length === 0);
 	const declined = refused || saysNotCovered(text, e.absent_terms);
 	if (e.decline) {
 		// The model must not present uncovered material as answered: a decline,
@@ -318,6 +333,8 @@ async function main() {
 	const report: Record<string, unknown> = {
 		ran_at: new Date().toISOString(),
 		collections: process.env.KH_COLLECTIONS,
+		chat_model: CORPUS === "v2" ? getSourceChatModel() : OPENAI_MODELS.chat,
+		prompt_version: CORPUS === "v2" ? PROMPT_VERSION_V2 : PROMPT_VERSION,
 	};
 
 	const repeatIdx = argv.indexOf("--repeat");
@@ -431,6 +448,12 @@ async function main() {
 		const authorityFlags = rows.flatMap(
 			(r) => r.authority_flags as unknown[],
 		).length;
+		// Authority cases are graded on routing/citation; their lint flags are
+		// reported here so a flagged pass is never mistaken for a clean one.
+		const authorityCases = rows.filter((r) => r.category === "authority");
+		const authorityFlagged = authorityCases.filter(
+			(r) => (r.authority_flags as unknown[]).length > 0,
+		).length;
 		const splits = Object.fromEntries(
 			(["tuned_on", "regression", "held_out", "blind"] as const).map((k) => {
 				const xs = rows.filter((r) => r.split === k);
@@ -440,12 +463,15 @@ async function main() {
 		console.log(
 			`sources: ${passed}/${rows.length}  (${Object.entries(splits)
 				.map(([k, v]) => `${k} ${v}`)
-				.join(" · ")}) · authority flags ${authorityFlags}`,
+				.join(
+					" · ",
+				)}) · authority flags ${authorityFlags} (authority cases flagged ${authorityFlagged}/${authorityCases.length})`,
 		);
 		report.sources = {
 			summary: `${passed}/${rows.length}`,
 			...splits,
 			authority_flags: authorityFlags,
+			authority_cases_flagged: `${authorityFlagged}/${authorityCases.length}`,
 			rows,
 		};
 	}
