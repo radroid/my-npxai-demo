@@ -98,6 +98,19 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [ ] Raj review the committed RAG evaluation report (scores per category + methodology) and decide whether any score warrants a follow-up hardening phase.
 - [x] **Embedding upgrade — hosted migration + re-ingest — ✅ EXECUTED BY AGENT 2026-07-14 under explicit authorization** ("run it on production now"). Ran `migration repair` (5 foundational, mark-only) → `db push` (applied the signup-500 fix `20260714000000`, statement-timeout+NOTIFY `010000`, staging-swap `020000`, AND the embedding halfvec migration `030000`) → re-ingest at -large (1945 rows, 0 null embeddings, atomic staging swap) → merged PR #13. This also cleared the pending signup-500 fix on hosted. *(Original human-task text preserved below for reference.)* PR #13 upgrades embeddings to `text-embedding-3-large`@3072 (halfvec); merging deploys 3072-dim code that is incompatible with the current hosted `vector(1536)` RPC, so **do the hosted swap FIRST**. Verified precondition: hosted pgvector is 0.8.0 (halfvec OK). Runbook (feature is down only from `db push` → merge — keep back-to-back): (1) **pause the daily keep-alive cron**; (2) *optional insurance* `CREATE TABLE regdoc_chunks_emb_bak AS SELECT id, embedding FROM regdoc_chunks;` (the migration's DROP COLUMN is irreversible in-DB); (3) `bunx supabase db push --linked` to apply `20260714030000_embedding_3large_halfvec.sql`; (4) re-ingest at -large: `bun run ingest --force` (staging-swap keeps the live table whole); (5) **merge PR #13**; (6) smoke a query, then **un-pause the cron**. Note: this comes AFTER the `20260714000000/010000/020000` migration-repair→push sequence in the un-pause task above.
 
+### Phase 12 — source-aware regulatory expansion (opened 2026-10-01)
+
+> Decisions behind each item: `PLAN.md` → Needs human decision. Runbook and evidence: `docs/phase-12-sources.md`.
+
+- [ ] **Authorize the hosted rollout** (`docs/phase-12-sources.md` §5): `db push` of the additive migration → `sources:publish --force` (~$0.40 embeddings) → audit/parity on hosted → `KH_SOURCE_CORPUS=v2` with `KH_COLLECTIONS=cnsc` → then NRC, ONR, EU one at a time. The PR is safe to merge before this; with the default flag nothing changes.
+- [ ] **CNSC rights (R1):** confirm the "short attributed snippets + link" reading of OGL-Canada vs the PDFs' "individual use" notice, or switch CNSC to link-only.
+- [ ] **IAEA:** request text-use permission (16 standards + 8 IAEA-published Fukushima reports), or confirm they stay link-only.
+- [ ] **NRA (2 docs):** if wanted, download in a browser and run `bun run sources:fetch --import <key>@<version> <file>`, plus a reuse-terms decision. The agent won't spoof a browser UA.
+- [ ] **NRC RG 1.109:** text-minus-third-party-figure, or keep it link-only.
+- [ ] **Staged NRC guides:** say whether your 15 staged guides include any not in `corpus/register.json`. They weren't found from the worktree, so the agent fetched official copies.
+- [ ] **CNSC battery #21/#26:** re-key them to the current editions when v2 ships, or keep them legacy-only.
+- [ ] Live-verify the Sources picker, notice buttons, citation chips and the Sources panel in **light and dark** once v2 is on (local: `KH_SOURCE_CORPUS=v2` in `.env.local` plus a dev-server restart, which agents don't do).
+
 ### Tuesday Apr 21 — Outreach (paused behind Phase 6 completion)
 - [ ] 9 AM — LinkedIn DM to Kshitij Ahuja
 - [ ] 11 AM — LinkedIn DM to Bharath Nangia
@@ -404,35 +417,46 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] pre-item · **Fail loud on partial ingest** — `scripts/ingest.ts` now asserts the post-insert row count in `regdoc_chunks` matches the number of rows it intended to insert and exits non-zero with a clear message on mismatch, instead of printing `✅ Ingestion complete` over a table the non-transactional wipe-then-insert left half-populated by a timed-out batch (2026-07-14).
 - [ ] Build the **keep-alive Worker** (`npxai-keepalive`) — daily Cloudflare Cron Trigger pinging the hosted REST endpoint so the free project stops auto-pausing. Spec + `wrangler.jsonc` + handler in `supabase/LOCAL.md`. Free tier pauses after ~7 days idle; a *weekly* cron races that boundary, so the cron is daily. Blocked on the human item below (needs the project un-paused and the hosted anon key as a Worker secret).
 
-### Planned Phase 12 — source-aware regulatory expansion (not yet current)
+### Phase 12 — source-aware regulatory expansion (opened 2026-10-01; implemented behind `KH_SOURCE_CORPUS`, hosted rollout held)
 
 **Gate 0 · Inventory and rights**
-- [ ] Locate the 15 already fetched/PDF-validated NRC guides outside this worktree; record official URL, guide number, revision/status, file hash, parse quality, and rights evidence in a versioned source manifest. Revalidate against the current NRC listing before release.
-- [ ] Register the 16 IAEA safety standards as metadata-only references with official links and editions. Enforce zero text chunks and zero embeddings for these entries. Record document-specific rights decisions for every proposed ONR, EU/ENSREG/WENRA, AERB, and Fukushima report; leave uncertain items link-only.
-- [ ] Record rights and current-edition evidence for the existing CNSC documents before backfilling them into the new rights-gated table.
+- [x] Locate the 15 already fetched/PDF-validated NRC guides outside this worktree; record official URL, guide number, revision/status, file hash, parse quality, and rights evidence in a versioned source manifest. Revalidate against the current NRC listing before release.
+  - The staged files weren't reachable from this worktree. Official copies were fetched from nrc.gov instead and sha256-pinned in `corpus/register.json` (v2026-10-01.2): 11 RGs full text, RG 1.109 link-only (third-party figure). Revisions were checked against the NRC listing on 2026-10-01. Whether the staged list differs is a 👤 item.
+- [x] Register the 16 IAEA safety standards as metadata-only references with official links and editions. Enforce zero text chunks and zero embeddings for these entries. Record document-specific rights decisions for every proposed ONR, EU/ENSREG/WENRA, AERB, and Fukushima report; leave uncertain items link-only.
+  - IAEA: 16 entries, metadata-only. The DB CHECK keeps the collection closed and `sources:audit` verifies zero chunks. Recorded per-document decisions: ONR (OGL v3, text), EUR-Lex (text), WENRA/AERB/Fukushima (link-only).
+- [x] Record rights and current-edition evidence for the existing CNSC documents before backfilling them into the new rights-gated table.
+  - 12 current docs backfilled unchanged. 7 were outdated in the legacy corpus, so their current editions were fetched (old ones kept as superseded). The REGDOC-2.1.1 2018 *draft* is registered and never served. R1 (OGL vs "individual use") is a 👤 item.
 
 **Gate 1 · Platform and CNSC parity**
-- [ ] Add `source_documents`/`source_chunks` migrations, RLS/grants, active-version metadata, rights gate, and bounded filtered search RPC; backfill CNSC without changing the live query path until counts and retrieval match. Use Supabase CLI and the local runbook before any hosted migration.
-- [ ] Build manifest-driven PDF/HTML parsers and an atomic per-document/version publish path with source hash, parser version, section/page locators, extraction checks, and idempotent reruns. Keep `scripts/ingest.ts` for the existing corpus until parity is proven.
-- [ ] Implement verified `[[S1]]`-style citation IDs end to end in chat, source chips/panel, artifact output, cache, and RAG evaluation. Keep legacy REGDOC citation rendering for saved threads; validate all outbound URLs against stored source metadata.
-- [ ] Preserve the existing untrusted-context, output-guard, and artifact-sanitizer protections for all newly parsed text; verify new source links cannot introduce unsafe URL schemes or hosts.
-- [ ] Add `auto` and pinned collection/jurisdiction selection. In `auto`, use CNSC for unqualified questions and route explicit source mentions; keep pinned scopes fixed and require explicit comparison intent. Recalibrate per-collection thresholds and compare filtered approximate search against exact recall.
+- [x] Add `source_documents`/`source_chunks` migrations, RLS/grants, active-version metadata, rights gate, and bounded filtered search RPC; backfill CNSC without changing the live query path until counts and retrieval match. Use Supabase CLI and the local runbook before any hosted migration.
+- [x] Build manifest-driven PDF/HTML parsers and an atomic per-document/version publish path with source hash, parser version, section/page locators, extraction checks, and idempotent reruns. Keep `scripts/ingest.ts` for the existing corpus until parity is proven.
+- [x] Implement verified `[[S1]]`-style citation IDs end to end in chat, source chips/panel, artifact output, cache, and RAG evaluation. Keep legacy REGDOC citation rendering for saved threads; validate all outbound URLs against stored source metadata.
+- [x] Preserve the existing untrusted-context, output-guard, and artifact-sanitizer protections for all newly parsed text; verify new source links cannot introduce unsafe URL schemes or hosts.
+- [x] Add `auto` and pinned collection/jurisdiction selection. In `auto`, use CNSC for unqualified questions and route explicit source mentions; keep pinned scopes fixed and require explicit comparison intent. Recalibrate per-collection thresholds and compare filtered approximate search against exact recall.
+  - `sources:calibrate`: NRC refusal gate moved 0.40→0.44, others keep legacy. `sources:recall` is exact at this corpus size (planner chooses a seq scan); the forced-HNSW probe (`scripts/sources/sql/hnsw-forced-recall.sql`) gives 0.935–0.995.
 
 **Gate 2 · NRC release**
-- [ ] Publish the 15 held NRC regulatory guides after rights/version/parse checks; verify every displayed citation resolves to the correct NRC guide, revision, section/page, and official URL.
-- [ ] Add a curated set of current 10 CFR provisions and NUREG reports through the same pipeline, with distinct binding-regulation versus guidance/report labels and edition dates.
+- [x] Publish the 15 held NRC regulatory guides after rights/version/parse checks; verify every displayed citation resolves to the correct NRC guide, revision, section/page, and official URL.
+- [x] Add a curated set of current 10 CFR provisions and NUREG reports through the same pipeline, with distinct binding-regulation versus guidance/report labels and edition dates.
 
 **Gate 3 · Fukushima collection**
-- [ ] Register the eight report groups in the source plan and ingest each rights-cleared English report separately. Label IAEA, NAIIC, government, TEPCO, NRA, and review-mission perspectives and dates; keep blocked reports link-only.
-- [ ] Add questions testing accident findings versus post-accident regulatory changes, conflicting accounts, and historical/current status; verify citations never present an investigation report as binding regulation.
+- [!] Register the eight report groups in the source plan and ingest each rights-cleared English report separately. Label IAEA, NAIIC, government, TEPCO, NRA, and review-mission perspectives and dates; keep blocked reports link-only.
+  - 13 entries registered, all link-only for now. The 2 rights-plausible NRA documents are fetch-blocked (403). Blocked on 👤 NRA download + IAEA permission.
+- [!] Add questions testing accident findings versus post-accident regulatory changes, conflicting accounts, and historical/current status; verify citations never present an investigation report as binding regulation.
+  - Blocked: no Fukushima text is ingested yet. The link-only notice path is tested (`v2-fukushima-not-enabled`), and `investigation_report` is typed `nonbinding` in the register rules.
 
 **Gate 4 · ONR, EU/WENRA, and AERB**
-- [ ] Ingest ONR SAPs and a curated TAG batch with OGL attribution; ingest the relevant EUR-Lex directives using stable CELEX links; add ENSREG/WENRA only after individual rights checks; add priority AERB PHWR codes only after rights checks. Release each publisher independently.
+- [x] Ingest ONR SAPs and a curated TAG batch with OGL attribution; ingest the relevant EUR-Lex directives using stable CELEX links; add ENSREG/WENRA only after individual rights checks; add priority AERB PHWR codes only after rights checks. Release each publisher independently.
+  - ONR: SAPs + 6 TAGs (OGL v3 attribution shown). EU: 2009/71 (original, superseded, plus consolidated), 2014/87, 2011/70 via CELEX resolver. WENRA and AERB: link-only (unclear terms; aerb.gov.in resets TLS). Each collection has its own DB `searchable` switch.
 
 **Gate 5 · Evaluation and rollout**
-- [ ] Extend golden/citation/out-of-corpus evaluations for each collection and cross-jurisdiction comparison. Pin the existing CNSC questions to CNSC scope (including their NRC out-of-corpus case), adapt citation scoring to source IDs, and add an `auto`-scope NRC success case. Require zero unauthorized chunks/embeddings, zero unresolved citations, no wrong-jurisdiction or wrong-authority claims in reviewed samples, and no CNSC semantic baseline regression before enabling each collection.
-- [ ] Roll out behind a collection flag, smoke chat and artifact links on the deployed app, record corpus/manifest version in logs and cache keys, and retain the old CNSC RPC/table as the rollback path until the new path is stable.
-- [ ] Set a documented rights/revision recheck cadence and expose source as-of dates; verify source controls and citation chips in both light and dark themes.
+- [x] Extend golden/citation/out-of-corpus evaluations for each collection and cross-jurisdiction comparison. Pin the existing CNSC questions to CNSC scope (including their NRC out-of-corpus case), adapt citation scoring to source IDs, and add an `auto`-scope NRC success case. Require zero unauthorized chunks/embeddings, zero unresolved citations, no wrong-jurisdiction or wrong-authority claims in reviewed samples, and no CNSC semantic baseline regression before enabling each collection.
+  - `evals/sources-v2.jsonl`: 24 cases, 24/24. CNSC battery ×3, legacy vs v2-pinned: ship 17/18/17 vs 18/17/18. v2 loses #21/#26 to edition drift (verified in the DB) and #8 to likely variance; it gains #4/#25. Audit: zero unauthorized chunks. Unresolved ids fail every case.
+- [!] Roll out behind a collection flag, smoke chat and artifact links on the deployed app, record corpus/manifest version in logs and cache keys, and retain the old CNSC RPC/table as the rollback path until the new path is stable.
+  - Done: `KH_SOURCE_CORPUS`/`KH_COLLECTIONS` + the DB `searchable` switch; corpus version in cache keys and `stream_end` logs; old RPC/table untouched. Blocked on 👤 hosted-rollout authorization for the deployed smoke.
+- [~] Set a documented rights/revision recheck cadence and expose source as-of dates; verify source controls and citation chips in both light and dark themes.
+  - Cadence 180 days (`sources:audit` warns). As-of dates appear in the picker and on source cards. Light/dark was checked statically (canonical token utilities only, no hex, no `bg-[--x]`). Live check is a 👤 item, because the dev server runs legacy.
+- [ ] Re-run `sources:recall` and the forced-HNSW probe whenever the corpus grows; raise `ef_search` (e.g. 200) if the planner starts choosing the index and mixed-probe recall stays under 0.95.
 
 ---
 

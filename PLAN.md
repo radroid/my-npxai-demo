@@ -12,7 +12,13 @@
 
 **Trigger rule for agents:** if a blocker can't be resolved within 24 hours of being identified, or it requires judgment that research can't settle (personal narrative, subjective brand calls, credentials), add a one-line bullet here.
 
-- *(none yet — will populate as agent iterations surface truly irreducible choices)*
+- **Phase 12 hosted rollout — authorize?** The code is safe to merge on its own (additive migration; default `KH_SOURCE_CORPUS=legacy`). Rolling out means `db push`, publishing (~$0.40 of embeddings) and flipping Worker vars, following `docs/phase-12-sources.md` §5. Recommended soon: prod's legacy path answers REGDOC-2.1.1 questions from a 2018 *consultation draft* and serves 7 outdated CNSC editions; v2 fixes both.
+- **CNSC rights (R1):** the Open Government Licence – Canada dataset entries allow reuse with attribution, but the REGDOC PDFs' inside cover allows extracts "for individual use" only. The register records full_text conditioned on short attributed snippets with a link and no whole-document republication, which is how the app already uses them. Confirm that reading, or switch CNSC to link-only.
+- **IAEA permission:** the 16 safety standards and 8 IAEA-published Fukushima reports stay titles + links only. Their terms require a licence for storing or embedding full text for AI use. Request one from IAEA Rights and Permissions, or keep them link-only.
+- **NRA (2 docs):** `www.nra.go.jp` returns 403 to non-browser clients, and the agent won't spoof a browser user agent. If you want them, download them in a browser and run `bun run sources:fetch --import …`, after confirming the NRA/Government of Japan reuse terms for these two.
+- **NRC RG 1.109** is metadata-only because of a third-party figure. Accept text-minus-figure, or keep it link-only.
+- **The "15 staged NRC guides"** weren't found from this worktree. The register's 11 full-text RGs, RG 1.109 (metadata-only), 6 NUREG volumes and 12 10 CFR provisions were fetched fresh from nrc.gov/ecfr.gov with pinned hashes. Tell the agent if your staged list has guides that aren't in `corpus/register.json`.
+- **CNSC battery vs current editions:** cases #21 (REGDOC-2.5.2 §7.3.4/§7.6.2 → §5.3.4/§6.6.12 in v2.1) and #26 (phrases only in the 2018 2.1.1 draft) score the outdated texts. Re-key them to the current editions when v2 ships (the legacy path will then fail them), or keep them as legacy-only.
 
 > **Ship readiness checklist** lives in Appendix H.5 — single source of truth; don't duplicate it here.
 
@@ -58,7 +64,9 @@ Architecture note for README: portable to Azure OpenAI + Cosmos DB vector + Azur
 
 ## Current phase
 
-**Phase 11 — Artifact mode + RAG eval framework** (opened 2026-07-13 by Raj).
+**Phase 12 — source-aware regulatory expansion** (opened 2026-10-01 at Raj's request). Implemented on `feat/phase-12-source-aware-expansion` behind `KH_SOURCE_CORPUS` (default `legacy`). Gates 0–5 pass locally (`docs/phase-12-sources.md` §4). The hosted rollout is held for Raj (see Needs human decision).
+
+**Phase 11 — Artifact mode + RAG eval framework** (opened 2026-07-13 by Raj; superseded as current by Phase 12).
 
 Two tracks, delivered via the orchestrated-delivery loop (see `docs/orchestration/backlog.md` for live progress): **item-1** adds an "Artifact" answer mode to the Knowledge Hub — a toggle that generates a self-contained, NPX-themed HTML explainer with inline-SVG diagrams for complex regulatory topics, rendered in a sandboxed iframe with the same guard/rate-limit surface as chat. **item-2** builds a RAG-pipeline evaluation framework (golden dataset from the ingested corpus, established metrics — faithfulness / answer relevancy / context precision / context recall / consistency — experiment runner with structured logs + cost guard) and ships a committed report scoring the pipeline with realistic percentages per category. Prior phase state (6–10) is preserved below and in TODO.md history.
 
@@ -72,9 +80,9 @@ Load-bearing decisions taken at Phase 6 open (all logged below in the decisions 
 
 ---
 
-## Planned Phase 12 — source-aware regulatory expansion (proposed 2026-09-23)
+## Phase 12 — source-aware regulatory expansion (proposed 2026-09-23, opened 2026-10-01)
 
-Phase 11 remains current. Phase 12 extends the Knowledge Hub beyond CNSC using the source inventory in `nuclear-regulatory-sources.md` (researched 2026-09-20) and the staged status supplied by Raj: 15 NRC guides fetched and PDF-validated but not ingested; 16 IAEA standards catalogued for reference only; Japanese binding ordinances and Russian texts deferred; Fukushima reports prioritized as a separate English-language lessons-learned collection. The staged files are not in this worktree, so their inventory, versions, and hashes must be confirmed before publication.
+Status 2026-10-01: implemented behind a flag. Operator guide, release evidence and hosted runbook: `docs/phase-12-sources.md`. Phase 12 extends the Knowledge Hub beyond CNSC using the source inventory in `nuclear-regulatory-sources.md` (researched 2026-09-20) and the staged status supplied by Raj: 15 NRC guides fetched and PDF-validated but not ingested; 16 IAEA standards catalogued for reference only; Japanese binding ordinances and Russian texts deferred; Fukushima reports prioritized as a separate English-language lessons-learned collection. The staged files are not in this worktree, so their inventory, versions, and hashes must be confirmed before publication.
 
 ### Publication and authority rules
 
@@ -167,6 +175,12 @@ Japan's mostly Japanese binding ordinances and Russian full texts remain outside
 - **2026-07-14** — **Embedding upgrade DEPLOYED to hosted (PR #13 merged, agent-executed under explicit authorization).** Sequence: `migration repair` (5 foundational) → `db push` (signup-500 fix + statement-timeout + staging-swap + halfvec migration) → re-ingest at -large (1945 rows, 0 nulls) → merge. Hosted pgvector 0.8.0 confirmed halfvec. Threshold calibration against hosted -large: in-corpus golden topSim min 0.512 / median 0.752 vs OOC median 0.582 — the 0.457 "shift turnover" smoke was a single-phrase outlier; `LOW_SIM_OOS=0.40` keeps 100% of golden answerable with a 0.11 margin, so thresholds left UNCHANGED (validated, not re-tuned). Post-deploy caught an adversarial regression (ooc-017: -large's stronger retrieval → misattribution of a requirement to a non-corpus REGDOC; negative rejection 100→97.3%); fixed with prompt rule 2d (attribution grounding), restoring 37/37 with zero golden over-rejection ([[feedback_rereview_fix_rounds]] — the upgrade itself introduced the regression, caught only by end-to-end re-verification, not the ranking eval).
 - **2026-07-14** — **RAG eval set hardened (PR #13, `3f64905`).** Golden 65→92; OOC probes 23→37 (+`in_corpus_false_premise`, `version_temporal`, `numeric_fabrication`, `plausible_absent`); anti-echo phrasing rule so questions measure retrieval not string-overlap; added a synthetic retrieval-reachability honesty metric. Generation measured 0.990 faithful / 0.998 citation support (n=47) and 100% negative rejection (37 probes).
 - **2026-09-23** — **Phase 12 planned, not opened:** multi-source expansion starts with provenance/rights and source-neutral citations, then publishes NRC, Fukushima, ONR/EU/AERB in gated batches; 16 IAEA standards remain metadata-only pending documented text-use permission. Phase 11 remains current.
+- **2026-10-01** — **Phase 12 opened and implemented behind `KH_SOURCE_CORPUS=legacy|v2` (default legacy = byte-identical old path = rollback).** The migration is additive (new tables and RPCs; `regdoc_chunks`/`match_regdoc_chunks` untouched), so merge and migration are decoupled, unlike PR #13's in-place swap.
+- **2026-10-01** — **Source picker = "Auto" + pinned regulator, model-picker style** (Raj's question). Auto routes by the regulator a question names (default CNSC). Comparison only on explicit intent. Several regimes without it → ask. Out-of-scope → deterministic notice with one-click switches, no model call. The choice is remembered (localStorage) and shared by chat and artifact modes.
+- **2026-10-01** — **Rights posture:** unknown rights → metadata + link only. IAEA, AERB and the Fukushima reports are link-only. NRA PDFs are fetch-blocked (403) and **not** fetched with a spoofed browser UA. Text exists only for CNSC, NRC (U.S. Gov work), ONR (OGL v3) and EUR-Lex.
+- **2026-10-01** — **Per-collection refusal gates:** NRC 0.40→0.44 (one off-topic probe reached 0.401; smallest move with a 0.03 margin, not the gap midpoint). CNSC/ONR/EU keep legacy values (they classify every probe).
+- **2026-10-01** — **HNSW recall finding:** at ~8.6k chunks the planner answers `match_source_chunks` with an exact scan, so production recall is exact. Forced-HNSW recall (synthetic probes) is 0.935–0.995 (`scripts/sources/sql/hnsw-forced-recall.sql`). Re-measure when the corpus grows; consider `ef_search` 200 then.
+- **2026-10-01** — **Chunk page ranges fixed** to cover sentences that cross a page break (found by the audit's independent pdf.js spot check: 107/108 → 108/108). Legacy `chunkDoc` output re-verified byte-identical.
 
 ---
 
