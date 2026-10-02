@@ -2054,6 +2054,31 @@ check(
 			CNSC_ONLY,
 			"single:cnsc",
 		],
+		// Answered (round-8 review): a transport far end or origin.
+		[
+			"What are CNSC requirements for transporting sources between Canada and the US?",
+			AUTO,
+			ALL,
+			"single:cnsc",
+		],
+		[
+			"Compare Type A and Type B packages for transport to the UK.",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"Can a Type B(U) package certified in the UK be transported here?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
+		[
+			"How do I transport a radiography camera to a job site in the US?",
+			AUTO,
+			CNSC_ONLY,
+			"single:cnsc",
+		],
 		// Answered (round-7 review): a country at the far end of a transport
 		// or a shipment, even with a comparison word elsewhere.
 		[
@@ -2201,6 +2226,50 @@ check(
 			AUTO,
 			CNSC_ONLY,
 			"notice:reference_only",
+		],
+		// Declined or compared (round-8 review): the US/UK's own transport or
+		// trade rules, and both ends compared.
+		[
+			"What are US transport requirements for Type B packages?",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How is spent fuel transported in the US?",
+			PIN_CNSC,
+			CNSC_ONLY,
+			"notice:pinned_mismatch",
+		],
+		[
+			"What are the UK export controls on nuclear material?",
+			AUTO,
+			ALL,
+			"single:onr",
+		],
+		[
+			"Compare importing sealed sources into the US with importing them into Canada.",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"How do licensing requirements for imports into the UK compare with Canada?",
+			AUTO,
+			ALL,
+			"compare:cnsc+onr",
+		],
+		[
+			"Compare Canadian import requirements to the US.",
+			AUTO,
+			CNSC_ONLY,
+			"notice:not_enabled",
+		],
+		[
+			"Are US sites subject to stricter transport rules than Canadian sites?",
+			AUTO,
+			ALL,
+			"compare:cnsc+nrc",
 		],
 		// Declined or compared (round-7 review): a trade or transport country
 		// that is the subject, or compared without being the far end.
@@ -2533,6 +2602,13 @@ check(
 		"The guide does not by itself require anything [[S2]].",
 		"The guide places no additional obligations on licensees [[S2]].",
 		"A second review shall not be required [[S2]].",
+		// The negated word's object and coordinates (round-8 review).
+		"NRC Regulatory Guide 8.10 does not impose legal obligations on US licensees [[S2]].",
+		"The guide does not create legally binding obligations [[S2]].",
+		"Use of RG 8.29 is not required or mandatory for licensees [[S2]].",
+		"The SAPs do not impose duties or obligations on dutyholders [[S2]].",
+		"The CNSC does not require a second review, nor does it prohibit one [[S2]].",
+		"The guide neither requires nor prohibits portable shielding [[S2]].",
 	];
 	check(
 		"lint: the negated obligation itself (a few words apart) is not a violation",
@@ -2547,6 +2623,8 @@ check(
 		"This is not just recommended but required [[S2]].",
 		"Licensees must confirm that no open regulatory requirements remain [[S2]].",
 		// A negation excuses only what it negates (round-7 review).
+		"Licensees are required to keep records, though not required to submit them [[S2]].",
+		"The guide does not require it but the licence must reference it [[S2]].",
 		"Licensees must perform an ALARA review with no new requirements beyond Part 20 [[S2]].",
 		"Licensees are required to keep records but are not required to submit them [[S2]].",
 	];

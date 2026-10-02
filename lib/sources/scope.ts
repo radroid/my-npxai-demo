@@ -222,10 +222,18 @@ const TRADE_CORE =
 	"export\\w*|import\\w*|ship\\w*|transfer\\w*|supplier\\w*|customer\\w*|vendor\\w*|client\\w*|buyer\\w*|destin\\w*|cross-border|border";
 const TRADE_WORDS = `${TRADE_CORE}|bound|from`;
 const TRADE_RE = new RegExp(`\\b(?:${TRADE_CORE})\\b`, "i");
-// A question about moving material: trade, or transport to or from a place
-// ("transporting a Type B package to the US"). Only for telling an indexed
-// country's role (detectMentions); comparison slots keep TRADE_CORE.
-const MOVEMENT_RE = new RegExp(`\\b(?:${TRADE_CORE}|transport\\w*)\\b`, "i");
+// "Transport" alone (a regulatory topic — the PTNSR) makes an indexed
+// country a place only at the far end ("transporting a Type B package to
+// the US"); "US transport requirements" are the US's own rules.
+const TRANSPORT_RE = /\btransport\w*/i;
+// Rule nouns: "export requirements to the US" is about rules, so a trade
+// word before them does not govern what follows.
+const RULE_NOUNS =
+	"requirements?|regulations?|rules|controls?|licensing|limits?|standards?|laws?|regimes?|frameworks?|polic(?:y|ies)|approach(?:es)?";
+// Topic words between a country and a rule noun: "US transport
+// requirements", "UK export controls", "US dose limits".
+const TOPIC_WORDS =
+	"transport\\w*|import\\w*|export\\w*|shipping|packag\\w*|licens\\w*|safety|security|radiation|dose|nuclear|safeguards|emergency|waste|federal";
 // A country as the SUBJECT of the question — its own rules: "Finland's",
 // "France requires", "Spain requirements" (adjacent), or a rules word
 // governing the place: "regulated in Sweden", "mandatory in Finland", "the
@@ -237,7 +245,7 @@ const MOVEMENT_RE = new RegExp(`\\b(?:${TRADE_CORE}|transport\\w*)\\b`, "i");
 function countrySubjectRe(countries: string): RegExp {
 	const c = `(?:${countries})(?![\\w-])`;
 	return new RegExp(
-		`\\b${c}(?:['’]s\\b|\\s+(?:${ADJACENT_RULE_WORDS})\\b)|\\b(?:${GOVERNING_RULE_WORDS})\\b(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?!;:]){0,40}?(?<!\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed)\\s)\\b(?:in|for|of|within)\\s+(?:the\\s+)?(?:Republic\\s+of\\s+)?\\b${c}`,
+		`\\b${c}(?:['’]s\\b|\\s+(?:${ADJACENT_RULE_WORDS})\\b|\\s+(?:(?:${TOPIC_WORDS})\\s+){1,2}(?:${RULE_NOUNS})\\b)|\\b(?:${GOVERNING_RULE_WORDS})\\b(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?!;:]){0,40}?(?<!\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed)\\s)\\b(?:in|for|of|within)\\s+(?:the\\s+)?(?:Republic\\s+of\\s+)?\\b${c}`,
 		"i",
 	);
 }
@@ -263,18 +271,27 @@ const INDEXED_COUNTRY_SUBJECT = Object.fromEntries(
 // shipments to the US") does not make it a regime.
 const PARTNER_NOUNS =
 	"suppliers?|customers?|vendors?|clients?|buyers?|destinations?|recipients?|consignees?|carriers?|sites?|facilit(?:y|ies)";
+// Also an origin ("a package certified in the UK") or one end of a moved
+// pair ("shipments between Canada and the US").
+const MOVED = `(?:${TRADE_CORE}|transport\\w*)(?:\\s+(?!(?:${RULE_NOUNS})\\b)[\\w-]+){0,3}?\\s+between\\s+`;
+function farEndRe(names: string): RegExp {
+	const c = `(?:${names})(?![\\w-])`;
+	return new RegExp(
+		`\\b(?:to|from|into|via|through|across|out\\s+of)\\s+(?:the\\s+|an?\\s+)?${c}|\\b${c}\\s+(?:${PARTNER_NOUNS})\\b|\\b(?:${PARTNER_NOUNS})\\s+(?:in|from)\\s+(?:the\\s+)?${c}|\\b(?:built|made|manufactured|fabricated|produced|sourced|supplied|designed|certified|licensed|approved)\\s+in\\s+(?:the\\s+)?${c}|\\b${MOVED}(?:the\\s+)?(?:[\\w-]+\\s+){0,2}?and\\s+(?:the\\s+)?${c}|\\b${MOVED}(?:the\\s+)?${c}\\s+and\\b`,
+		"i",
+	);
+}
 const INDEXED_COUNTRY_TRADED = Object.fromEntries(
-	Object.entries(INDEXED_COUNTRY_NAMES).map(([id, names]) => {
-		const c = `(?:${names})(?![\\w-])`;
-		return [
-			id,
-			new RegExp(
-				`\\b(?:to|from|into|via|through|across|out\\s+of)\\s+(?:the\\s+|an?\\s+)?${c}|\\b${c}\\s+(?:${PARTNER_NOUNS})\\b|\\b(?:${PARTNER_NOUNS})\\s+(?:in|from)\\s+(?:the\\s+)?${c}`,
-				"i",
-			),
-		];
-	}),
+	Object.entries(INDEXED_COUNTRY_NAMES).map(([id, names]) => [
+		id,
+		farEndRe(names as string),
+	]),
 ) as Partial<Record<CollectionId, RegExp>>;
+// Canada at the same far end — "importing into the US … into Canada", "a
+// US site and a Canadian site" — compares two regimes; a destination
+// alone does not.
+const CANADA_FAR_END_RE =
+	/\b(?:to|from|into|via|through|across|out\s+of)\s+(?:the\s+)?Canada\b(?!-)|\bCanadian\s+(?:sites?|facilit(?:y|ies))\b|\b(?:sites?|facilit(?:y|ies))\s+in\s+Canada\b/i;
 
 // The names that put a collection's regime into a comparison slot (below).
 // `regulators` always count. `countries` count in a "between/both/compare
@@ -382,7 +399,7 @@ function slotSources(
 	// For countries: not a pair a trade word governs ("shipments between
 	// Canada and the US", "for shipments to the US and France").
 	const notTraded = tradeGuard
-		? `(?<!\\b(?:${TRADE_CORE})(?:\\s+[\\w-]+){0,2}\\s+(?:(?:to|from|into|via|for)\\s+)?(?:the\\s+)?)`
+		? `(?<!\\b(?:${TRADE_CORE}|transport\\w*)(?:\\s+(?!(?:${RULE_NOUNS})\\b)[\\w-]+){0,2}\\s+(?:(?:to|from|into|via|for)\\s+)?(?:the\\s+)?)`
 		: "";
 	const pairLead = `${notTraded}\\b(?:[Bb]etween|[Bb]oth|[Cc]ompar(?:e[ds]?|ing))\\s+`;
 	const gap = `(?:(?!\\b(?:${TRADE_WORDS})\\b)[^,.?;:]){0,60}?`;
@@ -480,26 +497,34 @@ export interface Mentions {
 export function detectMentions(query: string): Mentions {
 	const collections: CollectionId[] = [];
 	const nonEvent: CollectionId[] = [];
-	// In a question about moving material, a country is a partner unless it
-	// is the subject ("US import requirements"), sits in a comparison slot
-	// ("differ between Canada and the US"), or is compared without being
-	// the far end of the movement ("Are US import rules stricter?").
-	const movement = MOVEMENT_RE.test(query);
+	// In a trade question a country is a partner, and in a transport
+	// question only at the far end — unless it is the subject ("US import
+	// requirements"), sits in a comparison slot ("differ between Canada and
+	// the US"), or is compared other than as a far end ("Are US import
+	// rules stricter?", "importing into the US vs into Canada").
+	const trade = TRADE_RE.test(query);
+	const movement = trade || TRANSPORT_RE.test(query);
 	const comparing = COMPARISON_CONTEXT_RE.test(query);
+	// Canada at the same far end, or in the comparison slot ("… for
+	// imports into the UK compare with Canada?").
+	const canadaCompared =
+		CANADA_FAR_END_RE.test(query) || COLLECTION_SLOT.cnsc(query);
 	for (const rule of MENTION_RULES) {
 		const stripped = (rule.incidentalPhrases ?? []).reduce(
 			(q, re) => q.replace(re, " "),
 			query,
 		);
 		const country = rule.countries?.some((re) => re.test(query)) === true;
+		const farEnd =
+			INDEXED_COUNTRY_TRADED[rule.collection]?.test(query) === true;
 		const regime =
 			rule.res.some((re) => re.test(stripped)) ||
 			(country &&
 				(!movement ||
 					INDEXED_COUNTRY_SUBJECT[rule.collection]?.test(query) === true ||
 					COLLECTION_SLOT[rule.collection](query) ||
-					(comparing &&
-						INDEXED_COUNTRY_TRADED[rule.collection]?.test(query) !== true)));
+					(!trade && !farEnd) ||
+					(comparing && (!farEnd || canadaCompared))));
 		if (
 			regime ||
 			country ||

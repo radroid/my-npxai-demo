@@ -214,8 +214,27 @@ const OBLIGATION_RE =
 // negation excuses only the words it negates: "places no additional
 // obligations" passes, "must perform the review with no new requirements"
 // does not.
-const NEGATED_OBLIGATION_RE =
-	/(?<!\b(?:must|shall)\s)\b(?:not|never|no longer),?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b(?:\s+(?:any|an?|such|the)\s+(?:\w+\s+)?(?:obligations?|duty|duties|mandates?|requirements?)\b)?|n['’]t,?\s+(?:(?!but\b)\w+,?\s+){0,3}?(?:requir\w*|mandatory|obligat\w*|binding|impos\w*)\b(?:\s+(?:any|an?|such|the)\s+(?:\w+\s+)?(?:obligations?|duty|duties|mandates?|requirements?)\b)?|\bno\s+(?:(?:legal|regulatory|such|specific|explicit|formal|binding|additional|new|further|other)\s+)?(?:requirements?|obligations?|mandates?|duty|duties)\b|\b(?:must|shall)\s+not\s+be\s+(?:\w+\s+)?(?:requir\w*|mandatory|obligat\w*)|\bnot\s+(?:believe|consider|think)\b[^.;:]{0,120}\b(?:requires?|required|necessary)\b|\bnot (?:a |an )?(?:\w+ )?requirements?\b/gi;
+// What a negated word governs: its object ("impose legally binding
+// obligations") and what "or"/"nor" join to it ("required or mandatory",
+// "duties or obligations"), or "and" before a noun ("duties and
+// obligations").
+const NEG_WORDS =
+	"requir\\w*|mandatory|obligat\\w*|binding|enforceable|impos\\w*|prohibit\\w*";
+const NEG_NOUNS =
+	"requirements?|obligations?|mandates?|duty|duties|prohibitions?";
+const NEG_GAP = "(?:(?!but\\b)\\w+,?\\s+){0,3}?";
+const NEG_TAIL = `(?:\\s+(?:(?!but\\b)[\\w-]+\\s+){0,3}?(?:${NEG_NOUNS})\\b)?(?:,?\\s+(?:or|nor)\\s+(?:(?!but\\b)[\\w-]+\\s+){0,2}?(?:${NEG_WORDS}|${NEG_NOUNS})\\b|\\s+and\\s+(?:${NEG_NOUNS})\\b)*`;
+const NEGATED_OBLIGATION_RE = new RegExp(
+	[
+		`(?<!\\b(?:must|shall)\\s)\\b(?:not|never|no longer|neither|nor),?\\s+${NEG_GAP}(?:${NEG_WORDS})\\b${NEG_TAIL}`,
+		`n['’]t,?\\s+${NEG_GAP}(?:${NEG_WORDS})\\b${NEG_TAIL}`,
+		`\\bno\\s+(?:(?:legal|legally|regulatory|such|specific|explicit|formal|binding|enforceable|additional|new|further|other)\\s+){0,2}(?:${NEG_NOUNS})\\b${NEG_TAIL}`,
+		`\\b(?:must|shall)\\s+not\\s+be\\s+(?:\\w+\\s+)?(?:requir\\w*|mandatory|obligat\\w*)\\b${NEG_TAIL}`,
+		"\\bnot\\s+(?:believe|consider|think)\\b[^.;:]{0,120}\\b(?:requires?|required|necessary)\\b",
+		"\\bnot (?:a |an )?(?:\\w+ )?requirements?\\b",
+	].join("|"),
+	"gi",
+);
 // A clause that calls the text itself non-binding ("voluntary guidance …")
 // is the right answer, whatever else it says.
 const NONBINDING_CLAUSE_RE = /\bneed not\b|\b(?:voluntary|non-?binding)\b/i;
