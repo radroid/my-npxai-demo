@@ -1,5 +1,5 @@
 {
-	"run_at": "2026-10-02T00:48:12.610Z",
+	"run_at": "2026-10-02T02:57:51.227Z",
 	"envelope": 8,
 	"summary": {
 		"unchanged": {
@@ -59,7 +59,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.738,
-			"v2_top": 0.748,
+			"v2_top": 0.747,
 			"gate_agrees": true
 		},
 		{
@@ -72,7 +72,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.79,
-			"v2_top": 0.791,
+			"v2_top": 0.79,
 			"gate_agrees": true
 		},
 		{
@@ -85,7 +85,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.753,
-			"v2_top": 0.753,
+			"v2_top": 0.755,
 			"gate_agrees": true
 		},
 		{
@@ -137,7 +137,7 @@
 			"v2_hit": true,
 			"v2_historical_hit": true,
 			"legacy_top": 0.797,
-			"v2_top": 0.797,
+			"v2_top": 0.796,
 			"gate_agrees": true
 		},
 		{

@@ -1,9 +1,10 @@
 {
-	"run_at": "2026-10-02T00:42:48.915Z",
-	"note": "match_source_chunks is exact by design (enable_indexscan=off), so 1.000 is expected: this is a regression guard, not an HNSW measurement. Filtered-HNSW recall: corpus/reports/hnsw-forced-recall.txt.",
+	"run_at": "2026-10-02T02:45:09.973Z",
+	"note": "match_source_chunks is exact by design (enable_indexscan=off), so recall 1.000 is expected: this guards the production RPC's results and times it; it is not an HNSW measurement. Filtered-HNSW recall: corpus/reports/hnsw-forced-recall.txt.",
 	"bar": {
 		"mean_recall_at_8": 0.95,
-		"min_recall_at_8": 0.75
+		"min_recall_at_8": 0.75,
+		"latency_max_ms": 2500
 	},
 	"scopes": {
 		"cnsc": {
@@ -16,6 +17,11 @@
 			"mean_recall_at_20": 1,
 			"min_recall_at_8": 1,
 			"top1_agreement": 1,
+			"latency_ms": {
+				"p50": 80,
+				"p95": 166,
+				"max": 166
+			},
 			"pass": true,
 			"per_question": [
 				{
@@ -23,6 +29,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 81,
 					"top1_match": 1
 				},
 				{
@@ -30,6 +37,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 81,
 					"top1_match": 1
 				},
 				{
@@ -37,6 +45,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 83,
 					"top1_match": 1
 				},
 				{
@@ -44,6 +53,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 74,
 					"top1_match": 1
 				},
 				{
@@ -51,6 +61,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 65,
 					"top1_match": 1
 				},
 				{
@@ -58,6 +69,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 72,
 					"top1_match": 1
 				},
 				{
@@ -65,6 +77,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 68,
 					"top1_match": 1
 				},
 				{
@@ -72,6 +85,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 67,
 					"top1_match": 1
 				},
 				{
@@ -79,6 +93,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 65,
 					"top1_match": 1
 				},
 				{
@@ -86,6 +101,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 82,
 					"top1_match": 1
 				},
 				{
@@ -93,6 +109,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 66,
 					"top1_match": 1
 				},
 				{
@@ -100,6 +117,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 65,
 					"top1_match": 1
 				},
 				{
@@ -107,6 +125,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 98,
 					"top1_match": 1
 				},
 				{
@@ -114,6 +133,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 93,
 					"top1_match": 1
 				},
 				{
@@ -121,6 +141,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 70,
 					"top1_match": 1
 				},
 				{
@@ -128,6 +149,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 166,
 					"top1_match": 1
 				},
 				{
@@ -135,6 +157,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 136,
 					"top1_match": 1
 				},
 				{
@@ -142,6 +165,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 70,
 					"top1_match": 1
 				},
 				{
@@ -149,6 +173,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 80,
 					"top1_match": 1
 				},
 				{
@@ -156,6 +181,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 162,
 					"top1_match": 1
 				}
 			]
@@ -170,6 +196,11 @@
 			"mean_recall_at_20": 1,
 			"min_recall_at_8": 1,
 			"top1_agreement": 1,
+			"latency_ms": {
+				"p50": 95,
+				"p95": 203,
+				"max": 203
+			},
 			"pass": true,
 			"per_question": [
 				{
@@ -177,6 +208,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 203,
 					"top1_match": 1
 				},
 				{
@@ -184,6 +216,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 119,
 					"top1_match": 1
 				},
 				{
@@ -191,6 +224,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 94,
 					"top1_match": 1
 				},
 				{
@@ -198,6 +232,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 93,
 					"top1_match": 1
 				},
 				{
@@ -205,6 +240,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 93,
 					"top1_match": 1
 				},
 				{
@@ -212,6 +248,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 141,
 					"top1_match": 1
 				},
 				{
@@ -219,6 +256,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 96,
 					"top1_match": 1
 				},
 				{
@@ -226,6 +264,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 93,
 					"top1_match": 1
 				},
 				{
@@ -233,6 +272,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 143,
 					"top1_match": 1
 				},
 				{
@@ -240,6 +280,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 123,
 					"top1_match": 1
 				},
 				{
@@ -247,6 +288,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 95,
 					"top1_match": 1
 				},
 				{
@@ -254,6 +296,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 94,
 					"top1_match": 1
 				},
 				{
@@ -261,6 +304,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 94,
 					"top1_match": 1
 				},
 				{
@@ -268,6 +312,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 96,
 					"top1_match": 1
 				},
 				{
@@ -275,6 +320,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 93,
 					"top1_match": 1
 				},
 				{
@@ -282,6 +328,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 95,
 					"top1_match": 1
 				}
 			]
@@ -296,6 +343,11 @@
 			"mean_recall_at_20": 1,
 			"min_recall_at_8": 1,
 			"top1_agreement": 1,
+			"latency_ms": {
+				"p50": 57,
+				"p95": 78,
+				"max": 78
+			},
 			"pass": true,
 			"per_question": [
 				{
@@ -303,6 +355,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 55,
 					"top1_match": 1
 				},
 				{
@@ -310,6 +363,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 61,
 					"top1_match": 1
 				},
 				{
@@ -317,6 +371,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 57,
 					"top1_match": 1
 				},
 				{
@@ -324,6 +379,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 65,
 					"top1_match": 1
 				},
 				{
@@ -331,6 +387,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 57,
 					"top1_match": 1
 				},
 				{
@@ -338,6 +395,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 53,
 					"top1_match": 1
 				},
 				{
@@ -345,6 +403,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 78,
 					"top1_match": 1
 				},
 				{
@@ -352,6 +411,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 59,
 					"top1_match": 1
 				},
 				{
@@ -359,6 +419,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 53,
 					"top1_match": 1
 				},
 				{
@@ -366,6 +427,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 54,
 					"top1_match": 1
 				},
 				{
@@ -373,6 +435,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 53,
 					"top1_match": 1
 				},
 				{
@@ -380,6 +443,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 53,
 					"top1_match": 1
 				}
 			]
@@ -394,6 +458,11 @@
 			"mean_recall_at_20": 1,
 			"min_recall_at_8": 1,
 			"top1_agreement": 1,
+			"latency_ms": {
+				"p50": 51,
+				"p95": 95,
+				"max": 95
+			},
 			"pass": true,
 			"per_question": [
 				{
@@ -401,6 +470,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 49,
 					"top1_match": 1
 				},
 				{
@@ -408,6 +478,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 52,
 					"top1_match": 1
 				},
 				{
@@ -415,6 +486,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 50,
 					"top1_match": 1
 				},
 				{
@@ -422,6 +494,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 50,
 					"top1_match": 1
 				},
 				{
@@ -429,6 +502,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 49,
 					"top1_match": 1
 				},
 				{
@@ -436,6 +510,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 50,
 					"top1_match": 1
 				},
 				{
@@ -443,6 +518,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 51,
 					"top1_match": 1
 				},
 				{
@@ -450,6 +526,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 58,
 					"top1_match": 1
 				},
 				{
@@ -457,6 +534,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 83,
 					"top1_match": 1
 				},
 				{
@@ -464,6 +542,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 95,
 					"top1_match": 1
 				}
 			]
@@ -478,6 +557,11 @@
 			"mean_recall_at_20": 1,
 			"min_recall_at_8": 1,
 			"top1_agreement": 1,
+			"latency_ms": {
+				"p50": 75,
+				"p95": 88,
+				"max": 88
+			},
 			"pass": true,
 			"per_question": [
 				{
@@ -485,6 +569,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 73,
 					"top1_match": 1
 				},
 				{
@@ -492,6 +577,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 72,
 					"top1_match": 1
 				},
 				{
@@ -499,6 +585,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 72,
 					"top1_match": 1
 				},
 				{
@@ -506,6 +593,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 72,
 					"top1_match": 1
 				},
 				{
@@ -513,6 +601,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 73,
 					"top1_match": 1
 				},
 				{
@@ -520,6 +609,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 88,
 					"top1_match": 1
 				},
 				{
@@ -527,6 +617,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 82,
 					"top1_match": 1
 				},
 				{
@@ -534,6 +625,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 81,
 					"top1_match": 1
 				},
 				{
@@ -541,6 +633,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 75,
 					"top1_match": 1
 				},
 				{
@@ -548,6 +641,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 82,
 					"top1_match": 1
 				}
 			]
@@ -565,6 +659,11 @@
 			"mean_recall_at_20": 1,
 			"min_recall_at_8": 1,
 			"top1_agreement": 1,
+			"latency_ms": {
+				"p50": 119,
+				"p95": 132,
+				"max": 381
+			},
 			"pass": true,
 			"per_question": [
 				{
@@ -572,6 +671,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 120,
 					"top1_match": 1
 				},
 				{
@@ -579,6 +679,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 122,
 					"top1_match": 1
 				},
 				{
@@ -586,6 +687,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 119,
 					"top1_match": 1
 				},
 				{
@@ -593,6 +695,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 119,
 					"top1_match": 1
 				},
 				{
@@ -600,6 +703,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 121,
 					"top1_match": 1
 				},
 				{
@@ -607,6 +711,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -614,6 +719,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 115,
 					"top1_match": 1
 				},
 				{
@@ -621,6 +727,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 115,
 					"top1_match": 1
 				},
 				{
@@ -628,6 +735,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 113,
 					"top1_match": 1
 				},
 				{
@@ -635,6 +743,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -642,6 +751,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -649,6 +759,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 123,
 					"top1_match": 1
 				},
 				{
@@ -656,6 +767,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 115,
 					"top1_match": 1
 				},
 				{
@@ -663,6 +775,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 159,
 					"top1_match": 1
 				},
 				{
@@ -670,6 +783,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 129,
 					"top1_match": 1
 				},
 				{
@@ -677,6 +791,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 117,
 					"top1_match": 1
 				},
 				{
@@ -684,6 +799,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 381,
 					"top1_match": 1
 				},
 				{
@@ -691,6 +807,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 119,
 					"top1_match": 1
 				},
 				{
@@ -698,6 +815,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 124,
 					"top1_match": 1
 				},
 				{
@@ -705,6 +823,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 121,
 					"top1_match": 1
 				},
 				{
@@ -712,6 +831,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 120,
 					"top1_match": 1
 				},
 				{
@@ -719,6 +839,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 130,
 					"top1_match": 1
 				},
 				{
@@ -726,6 +847,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 124,
 					"top1_match": 1
 				},
 				{
@@ -733,6 +855,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 132,
 					"top1_match": 1
 				},
 				{
@@ -740,6 +863,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -747,6 +871,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -754,6 +879,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 115,
 					"top1_match": 1
 				},
 				{
@@ -761,6 +887,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 117,
 					"top1_match": 1
 				},
 				{
@@ -768,6 +895,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -775,6 +903,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 119,
 					"top1_match": 1
 				},
 				{
@@ -782,6 +911,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 122,
 					"top1_match": 1
 				},
 				{
@@ -789,6 +919,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 118,
 					"top1_match": 1
 				},
 				{
@@ -796,6 +927,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -803,6 +935,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 121,
 					"top1_match": 1
 				},
 				{
@@ -810,6 +943,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -817,6 +951,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -824,6 +959,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 120,
 					"top1_match": 1
 				},
 				{
@@ -831,6 +967,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 117,
 					"top1_match": 1
 				},
 				{
@@ -838,6 +975,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 121,
 					"top1_match": 1
 				},
 				{
@@ -845,6 +983,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 116,
 					"top1_match": 1
 				},
 				{
@@ -852,6 +991,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 119,
 					"top1_match": 1
 				},
 				{
@@ -859,6 +999,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 119,
 					"top1_match": 1
 				},
 				{
@@ -866,6 +1007,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 117,
 					"top1_match": 1
 				},
 				{
@@ -873,6 +1015,7 @@
 					"recall@8": 1,
 					"recall@20": 1,
 					"returned": 20,
+					"ms": 122,
 					"top1_match": 1
 				}
 			]

@@ -433,10 +433,11 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 - [x] Implement verified `[[S1]]`-style citation IDs end to end in chat, source chips/panel, artifact output, cache, and RAG evaluation. Keep legacy REGDOC citation rendering for saved threads; validate all outbound URLs against stored source metadata.
 - [x] Preserve the existing untrusted-context, output-guard, and artifact-sanitizer protections for all newly parsed text; verify new source links cannot introduce unsafe URL schemes or hosts.
 - [x] Add `auto` and pinned collection/jurisdiction selection. In `auto`, use CNSC for unqualified questions and route explicit source mentions; keep pinned scopes fixed and require explicit comparison intent. Recalibrate per-collection thresholds and compare filtered approximate search against exact recall.
-  - `sources:calibrate`: NRC refusal gate moved 0.40→0.44, others keep legacy. `sources:recall` is exact at this corpus size (planner chooses a seq scan); the forced-HNSW probe (`scripts/sources/sql/hnsw-forced-recall.sql`) gives 0.935–0.995.
+  - `sources:calibrate`: NRC refusal gate moved 0.40→0.44; the others keep legacy values. `match_source_chunks` is exact by design (review fix), so `sources:recall` is a regression guard. Filtered-HNSW tail failures are documented in `corpus/reports/hnsw-forced-recall.txt`.
 
 **Gate 2 · NRC release**
-- [x] Publish the 15 held NRC regulatory guides after rights/version/parse checks; verify every displayed citation resolves to the correct NRC guide, revision, section/page, and official URL.
+- [!] Publish the 15 held NRC regulatory guides after rights/version/parse checks; verify every displayed citation resolves to the correct NRC guide, revision, section/page, and official URL.
+  - 11 RGs are published (official copies, hashes pinned, pages spot-checked 108/108), with RG 1.109 link-only. "The 15 held guides" can't be confirmed until Raj says whether his staged list has others (👤).
 - [x] Add a curated set of current 10 CFR provisions and NUREG reports through the same pipeline, with distinct binding-regulation versus guidance/report labels and edition dates.
 
 **Gate 3 · Fukushima collection**
@@ -451,12 +452,16 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[!]` blocked (explain 
 
 **Gate 5 · Evaluation and rollout**
 - [x] Extend golden/citation/out-of-corpus evaluations for each collection and cross-jurisdiction comparison. Pin the existing CNSC questions to CNSC scope (including their NRC out-of-corpus case), adapt citation scoring to source IDs, and add an `auto`-scope NRC success case. Require zero unauthorized chunks/embeddings, zero unresolved citations, no wrong-jurisdiction or wrong-authority claims in reviewed samples, and no CNSC semantic baseline regression before enabling each collection.
-  - `evals/sources-v2.jsonl`: 24 cases, 24/24. CNSC battery ×3, legacy vs v2-pinned: ship 17/18/17 vs 18/17/18. v2 loses #21/#26 to edition drift (verified in the DB) and #8 to likely variance; it gains #4/#25. Audit: zero unauthorized chunks. Unresolved ids fail every case.
+  - `evals/sources-v2.jsonl`: 46 cases (tuned-on / regression / held-out / blind), final 45/46 (blind 13/14). CNSC battery, legacy 8 runs vs v2-pinned 9 runs: ship mean 16.8 vs 17.6, hard 10.5 vs 9.9; v2 loses #21/#26 to edition drift (verified in the DB) and gains #4/#25/#28. Audit: zero unauthorized chunks. Unresolved and malformed ids fail every case. Wrong-authority review and residuals: `docs/phase-12-sources.md` §4 and PLAN → Needs human decision.
 - [!] Roll out behind a collection flag, smoke chat and artifact links on the deployed app, record corpus/manifest version in logs and cache keys, and retain the old CNSC RPC/table as the rollback path until the new path is stable.
   - Done: `KH_SOURCE_CORPUS`/`KH_COLLECTIONS` + the DB `searchable` switch; corpus version in cache keys and `stream_end` logs; old RPC/table untouched. Blocked on 👤 hosted-rollout authorization for the deployed smoke.
 - [~] Set a documented rights/revision recheck cadence and expose source as-of dates; verify source controls and citation chips in both light and dark themes.
   - Cadence 180 days (`sources:audit` warns). As-of dates appear in the picker and on source cards. Light/dark was checked statically (canonical token utilities only, no hex, no `bg-[--x]`). Live check is a 👤 item, because the dev server runs legacy.
-- [ ] Re-run `sources:recall` and the forced-HNSW probe whenever the corpus grows; raise `ef_search` (e.g. 200) if the planner starts choosing the index and mixed-probe recall stays under 0.95.
+- [ ] If the corpus grows past ~50k chunks (or search latency matters): tune `hnsw.ef_search` / `hnsw.max_scan_tuples`, re-run `scripts/sources/sql/hnsw-forced-recall.sql` until mixed probes clear 0.95 with no 0/8 tail, then allow the index in `match_source_chunks`.
+- [ ] Display `third_party_notice` (e.g. REGDOC-2.6.3 "adapted from IAEA NS-G-2.12") on source cards once R1 is decided. The field is stored in the register but not yet in `source_documents`.
+- [ ] Re-key CNSC battery cases #21 and #26 to the current REGDOC-2.5.2 / REGDOC-2.1.1 editions once 👤 decides (PLAN → "CNSC battery vs current editions").
+- [ ] Scope resolver residuals (`docs/phase-12-sources.md` §4): oddly cased "US"/"UK", "licensed in Sweden"-style subjects without a rules word, comparisons phrased as trade questions. Consider a small intent classifier only if live logs show these matter; regex rules are at their useful limit.
+- [ ] Run `bun run test:tiers` against a dev server on :3001 (not run in the Phase 12 sessions — the worktree had no server and agents do not start one).
 
 ---
 
