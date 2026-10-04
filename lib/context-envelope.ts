@@ -2,8 +2,40 @@
 // body text. See Appendix D.2 — the XML-like boundary is defense-in-depth
 // against indirect prompt injection coming from scraped REGDOC content.
 
+import type {
+	CollectionId,
+	DocumentKind,
+	DocumentStatus,
+	LegalForce,
+} from "./sources/catalog";
+
+// Document-level provenance carried by chunks from the multi-source corpus
+// (source_chunks / match_source_chunks, PLAN.md Phase 12). Absent on rows from
+// the legacy regdoc_chunks table, which is CNSC-only by construction.
+export interface SourceMeta {
+	document_key: string;
+	ref: string;
+	label: string;
+	title: string;
+	publisher: string;
+	jurisdiction: string;
+	collection: CollectionId;
+	document_kind: DocumentKind;
+	legal_force: LegalForce;
+	edition: string | null;
+	status: DocumentStatus;
+	as_of: string;
+	canonical_url: string;
+	page_start: number | null;
+	page_end: number | null;
+	attribution: string | null;
+}
+
 export interface RetrievedChunk {
 	id: number;
+	// The document's short reference — a REGDOC id / "NSCA" on the legacy
+	// path, SourceMeta.ref ("RG 1.21", "10 CFR 20.1201") on the v2 path. The
+	// named-doc boost and doc-diversity pass key on it in both.
 	regdoc_id: string;
 	section_number: string | null;
 	section_title: string | null;
@@ -11,6 +43,7 @@ export interface RetrievedChunk {
 	url: string | null;
 	requirement_type: "requirement" | "guidance" | null;
 	similarity: number;
+	source?: SourceMeta;
 }
 
 function htmlEscape(raw: string): string {

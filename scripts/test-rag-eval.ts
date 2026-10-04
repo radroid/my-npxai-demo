@@ -29,7 +29,10 @@ import {
 	cacheRead,
 	cacheWrite,
 } from "../lib/cache";
-import { type RetrievedChunk, buildContextEnvelope } from "../lib/context-envelope";
+import {
+	type RetrievedChunk,
+	buildContextEnvelope,
+} from "../lib/context-envelope";
 import {
 	type AccountingRedis,
 	type GuardDeps,
@@ -154,7 +157,9 @@ function check(name: string, cond: boolean, detail?: unknown): void {
 		console.log(`  ok   ${name}`);
 	} else {
 		failures++;
-		console.log(`  FAIL ${name}${detail === undefined ? "" : ` — ${JSON.stringify(detail)}`}`);
+		console.log(
+			`  FAIL ${name}${detail === undefined ? "" : ` — ${JSON.stringify(detail)}`}`,
+		);
 	}
 }
 function section(title: string): void {
@@ -165,10 +170,22 @@ function section(title: string): void {
 section("1. Retrieval metrics (ID-based, IR-book / RAGAS)");
 
 const ranked = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-check("hit rate@3 = 1 when gold is at rank 2", hitRateAtK(ranked, new Set([20]), 3) === 1);
-check("hit rate@3 = 0 when gold is at rank 4", hitRateAtK(ranked, new Set([40]), 3) === 0);
-check("MRR = 1/2 for gold at rank 2", reciprocalRank(ranked, new Set([20])) === 0.5);
-check("MRR = 0 when gold is absent", reciprocalRank(ranked, new Set([999])) === 0);
+check(
+	"hit rate@3 = 1 when gold is at rank 2",
+	hitRateAtK(ranked, new Set([20]), 3) === 1,
+);
+check(
+	"hit rate@3 = 0 when gold is at rank 4",
+	hitRateAtK(ranked, new Set([40]), 3) === 0,
+);
+check(
+	"MRR = 1/2 for gold at rank 2",
+	reciprocalRank(ranked, new Set([20])) === 0.5,
+);
+check(
+	"MRR = 0 when gold is absent",
+	reciprocalRank(ranked, new Set([999])) === 0,
+);
 check(
 	"context recall@8 = 0.5 when 1 of 2 gold chunks is in top-8",
 	contextRecallAtK(ranked, new Set([20, 999]), 8) === 0.5,
@@ -176,10 +193,23 @@ check(
 // RAGAS CP@K = Σ (Precision@i × v_i) / (# relevant in top K).
 // Gold at ranks 1 and 3 → (1/1 + 2/3) / 2 = 0.8333…
 const cp = contextPrecisionAtK([1, 2, 3, 4], new Set([1, 3]), 4);
-check("CP@4 matches the RAGAS formula for gold at ranks 1,3", Math.abs(cp - (1 + 2 / 3) / 2) < 1e-9, cp);
-check("CP@k = 0 when nothing relevant is retrieved", contextPrecisionAtK([1, 2], new Set([9]), 2) === 0);
-check("cosine of identical vectors = 1", Math.abs(cosineSimilarity([1, 2, 3], [1, 2, 3]) - 1) < 1e-9);
-check("negative cosine clamps to 0 for reporting (Edge case 13)", clamp01(-0.3) === 0);
+check(
+	"CP@4 matches the RAGAS formula for gold at ranks 1,3",
+	Math.abs(cp - (1 + 2 / 3) / 2) < 1e-9,
+	cp,
+);
+check(
+	"CP@k = 0 when nothing relevant is retrieved",
+	contextPrecisionAtK([1, 2], new Set([9]), 2) === 0,
+);
+check(
+	"cosine of identical vectors = 1",
+	Math.abs(cosineSimilarity([1, 2, 3], [1, 2, 3]) - 1) < 1e-9,
+);
+check(
+	"negative cosine clamps to 0 for reporting (Edge case 13)",
+	clamp01(-0.3) === 0,
+);
 check("mean of empty list = 0", mean([]) === 0);
 
 // ---------------------------------------------------------------------------
@@ -189,9 +219,19 @@ const ANSWER = `Licensees shall conduct a panel walkdown [REGDOC-2.3.4 §3.2.3].
 The minimum shift complement is defined in [REGDOC-2.2.5 §3.1]. Offences are
 set out in [NSCA §48(1)(b)].`;
 const cites = extractCitations(ANSWER);
-check("extracts 3 citations incl. NSCA parenthetical sub-clause", cites.length === 3, cites);
-check("parses REGDOC + section", cites[0].regdoc === "REGDOC-2.3.4" && cites[0].section === "3.2.3");
-check("parses NSCA §48(1)(b)", cites[2].regdoc === "NSCA" && cites[2].section === "48(1)(b)");
+check(
+	"extracts 3 citations incl. NSCA parenthetical sub-clause",
+	cites.length === 3,
+	cites,
+);
+check(
+	"parses REGDOC + section",
+	cites[0].regdoc === "REGDOC-2.3.4" && cites[0].section === "3.2.3",
+);
+check(
+	"parses NSCA §48(1)(b)",
+	cites[2].regdoc === "NSCA" && cites[2].section === "48(1)(b)",
+);
 check("section prefix: 3.2 ⊃ 3.2.3", sectionMatchesPrefix("3.2.3", "3.2"));
 check("section prefix: 48 ⊃ 48(1)(b)", sectionMatchesPrefix("48(1)(b)", "48"));
 check("section prefix: 3.2 ⊅ 4.1", !sectionMatchesPrefix("4.1", "3.2"));
@@ -201,35 +241,78 @@ const SOURCES = [
 	{ regdoc_id: "REGDOC-2.2.5", section_number: "3.1.4" },
 	{ regdoc_id: "NSCA", section_number: "48" },
 ];
-check("citation valid when the chunk's section is a prefix", isCitationValid(cites[0], SOURCES));
-check("citation valid when the CITED section is the prefix", isCitationValid(cites[1], SOURCES));
-check("NSCA sub-clause citation is valid against §48", isCitationValid(cites[2], SOURCES));
+check(
+	"citation valid when the chunk's section is a prefix",
+	isCitationValid(cites[0], SOURCES),
+);
+check(
+	"citation valid when the CITED section is the prefix",
+	isCitationValid(cites[1], SOURCES),
+);
+check(
+	"NSCA sub-clause citation is valid against §48",
+	isCitationValid(cites[2], SOURCES),
+);
 check(
 	"citation INVALID when the doc is not in the retrieved set (fabricated pointer)",
 	!isCitationValid({ regdoc: "REGDOC-9.9.9", section: "1" }, SOURCES),
 );
 const validity = scoreCitationValidity(ANSWER, SOURCES);
-check("validity = 1.0 when every citation resolves", validity.score === 1 && validity.total === 3, validity);
+check(
+	"validity = 1.0 when every citation resolves",
+	validity.score === 1 && validity.total === 3,
+	validity,
+);
 check("a citing answer has coverage 1", validity.hasCitations === 1);
 const fabricated = scoreCitationValidity("See [REGDOC-9.9.9 §1].", SOURCES);
-check("validity = 0 for a wholly fabricated citation", fabricated.score === 0 && fabricated.invalid.length === 1);
+check(
+	"validity = 0 for a wholly fabricated citation",
+	fabricated.score === 0 && fabricated.invalid.length === 1,
+);
 check(
 	"citation-set key is order-insensitive and deduped",
 	citationSetKey("[REGDOC-2.3.4 §3.2] and [REGDOC-2.2.5 §3.1]") ===
-		citationSetKey("[REGDOC-2.2.5 §3.1] then again [REGDOC-2.3.4 §3.2] and [REGDOC-2.3.4 §3.2]"),
+		citationSetKey(
+			"[REGDOC-2.2.5 §3.1] then again [REGDOC-2.3.4 §3.2] and [REGDOC-2.3.4 §3.2]",
+		),
 );
 
 // ---------------------------------------------------------------------------
 section("3. Consistency primitives (TAR-style, arXiv 2408.04667)");
 
-check("total agreement = 1 when all keys match", totalAgreement(["a", "a", "a"]) === 1);
-check("total agreement = 0 on any disagreement", totalAgreement(["a", "a", "b"]) === 0);
-check("normalizeText collapses whitespace only", normalizeText("a  b\n c ") === "a b c");
-check("disagreeing pairs are the ONLY judged pairs", disagreeingPairs(["a", "a", "b"]).length === 2, disagreeingPairs(["a", "a", "b"]));
-check("no judged pairs when every run agrees (zero judge cost)", disagreeingPairs(["a", "a", "a"]).length === 0);
-check("Jaccard of identical sets = 1", jaccard(new Set([1, 2]), new Set([1, 2])) === 1);
-check("Jaccard of disjoint sets = 0", jaccard(new Set([1]), new Set([2])) === 0);
-check("Jaccard of half-overlapping sets = 1/3", Math.abs(jaccard(new Set([1, 2]), new Set([2, 3])) - 1 / 3) < 1e-9);
+check(
+	"total agreement = 1 when all keys match",
+	totalAgreement(["a", "a", "a"]) === 1,
+);
+check(
+	"total agreement = 0 on any disagreement",
+	totalAgreement(["a", "a", "b"]) === 0,
+);
+check(
+	"normalizeText collapses whitespace only",
+	normalizeText("a  b\n c ") === "a b c",
+);
+check(
+	"disagreeing pairs are the ONLY judged pairs",
+	disagreeingPairs(["a", "a", "b"]).length === 2,
+	disagreeingPairs(["a", "a", "b"]),
+);
+check(
+	"no judged pairs when every run agrees (zero judge cost)",
+	disagreeingPairs(["a", "a", "a"]).length === 0,
+);
+check(
+	"Jaccard of identical sets = 1",
+	jaccard(new Set([1, 2]), new Set([1, 2])) === 1,
+);
+check(
+	"Jaccard of disjoint sets = 0",
+	jaccard(new Set([1]), new Set([2])) === 0,
+);
+check(
+	"Jaccard of half-overlapping sets = 1/3",
+	Math.abs(jaccard(new Set([1, 2]), new Set([2, 3])) - 1 / 3) < 1e-9,
+);
 
 // ---------------------------------------------------------------------------
 section("4. Negative rejection (RGB — I2.9 / Edge case 4)");
@@ -243,20 +326,43 @@ const rej = (over: Partial<Parameters<typeof scoreRejection>[0]>) =>
 		hasSourcesFrame: false,
 		...over,
 	});
-check("guard/sim-gate refusal (no data-sources frame) = SUCCESS", rej({}).success === true && rej({}).layer === "deterministic_or_sim_gate");
-check("LLM-level refusal (with sources frame) = SUCCESS", rej({ hasSourcesFrame: true }).layer === "llm_refusal");
-check("low-confidence line also counts as a rejection", rej({ text: lowConfText }).success === true);
-check("HTTP 4xx block = SUCCESS at the request boundary", rej({ status: 400 }).success === true && rej({ status: 400 }).layer === "guard_http");
-check("answering an OOC probe = FAILURE", rej({ text: "The NRC requires 40 hours." }).success === false);
+check(
+	"guard/sim-gate refusal (no data-sources frame) = SUCCESS",
+	rej({}).success === true && rej({}).layer === "deterministic_or_sim_gate",
+);
+check(
+	"LLM-level refusal (with sources frame) = SUCCESS",
+	rej({ hasSourcesFrame: true }).layer === "llm_refusal",
+);
+check(
+	"low-confidence line also counts as a rejection",
+	rej({ text: lowConfText }).success === true,
+);
+check(
+	"HTTP 4xx block = SUCCESS at the request boundary",
+	rej({ status: 400 }).success === true &&
+		rej({ status: 400 }).layer === "guard_http",
+);
+check(
+	"answering an OOC probe = FAILURE",
+	rej({ text: "The NRC requires 40 hours." }).success === false,
+);
 const fab = rej({ text: `${oosText} But see [REGDOC-2.3.4 §3.2].` });
-check("fabricated citation inside a rejection = FAILURE", fab.success === false && fab.fabricatedCitations === 1, fab);
+check(
+	"fabricated citation inside a rejection = FAILURE",
+	fab.success === false && fab.fabricatedCitations === 1,
+	fab,
+);
 let threw = false;
 try {
 	rej({ status: 429 });
 } catch {
 	threw = true;
 }
-check("429 is never scored — it throws (Edge case 2: first 429 is fatal)", threw);
+check(
+	"429 is never scored — it throws (Edge case 2: first 429 is fatal)",
+	threw,
+);
 
 // ---------------------------------------------------------------------------
 section("5. SSE parser (R8 — must tolerate an absent data-sources frame)");
@@ -270,10 +376,22 @@ const SSE = [
 	"",
 ].join("\n");
 const parsed = parseStream(SSE);
-check("accumulates text-delta frames", parsed.text === "Hello world", parsed.text);
-check("captures the data-sources frame", parsed.sources?.length === 1 && parsed.sources[0].id === 7);
-const noSources = parseStream('data: {"type":"text-delta","delta":"refused"}\n');
-check("sources === null when the frame is absent (guard/OOS refusals)", noSources.sources === null);
+check(
+	"accumulates text-delta frames",
+	parsed.text === "Hello world",
+	parsed.text,
+);
+check(
+	"captures the data-sources frame",
+	parsed.sources?.length === 1 && parsed.sources[0].id === 7,
+);
+const noSources = parseStream(
+	'data: {"type":"text-delta","delta":"refused"}\n',
+);
+check(
+	"sources === null when the frame is absent (guard/OOS refusals)",
+	noSources.sources === null,
+);
 
 // ---------------------------------------------------------------------------
 section("6. Fingerprints (Edge case 6 / I2.10 — re-ingest id drift)");
@@ -287,11 +405,26 @@ const ref: GoldChunkRef = {
 	text_sha256: hash,
 };
 const rows: DbChunkRow[] = [
-	{ id: 101, regdoc_id: "REGDOC-2.3.4", section_number: "3.2", chunk_index: 4, text_sha256: hash },
+	{
+		id: 101,
+		regdoc_id: "REGDOC-2.3.4",
+		section_number: "3.2",
+		chunk_index: 4,
+		text_sha256: hash,
+	},
 ];
-check("fingerprint verifies when the id still matches", verifyFingerprint(ref, rows).status === "ok");
+check(
+	"fingerprint verifies when the id still matches",
+	verifyFingerprint(ref, rows).status === "ok",
+);
 const drifted: DbChunkRow[] = [
-	{ id: 555, regdoc_id: "REGDOC-2.3.4", section_number: "3.2", chunk_index: 4, text_sha256: hash },
+	{
+		id: 555,
+		regdoc_id: "REGDOC-2.3.4",
+		section_number: "3.2",
+		chunk_index: 4,
+		text_sha256: hash,
+	},
 ];
 const remap = verifyFingerprint(ref, drifted);
 check(
@@ -300,9 +433,18 @@ check(
 	remap,
 );
 const changed: DbChunkRow[] = [
-	{ id: 101, regdoc_id: "REGDOC-2.3.4", section_number: "3.2", chunk_index: 4, text_sha256: "deadbeefdeadbeef" },
+	{
+		id: 101,
+		regdoc_id: "REGDOC-2.3.4",
+		section_number: "3.2",
+		chunk_index: 4,
+		text_sha256: "deadbeefdeadbeef",
+	},
 ];
-check("vanished fingerprint (corpus text changed) = missing → run must abort", verifyFingerprint(ref, changed).status === "missing");
+check(
+	"vanished fingerprint (corpus text changed) = missing → run must abort",
+	verifyFingerprint(ref, changed).status === "missing",
+);
 
 // ---------------------------------------------------------------------------
 section("7. Committed datasets");
@@ -312,57 +454,117 @@ const probes = readJsonl<OocProbe>(OOC_PROBES_PATH);
 // to 37, adding the near-in-scope adversarial classes (in-corpus false premise,
 // fabricated numerics, version/temporal, plausible-absent). Bound widened from
 // the original spec-R4 15–25 to 30–60 to reflect that deliberate growth.
-check("OOC probe set has 30–60 probes (hardened R4)", probes.length >= 30 && probes.length <= 60, probes.length);
-check("every probe expects rejection", probes.every((p) => p.expected === "reject"));
-check("every probe has a unique id", new Set(probes.map((p) => p.probe_id)).size === probes.length);
+check(
+	"OOC probe set has 30–60 probes (hardened R4)",
+	probes.length >= 30 && probes.length <= 60,
+	probes.length,
+);
+check(
+	"every probe expects rejection",
+	probes.every((p) => p.expected === "reject"),
+);
+check(
+	"every probe has a unique id",
+	new Set(probes.map((p) => p.probe_id)).size === probes.length,
+);
 check(
 	"3–5 plausible-but-false-premise probes (spec R4)",
 	probes.filter((p) => p.category === "false_premise").length >= 3 &&
 		probes.filter((p) => p.category === "false_premise").length <= 5,
 );
-check("out-of-corpus probes cover ≥ 4 categories", new Set(probes.map((p) => p.category)).size >= 4);
+check(
+	"out-of-corpus probes cover ≥ 4 categories",
+	new Set(probes.map((p) => p.category)).size >= 4,
+);
 const golden = readJsonl<GoldenRecord>(GOLDEN_PATH);
 check("golden set parses as JSONL", golden.length > 0);
 // The committed golden set is a PLACEHOLDER (Supabase was paused when the
 // framework landed — spec D4 fallback). The runner refuses to score it. When it
 // is regenerated for real, this check flips to the schema assertions below it.
 if (isPlaceholderDataset(golden)) {
-	console.log("  note golden set is the committed PLACEHOLDER — regenerate with `bun run eval:rag:golden`");
-	check("placeholder golden set is detectable (the runner refuses to score it)", isPlaceholderDataset(golden));
+	console.log(
+		"  note golden set is the committed PLACEHOLDER — regenerate with `bun run eval:rag:golden`",
+	);
+	check(
+		"placeholder golden set is detectable (the runner refuses to score it)",
+		isPlaceholderDataset(golden),
+	);
 } else {
 	// Sample bumped from ~76 to ~92 (rag/eval-and-improve) for tighter metric CIs
 	// once the numbers drive model-tuning A/Bs. Bound widened from spec-R3 70–80
 	// to 85–120 to reflect the larger set.
-	check("real golden set has 85–120 records (hardened R3)", golden.length >= 85 && golden.length <= 120, golden.length);
-	check("every record carries ≥ 1 gold chunk with a fingerprint", golden.every((g) => g.gold_chunks.length > 0 && g.gold_chunks.every((c) => !!c.text_sha256)));
-	check("question ids are unique", new Set(golden.map((g) => g.question_id)).size === golden.length);
+	check(
+		"real golden set has 85–120 records (hardened R3)",
+		golden.length >= 85 && golden.length <= 120,
+		golden.length,
+	);
+	check(
+		"every record carries ≥ 1 gold chunk with a fingerprint",
+		golden.every(
+			(g) =>
+				g.gold_chunks.length > 0 && g.gold_chunks.every((c) => !!c.text_sha256),
+		),
+	);
+	check(
+		"question ids are unique",
+		new Set(golden.map((g) => g.question_id)).size === golden.length,
+	);
 }
 
 // ---------------------------------------------------------------------------
 section("8. Cost accountant (I2.3 — hard cap, three-way split)");
 
-check("priceUsd: 1M gpt-4o input tokens = $2.50", Math.abs(priceUsd("gpt-4o", 1_000_000, 0) - 2.5) < 1e-9);
-check("priceUsd: unpriced model throws (no silent $0)", (() => {
-	try {
-		priceUsd("some-new-model", 1, 1);
-		return false;
-	} catch {
-		return true;
-	}
-})());
+check(
+	"priceUsd: 1M gpt-4o input tokens = $2.50",
+	Math.abs(priceUsd("gpt-4o", 1_000_000, 0) - 2.5) < 1e-9,
+);
+check(
+	"priceUsd: unpriced model throws (no silent $0)",
+	(() => {
+		try {
+			priceUsd("some-new-model", 1, 1);
+			return false;
+		} catch {
+			return true;
+		}
+	})(),
+);
 const acct = new CostAccountant(0.01);
-acct.record({ kind: "judge", model: "gpt-4o", inputTokens: 1000, outputTokens: 100, estimated: false });
-check("under-cap charges do not throw", acct.totalUsd() > 0 && acct.totalUsd() < 0.01);
+acct.record({
+	kind: "judge",
+	model: "gpt-4o",
+	inputTokens: 1000,
+	outputTokens: 100,
+	estimated: false,
+});
+check(
+	"under-cap charges do not throw",
+	acct.totalUsd() > 0 && acct.totalUsd() < 0.01,
+);
 let capped: CostCapError | null = null;
 try {
-	acct.record({ kind: "judge", model: "gpt-4o", inputTokens: 1_000_000, outputTokens: 0, estimated: false });
+	acct.record({
+		kind: "judge",
+		model: "gpt-4o",
+		inputTokens: 1_000_000,
+		outputTokens: 0,
+		estimated: false,
+	});
 } catch (err) {
 	capped = err as CostCapError;
 }
 check("cap breach throws CostCapError", capped instanceof CostCapError);
-check("the charge that tripped the cap is still recorded (abort report stays honest)", acct.entryCount() === 2);
+check(
+	"the charge that tripped the cap is still recorded (abort report stays honest)",
+	acct.entryCount() === 2,
+);
 const split = acct.totalsByKind();
-check("three-way split tracks judge / embeddings / answerer separately", split.judge.usd > 0 && split.embeddings.usd === 0 && split.answerer_estimated.usd === 0);
+check(
+	"three-way split tracks judge / embeddings / answerer separately",
+	split.judge.usd > 0 &&
+		split.embeddings.usd === 0 &&
+		split.answerer_estimated.usd === 0,
+);
 
 // ---------------------------------------------------------------------------
 section("9. Judge module (R6 — rubric, cache, repair retry)");
@@ -388,13 +590,29 @@ function stubOpenAI(bodies: string[]): OpenAI {
 }
 
 const FAITH_JSON = JSON.stringify({
-	reasons: "Claim 1 appears verbatim in chunk 1; claim 2 is not in the context.",
+	reasons:
+		"Claim 1 appears verbatim in chunk 1; claim 2 is not in the context.",
 	claims: [
-		{ claim: "Licensees shall conduct a panel walkdown.", supported: true, why: "chunk 1" },
-		{ claim: "Turnover must take 45 minutes.", supported: false, why: "not in context" },
+		{
+			claim: "Licensees shall conduct a panel walkdown.",
+			supported: true,
+			why: "chunk 1",
+		},
+		{
+			claim: "Turnover must take 45 minutes.",
+			supported: false,
+			why: "not in context",
+		},
 	],
 });
-const CTX = [{ id: 1, regdoc_id: "REGDOC-2.3.4", section_number: "3.2", text: "Licensees shall conduct a panel walkdown at turnover." }];
+const CTX = [
+	{
+		id: 1,
+		regdoc_id: "REGDOC-2.3.4",
+		section_number: "3.2",
+		text: "Licensees shall conduct a panel walkdown at turnover.",
+	},
+];
 // Unique question per test run so the on-disk cache from a previous run can't
 // mask a real miss.
 const nonce = crypto.randomUUID();
@@ -402,26 +620,58 @@ const Q = `test-${nonce}: what is required at shift turnover?`;
 
 let cost9 = new CostAccountant(1);
 let deps9: JudgeDeps = { openai: stubOpenAI([FAITH_JSON]), cost: cost9 };
-const f1 = await judgeFaithfulness(deps9, { question: Q, answer: "answer-A", chunks: CTX });
-check("faithfulness parses claims and scores supported/total", f1.ok && f1.value?.score === 0.5, f1.value);
-check("CoT reasons are captured (G-Eval: reasons BEFORE the verdict)", typeof f1.reasons === "string" && (f1.reasons?.length ?? 0) > 0);
+const f1 = await judgeFaithfulness(deps9, {
+	question: Q,
+	answer: "answer-A",
+	chunks: CTX,
+});
+check(
+	"faithfulness parses claims and scores supported/total",
+	f1.ok && f1.value?.score === 0.5,
+	f1.value,
+);
+check(
+	"CoT reasons are captured (G-Eval: reasons BEFORE the verdict)",
+	typeof f1.reasons === "string" && (f1.reasons?.length ?? 0) > 0,
+);
 check("first call is a cache MISS (1 API call)", !f1.cached && chatCalls === 1);
-check("judge call is charged to the accountant", cost9.totalsByKind().judge.usd > 0);
+check(
+	"judge call is charged to the accountant",
+	cost9.totalsByKind().judge.usd > 0,
+);
 
 const callsBefore = chatCalls;
-const f2 = await judgeFaithfulness(deps9, { question: Q, answer: "answer-A", chunks: CTX });
-check("identical (question, answer, context) is a cache HIT — zero tokens", f2.cached && chatCalls === callsBefore, { cached: f2.cached, chatCalls });
+const f2 = await judgeFaithfulness(deps9, {
+	question: Q,
+	answer: "answer-A",
+	chunks: CTX,
+});
+check(
+	"identical (question, answer, context) is a cache HIT — zero tokens",
+	f2.cached && chatCalls === callsBefore,
+	{ cached: f2.cached, chatCalls },
+);
 check("cached verdict is identical to the fresh one", f2.value?.score === 0.5);
 
 // PROMPT_VERSION self-invalidation: a new prompt produces a new ANSWER, whose
 // hash is in the cache key — so the cached verdict cannot be reused.
-const f3 = await judgeFaithfulness(deps9, { question: Q, answer: "answer-B (a different answer)", chunks: CTX });
-check("a different answer MISSES the cache (PROMPT_VERSION self-invalidates — Edge case 5)", !f3.cached && chatCalls === callsBefore + 1);
+const f3 = await judgeFaithfulness(deps9, {
+	question: Q,
+	answer: "answer-B (a different answer)",
+	chunks: CTX,
+});
+check(
+	"a different answer MISSES the cache (PROMPT_VERSION self-invalidates — Edge case 5)",
+	!f3.cached && chatCalls === callsBefore + 1,
+);
 
 // Repair retry then judge_error (Edge case 3).
 chatCalls = 0;
 cost9 = new CostAccountant(1);
-deps9 = { openai: stubOpenAI(["not json at all", "{\"still\":\"wrong schema\"}"]), cost: cost9 };
+deps9 = {
+	openai: stubOpenAI(["not json at all", '{"still":"wrong schema"}']),
+	cost: cost9,
+};
 const bad = await judged<{ x: number }>(deps9, {
 	metricId: "test_metric",
 	question: `bad-${nonce}`,
@@ -429,18 +679,34 @@ const bad = await judged<{ x: number }>(deps9, {
 	contextHash: "c",
 	system: "s",
 	user: "u",
-	validate: (p) => (typeof (p as { x?: unknown }).x === "number" ? { x: (p as { x: number }).x } : null),
+	validate: (p) =>
+		typeof (p as { x?: unknown }).x === "number"
+			? { x: (p as { x: number }).x }
+			: null,
 });
-check("unparseable/off-schema JSON → exactly ONE repair retry, then judge_error", !bad.ok && chatCalls === 2, { ok: bad.ok, chatCalls, error: bad.error });
-check("judge_error is not cached (a transient bad generation can't poison future runs)", !bad.cached);
+check(
+	"unparseable/off-schema JSON → exactly ONE repair retry, then judge_error",
+	!bad.ok && chatCalls === 2,
+	{ ok: bad.ok, chatCalls, error: bad.error },
+);
+check(
+	"judge_error is not cached (a transient bad generation can't poison future runs)",
+	!bad.cached,
+);
 
 // ---------------------------------------------------------------------------
-section("10. DELTA D2 — eval retrieval never increments the production breaker");
+section(
+	"10. DELTA D2 — eval retrieval never increments the production breaker",
+);
 
 // Any network call throws (the fetch stub above). recordOpenAICall talks to
 // Upstash over REST, so if the no-op recordUsage were NOT honored, this would
 // blow up. Driving the REAL lib/retrieval proves the injection point works.
-function makeChunk(id: number, similarity: number, doc = "REGDOC-2.3.4"): RetrievedChunk {
+function makeChunk(
+	id: number,
+	similarity: number,
+	doc = "REGDOC-2.3.4",
+): RetrievedChunk {
 	return {
 		id,
 		regdoc_id: doc,
@@ -453,7 +719,9 @@ function makeChunk(id: number, similarity: number, doc = "REGDOC-2.3.4"): Retrie
 		similarity,
 	} as RetrievedChunk;
 }
-const pool = Array.from({ length: 20 }, (_, i) => makeChunk(i + 1, 0.9 - i * 0.02));
+const pool = Array.from({ length: 20 }, (_, i) =>
+	makeChunk(i + 1, 0.9 - i * 0.02),
+);
 const costD2 = new CostAccountant(1);
 let embedCalls = 0;
 const fakeOpenAI = {
@@ -487,13 +755,27 @@ try {
 } catch (err) {
 	d2Error = (err as Error).message;
 }
-check("retrieveChunks with a no-op recordUsage makes ZERO network calls", d2Error === null, d2Error);
-check("…and still retrieves (envelope filled at k=8)", result?.envelope.length === 8, result?.envelope.length);
-check("the metered client charged the embedding to the accountant", costD2.totalsByKind().embeddings.tokens === 42 && embedCalls === 1);
+check(
+	"retrieveChunks with a no-op recordUsage makes ZERO network calls",
+	d2Error === null,
+	d2Error,
+);
+check(
+	"…and still retrieves (envelope filled at k=8)",
+	result?.envelope.length === 8,
+	result?.envelope.length,
+);
+check(
+	"the metered client charged the embedding to the accountant",
+	costD2.totalsByKind().embeddings.tokens === 42 && embedCalls === 1,
+);
 check("trace is emitted only when withTrace is set", !!result?.trace);
 
 const trace = result?.trace as RetrievalTrace;
-check("trace pool carries pre/post-boost ranks + similarities", trace.pool.length === 20 && trace.pool[0].rankPostBoost === 1);
+check(
+	"trace pool carries pre/post-boost ranks + similarities",
+	trace.pool.length === 20 && trace.pool[0].rankPostBoost === 1,
+);
 
 // ── PRODUCTION INCIDENT 2026-07-14 — a dead Redis reported itself as "Embedding failed." ──
 // Upstash's host stopped resolving. Embeddings were provably fine (200, 1536 dims), but
@@ -515,7 +797,9 @@ check("trace pool carries pre/post-boost ranks + similarities", trace.pool.lengt
 				openai: meteredOpenAI(fakeOpenAI, new CostAccountant(10), "dead-redis"),
 				// Exactly what a vanished Upstash host does: the REST call rejects.
 				recordUsage: async () => {
-					throw new Error("fetch failed: getaddrinfo ENOTFOUND charming-lioness.upstash.io");
+					throw new Error(
+						"fetch failed: getaddrinfo ENOTFOUND charming-lioness.upstash.io",
+					);
 				},
 			},
 			{ envelopeChunks: 8 },
@@ -528,10 +812,14 @@ check("trace pool carries pre/post-boost ranks + similarities", trace.pool.lengt
 		deadRedisError === null,
 		deadRedisError,
 	);
-	check("…and retrieval still returns a full envelope with Redis dead", survived?.envelope.length === 8);
+	check(
+		"…and retrieval still returns a full envelope with Redis dead",
+		survived?.envelope.length === 8,
+	);
 	check(
 		"…and the failure is NEVER mislabelled as an embedding error",
-		deadRedisError === null || !deadRedisError.toLowerCase().includes("embedding"),
+		deadRedisError === null ||
+			!deadRedisError.toLowerCase().includes("embedding"),
 		deadRedisError,
 	);
 
@@ -559,7 +847,8 @@ check("trace pool carries pre/post-boost ranks + similarities", trace.pool.lengt
 	}
 	check(
 		"a genuine embedding failure IS still raised as RetrievalError('embedding')",
-		realEmbedFailure instanceof RetrievalError && (realEmbedFailure as RetrievalError).stage === "embedding",
+		realEmbedFailure instanceof RetrievalError &&
+			(realEmbedFailure as RetrievalError).stage === "embedding",
 		realEmbedFailure,
 	);
 
@@ -608,7 +897,11 @@ check("trace pool carries pre/post-boost ranks + similarities", trace.pool.lengt
 			"What is required at shift turnover?",
 			{
 				supabase: fakeSupabase,
-				openai: meteredOpenAI(fakeOpenAI, new CostAccountant(10), "wrapped-cap"),
+				openai: meteredOpenAI(
+					fakeOpenAI,
+					new CostAccountant(10),
+					"wrapped-cap",
+				),
 				recordUsage: async () => {
 					// Two layers of wrapping — the shape a helper that adds context
 					// produces. Neither wrapper is named CostCapError.
@@ -638,7 +931,11 @@ check("trace pool carries pre/post-boost ranks + similarities", trace.pool.lengt
 			"What is required at shift turnover?",
 			{
 				supabase: fakeSupabase,
-				openai: meteredOpenAI(fakeOpenAI, new CostAccountant(10), "wrapped-ord"),
+				openai: meteredOpenAI(
+					fakeOpenAI,
+					new CostAccountant(10),
+					"wrapped-ord",
+				),
 				recordUsage: async () => {
 					throw new Error("accounting failed", {
 						cause: new Error("ENOTFOUND charming-lioness.upstash.io"),
@@ -713,12 +1010,18 @@ check("trace pool carries pre/post-boost ranks + similarities", trace.pool.lengt
 		recorderLogs,
 	);
 }
-check("trace decision is 'normal' for a strong pool", trace.decision === "normal", { topSim: trace.topSim, LOW_SIM_OOS });
+check(
+	"trace decision is 'normal' for a strong pool",
+	trace.decision === "normal",
+	{ topSim: trace.topSim, LOW_SIM_OOS },
+);
 
 // The k-sweep derives every k from ONE retrieval — it must agree exactly with
 // what retrieveChunks itself would have selected at that envelopeChunks.
 for (const k of [3, 5, 8, 10]) {
-	const derived = deriveEnvelopeAtK(trace, k).slice(0, k).map((c) => c.id);
+	const derived = deriveEnvelopeAtK(trace, k)
+		.slice(0, k)
+		.map((c) => c.id);
 	const direct = (
 		await retrieveChunks(
 			"What is required at shift turnover?",
@@ -730,24 +1033,40 @@ for (const k of [3, 5, 8, 10]) {
 			{ envelopeChunks: k },
 		)
 	).envelope.map((c) => c.id);
-	check(`k-sweep envelope at k=${k} is identical to a direct retrieval at k=${k}`, JSON.stringify(derived) === JSON.stringify(direct), { derived, direct });
+	check(
+		`k-sweep envelope at k=${k} is identical to a direct retrieval at k=${k}`,
+		JSON.stringify(derived) === JSON.stringify(direct),
+		{ derived, direct },
+	);
 }
 
 // OOS branch: below the gate, the full ranked pool is returned (no envelope
 // trim), and MIN_CHUNK_SIM is not applied — the eval must score that honestly
 // (Edge case 9) rather than throw.
-const weakPool = Array.from({ length: 20 }, (_, i) => makeChunk(i + 1, 0.3 - i * 0.001));
-const weakSupabase = { rpc: async () => ({ data: weakPool, error: null }) } as unknown as RetrievalDeps["supabase"];
+const weakPool = Array.from({ length: 20 }, (_, i) =>
+	makeChunk(i + 1, 0.3 - i * 0.001),
+);
+const weakSupabase = {
+	rpc: async () => ({ data: weakPool, error: null }),
+} as unknown as RetrievalDeps["supabase"];
 const weak = await retrieveChunks(
 	"unrelated question",
-	{ supabase: weakSupabase, openai: meteredOpenAI(fakeOpenAI, new CostAccountant(1), "d2"), recordUsage: async () => {} },
+	{
+		supabase: weakSupabase,
+		openai: meteredOpenAI(fakeOpenAI, new CostAccountant(1), "d2"),
+		recordUsage: async () => {},
+	},
 	{ envelopeChunks: 8, withTrace: true },
 );
-check("OOS branch is reachable offline and flagged in the trace", weak.trace?.decision === "oos" && weak.topSim < LOW_SIM_OOS, {
-	decision: weak.trace?.decision,
-	topSim: weak.topSim,
-	MIN_CHUNK_SIM,
-});
+check(
+	"OOS branch is reachable offline and flagged in the trace",
+	weak.trace?.decision === "oos" && weak.topSim < LOW_SIM_OOS,
+	{
+		decision: weak.trace?.decision,
+		topSim: weak.topSim,
+		MIN_CHUNK_SIM,
+	},
+);
 
 // ===========================================================================
 // PR #8 FIX ROUND 1 — regression tests.
@@ -773,7 +1092,16 @@ section("11. Issue 2 — branch sentinels match what the APP ACTUALLY EMITS");
 // branch" by matching KNOWLEDGE_HUB_LOW_CONFIDENCE. NOTHING in the app emits
 // that string on that branch. The route's low-avg-similarity branch emits a
 // different hardcoded literal. Both sentinels were measuring nothing.
-const ROUTE_SRC = readSrc("app/api/knowledge-hub/query/route.ts");
+// Phase 12 moved the chat handler body verbatim into
+// lib/knowledge-hub/query-handler.ts (route files cannot export helpers);
+// the route file is now only `withGuard(..., knowledgeHubQueryHandler)`.
+const ROUTE_SRC = readSrc("lib/knowledge-hub/query-handler.ts");
+check(
+	"the chat route file delegates to the moved handler (so the handler source IS the route)",
+	/withGuard\(\s*\{ route: "knowledge-hub\/query" \},\s*knowledgeHubQueryHandler,?\s*\)/.test(
+		readSrc("app/api/knowledge-hub/query/route.ts"),
+	),
+);
 
 // PR #8 fix round 2 (issue 5 — test hygiene): this used to assert
 // `ROUTE_SRC.includes('KNOWLEDGE_HUB_LIMITED_CONTEXT,\n} from "@/lib/prompts"'.slice(0, 30))`.
@@ -800,21 +1128,34 @@ check(
 );
 // The markers must actually match the canonical strings, or the whole scheme is
 // theatre. (This is the check that catches a future prompt edit.)
-check("REFUSAL marker matches the canonical out-of-scope constant", isRefusalText(KNOWLEDGE_HUB_OUT_OF_SCOPE));
-check("LOW-CONFIDENCE marker matches the canonical low-confidence constant", isLowConfidenceText(KNOWLEDGE_HUB_LOW_CONFIDENCE));
-check("LIMITED-CONTEXT marker matches the route's disclaimer constant", isLimitedContextText(KNOWLEDGE_HUB_LIMITED_CONTEXT));
+check(
+	"REFUSAL marker matches the canonical out-of-scope constant",
+	isRefusalText(KNOWLEDGE_HUB_OUT_OF_SCOPE),
+);
+check(
+	"LOW-CONFIDENCE marker matches the canonical low-confidence constant",
+	isLowConfidenceText(KNOWLEDGE_HUB_LOW_CONFIDENCE),
+);
+check(
+	"LIMITED-CONTEXT marker matches the route's disclaimer constant",
+	isLimitedContextText(KNOWLEDGE_HUB_LIMITED_CONTEXT),
+);
 // eval-security.ts's grade() matches LOWERCASED SUBSTRINGS. The old scoreRejection
 // did a case-sensitive exact match, so a re-cased model refusal scored as
 // "answered_instead_of_rejecting" — a FALSE FAILURE that would have made the
 // negative-rejection row read LOW for the wrong reason.
-const RECASED = "This Assistant ONLY ANSWERS QUESTIONS ABOUT THE INDEXED CNSC regulatory documents.";
+const RECASED =
+	"This Assistant ONLY ANSWERS QUESTIONS ABOUT THE INDEXED CNSC regulatory documents.";
 check(
 	"a re-cased model refusal is still a rejection SUCCESS (lowercased-substring match)",
 	rej({ text: RECASED }).success === true,
 	rej({ text: RECASED }),
 );
 const WRAPPED = `I'm sorry — this assistant only answers questions about the indexed CNSC regulatory documents, so I can't help with that.`;
-check("a refusal wrapped in prose is still detected", rej({ text: WRAPPED }).success === true);
+check(
+	"a refusal wrapped in prose is still detected",
+	rej({ text: WRAPPED }).success === true,
+);
 check(
 	"eval-security.ts imports the shared markers instead of re-deriving them",
 	readSrc("scripts/eval-security.ts").includes('from "../lib/prompts"'),
@@ -823,15 +1164,24 @@ check(
 // classifyBranch: the four branches the app can actually take.
 check(
 	"branch: refusal text + NO sources frame → oos_or_guard (deterministic guard / sim gate)",
-	classifyBranch({ text: KNOWLEDGE_HUB_OUT_OF_SCOPE, hasSourcesFrame: false }) === "oos_or_guard",
+	classifyBranch({
+		text: KNOWLEDGE_HUB_OUT_OF_SCOPE,
+		hasSourcesFrame: false,
+	}) === "oos_or_guard",
 );
 check(
 	"branch: refusal text WITH a sources frame → llm_refusal",
-	classifyBranch({ text: KNOWLEDGE_HUB_OUT_OF_SCOPE, hasSourcesFrame: true }) === "llm_refusal",
+	classifyBranch({
+		text: KNOWLEDGE_HUB_OUT_OF_SCOPE,
+		hasSourcesFrame: true,
+	}) === "llm_refusal",
 );
 check(
 	"branch: the model's low-confidence line → low_confidence",
-	classifyBranch({ text: KNOWLEDGE_HUB_LOW_CONFIDENCE, hasSourcesFrame: true }) === "low_confidence",
+	classifyBranch({
+		text: KNOWLEDGE_HUB_LOW_CONFIDENCE,
+		hasSourcesFrame: true,
+	}) === "low_confidence",
 );
 check(
 	"branch: the route's disclaimer PREFIX on a real answer → limited_context",
@@ -840,16 +1190,31 @@ check(
 		hasSourcesFrame: true,
 	}) === "limited_context",
 );
-check("branch: a normal answer → null", classifyBranch({ text: "Licensees shall do X.", hasSourcesFrame: true }) === null);
+check(
+	"branch: a normal answer → null",
+	classifyBranch({ text: "Licensees shall do X.", hasSourcesFrame: true }) ===
+		null,
+);
 // The disclaimer is NOT a refusal — the model still answered. Counting it as one
 // would inflate the false-rejection rate.
-check("limited_context is NOT counted as a refusal", !REFUSAL_BRANCHES.has("limited_context"));
-check("oos_or_guard / llm_refusal / low_confidence ARE refusals", ["oos_or_guard", "llm_refusal", "low_confidence"].every((b) => REFUSAL_BRANCHES.has(b)));
+check(
+	"limited_context is NOT counted as a refusal",
+	!REFUSAL_BRANCHES.has("limited_context"),
+);
+check(
+	"oos_or_guard / llm_refusal / low_confidence ARE refusals",
+	["oos_or_guard", "llm_refusal", "low_confidence"].every((b) =>
+		REFUSAL_BRANCHES.has(b),
+	),
+);
 
 // ---------------------------------------------------------------------------
 section("12. Issue 1 — zero-citation answers are EXCLUDED, never a free 100%");
 
-const noCites = scoreCitationValidity("I don't have enough from the indexed CNSC documents.", SOURCES);
+const noCites = scoreCitationValidity(
+	"I don't have enough from the indexed CNSC documents.",
+	SOURCES,
+);
 check(
 	"validity is NULL (not 1.0) when an answer cites nothing — a vacuous case is not a pass",
 	noCites.score === null && noCites.total === 0,
@@ -867,14 +1232,21 @@ const validityAgg = meanDefined([
 ]);
 check(
 	"validity mean counts ONLY the answers that cited (n=2), excluding the 2 vacuous ones",
-	validityAgg.n === 2 && validityAgg.excluded === 2 && validityAgg.value === 0.5,
+	validityAgg.n === 2 &&
+		validityAgg.excluded === 2 &&
+		validityAgg.value === 0.5,
 	validityAgg,
 );
 const coverageAgg = meanDefined([1, 0, 0, 1]);
-check("citation coverage is its own metric with a full denominator", coverageAgg.n === 4 && coverageAgg.value === 0.5);
+check(
+	"citation coverage is its own metric with a full denominator",
+	coverageAgg.n === 4 && coverageAgg.value === 0.5,
+);
 
 // ---------------------------------------------------------------------------
-section("13. Issue 7 + report — no row prints a percentage over a padded denominator");
+section(
+	"13. Issue 7 + report — no row prints a percentage over a padded denominator",
+);
 
 // A synthetic baseline run: one good answer, one OOS refusal (no envelope, no
 // citations). Under the old code the refusal scored hit-rate 0 AND citation
@@ -921,22 +1293,35 @@ const baselineRun = {
 const reportRows = rowsFor(baselineRun);
 const row = (c: string): Row => reportRows.find((r) => r.category === c) as Row;
 
-const HIT_ROW = "Retrieval quality — hit rate@8 [stage: envelope shown to the LLM]";
-const MRR_ROW = "Retrieval quality — MRR [stage: post-filter similarity-ranked pool]";
+const HIT_ROW =
+	"Retrieval quality — hit rate@8 [stage: envelope shown to the LLM]";
+const MRR_ROW =
+	"Retrieval quality — MRR [stage: post-filter similarity-ranked pool]";
 const hitRow = row(HIT_ROW);
 check(
 	"hit rate@8 = 100% over n=1 — the OOS item is EXCLUDED, not scored 0",
-	hitRow.measured === "100.0%" && hitRow.n === "1" && hitRow.excluded.startsWith("1 —"),
+	hitRow.measured === "100.0%" &&
+		hitRow.n === "1" &&
+		hitRow.excluded.startsWith("1 —"),
 	hitRow,
 );
-check("…and the exclusion states WHY, in the table itself", hitRow.excluded.includes("NO envelope"), hitRow.excluded);
+check(
+	"…and the exclusion states WHY, in the table itself",
+	hitRow.excluded.includes("NO envelope"),
+	hitRow.excluded,
+);
 const mrrRow = row(MRR_ROW);
-check("MRR excludes the OOS item too (rank-sensitive metrics need a ranking)", mrrRow.n === "1" && mrrRow.excluded.startsWith("1 —"));
+check(
+	"MRR excludes the OOS item too (rank-sensitive metrics need a ranking)",
+	mrrRow.n === "1" && mrrRow.excluded.startsWith("1 —"),
+);
 
 const validRow = row("Citation validity (deterministic)");
 check(
 	"citation validity = 100% over n=1 — the zero-citation refusal is EXCLUDED, not a free pass",
-	validRow.measured === "100.0%" && validRow.n === "1" && validRow.excluded.startsWith("1 —"),
+	validRow.measured === "100.0%" &&
+		validRow.n === "1" &&
+		validRow.excluded.startsWith("1 —"),
 	validRow,
 );
 const covRow = row("Citation coverage (answers carrying ≥ 1 citation)");
@@ -946,29 +1331,53 @@ check(
 	covRow,
 );
 const frRow = row("False-rejection rate (answerable golden questions refused)");
-check("false-rejection rate counts the OOS refusal (50% of 2)", frRow.measured === "50.0%" && frRow.n === "2", frRow);
-check("a branch census row reconciles every item to a branch", row("Route branch census (which path produced each answer)").measured.includes("oos_or_guard: 1"));
+check(
+	"false-rejection rate counts the OOS refusal (50% of 2)",
+	frRow.measured === "50.0%" && frRow.n === "2",
+	frRow,
+);
+check(
+	"a branch census row reconciles every item to a branch",
+	row(
+		"Route branch census (which path produced each answer)",
+	).measured.includes("oos_or_guard: 1"),
+);
 
 // A run where NOTHING is measurable must print n/a — never a number.
 const allVacuous = rowsFor({
 	...baselineRun,
 	items: [baselineRun.items[1], baselineRun.items[1]],
 } as unknown as Parameters<typeof rowsFor>[0]);
-const vacuousValidity = allVacuous.find((r) => r.category === "Citation validity (deterministic)") as Row;
+const vacuousValidity = allVacuous.find(
+	(r) => r.category === "Citation validity (deterministic)",
+) as Row;
 check(
 	"a metric with an EMPTY denominator prints n/a, never a number",
-	vacuousValidity.measured === "n/a" && vacuousValidity.n === "0" && vacuousValidity.excluded.startsWith("2 —"),
+	vacuousValidity.measured === "n/a" &&
+		vacuousValidity.n === "0" &&
+		vacuousValidity.excluded.startsWith("2 —"),
 	vacuousValidity,
 );
 
 // The limited-context disclaimer is NOT a refusal — it must not inflate the rate.
 const disclaimerRun = rowsFor({
 	...baselineRun,
-	items: [{ fallback_taken: "limited_context", metrics: { hit_rate_at_k: 1, citation_validity: 1, citation_coverage: 1 } }],
+	items: [
+		{
+			fallback_taken: "limited_context",
+			metrics: { hit_rate_at_k: 1, citation_validity: 1, citation_coverage: 1 },
+		},
+	],
 } as unknown as Parameters<typeof rowsFor>[0]);
 check(
 	"the low-similarity DISCLAIMER is not counted as a false rejection (the model still answered)",
-	(disclaimerRun.find((r) => r.category === "False-rejection rate (answerable golden questions refused)") as Row).measured === "0.0%",
+	(
+		disclaimerRun.find(
+			(r) =>
+				r.category ===
+				"False-rejection rate (answerable golden questions refused)",
+		) as Row
+	).measured === "0.0%",
 );
 
 // Why rank-sensitivity matters at all: the same id-set in two different orders
@@ -978,7 +1387,8 @@ const similarityRanked = [11, 22, 33, 44];
 const diversityReordered = [44, 11, 22, 33];
 check(
 	"MRR over a diversity-reordered envelope ≠ MRR over the true similarity ranking",
-	reciprocalRank(similarityRanked, new Set([44])) !== reciprocalRank(diversityReordered, new Set([44])),
+	reciprocalRank(similarityRanked, new Set([44])) !==
+		reciprocalRank(diversityReordered, new Set([44])),
 	{
 		ranked: reciprocalRank(similarityRanked, new Set([44])),
 		reordered: reciprocalRank(diversityReordered, new Set([44])),
@@ -998,13 +1408,18 @@ const boostedPool = {
 };
 check(
 	"similarityRankedIdsFromTrace restores TRUE similarity order from the post-boost pool",
-	JSON.stringify(similarityRankedIdsFromTrace(boostedPool)) === JSON.stringify([11, 22, 33, 44]),
+	JSON.stringify(similarityRankedIdsFromTrace(boostedPool)) ===
+		JSON.stringify([11, 22, 33, 44]),
 	similarityRankedIdsFromTrace(boostedPool),
 );
 check(
 	"…and that order gives a DIFFERENT MRR than the pool's own (boosted) order",
-	reciprocalRank(similarityRankedIdsFromTrace(boostedPool), new Set([44])) === 1 / 4 &&
-		reciprocalRank(boostedPool.pool.map((e) => e.chunk.id), new Set([44])) === 1,
+	reciprocalRank(similarityRankedIdsFromTrace(boostedPool), new Set([44])) ===
+		1 / 4 &&
+		reciprocalRank(
+			boostedPool.pool.map((e) => e.chunk.id),
+			new Set([44]),
+		) === 1,
 );
 // NOTE (fix round 2, issue 2): round 1 asserted here that run.ts computed the
 // rank-sensitive baseline metrics from `similarityRankedIdsFromTrace(trace)`.
@@ -1018,7 +1433,8 @@ section("14. Issue 3 — the answerer cost estimate reflects the REAL prompt");
 // The bug: input tokens were estimated from `sources[].snippet`, the SSE DISPLAY
 // projection (chunk_text.slice(0, 260)), while the model's prompt carries the
 // FULL ~400-token chunk_text. Real spend systematically exceeded the cap.
-const FULL_CHUNK_TEXT = "Licensees shall maintain records of every shift turnover. ".repeat(30); // ~1700 chars
+const FULL_CHUNK_TEXT =
+	"Licensees shall maintain records of every shift turnover. ".repeat(30); // ~1700 chars
 const fullChunks: RetrievedChunk[] = Array.from({ length: 8 }, (_, i) => ({
 	id: i + 1,
 	regdoc_id: "REGDOC-2.3.4",
@@ -1029,8 +1445,14 @@ const fullChunks: RetrievedChunk[] = Array.from({ length: 8 }, (_, i) => ({
 	requirement_type: "requirement",
 	similarity: 0.7 - i * 0.01,
 }));
-const SNIPPET_JOIN = fullChunks.map((c) => c.chunk_text.slice(0, 260)).join("\n"); // the OLD estimate
-const REAL_ENVELOPE = buildContextEnvelope(fullChunks, "What is required at turnover?", ["REGDOC-2.3.4"]);
+const SNIPPET_JOIN = fullChunks
+	.map((c) => c.chunk_text.slice(0, 260))
+	.join("\n"); // the OLD estimate
+const REAL_ENVELOPE = buildContextEnvelope(
+	fullChunks,
+	"What is required at turnover?",
+	["REGDOC-2.3.4"],
+);
 
 const costOld = new CostAccountant(100);
 recordAnswerCost(costOld, {
@@ -1053,7 +1475,11 @@ const newTok = costNew.totalsByKind().answerer_estimated.tokens;
 check(
 	"the real-envelope estimate is ≥ 4x the truncated-snippet estimate it replaced",
 	newTok >= oldTok * 4,
-	{ snippetEstimate: oldTok, realEnvelopeEstimate: newTok, ratio: (newTok / oldTok).toFixed(2) },
+	{
+		snippetEstimate: oldTok,
+		realEnvelopeEstimate: newTok,
+		ratio: (newTok / oldTok).toFixed(2),
+	},
 );
 check(
 	"run.ts no longer estimates from the SSE display snippet",
@@ -1071,7 +1497,13 @@ recordAnswerCost(costFallback, {
 	label: "fallback",
 });
 const costNoFallback = new CostAccountant(100);
-recordAnswerCost(costNoFallback, { systemPrompt: "sys", question: "q", envelopeText: "", answer: "a", label: "none" });
+recordAnswerCost(costNoFallback, {
+	systemPrompt: "sys",
+	question: "q",
+	envelopeText: "",
+	answer: "a",
+	label: "none",
+});
 check(
 	"an unresolved chunk is charged at the err-high snippet factor, not at snippet face value",
 	SNIPPET_TO_FULL_CHUNK_FACTOR >= 6 &&
@@ -1118,7 +1550,9 @@ let capturedEmbedInputs: string[] = [];
 const capturingOpenAI = {
 	embeddings: {
 		create: async (body: { input: string | string[] }) => {
-			capturedEmbedInputs = Array.isArray(body.input) ? body.input : [body.input];
+			capturedEmbedInputs = Array.isArray(body.input)
+				? body.input
+				: [body.input];
 			return {
 				data: capturedEmbedInputs.map(() => ({ embedding: [0.1, 0.2, 0.3] })),
 				usage: { prompt_tokens: 1 },
@@ -1193,21 +1627,54 @@ try {
 } catch (err) {
 	reserved = err as CostCapError;
 }
-check("reserve() throws CostCapError on a projected breach", reserved instanceof CostCapError);
-check("…BEFORE the call: nothing was recorded, no money spent", acctR.entryCount() === 0 && acctR.totalUsd() === 0);
-check("…and the error says so (projected, call NOT made)", reserved?.projected === true && reserved.message.includes("NOT made"));
-check("reserve() is silent when the projection fits under the cap", (() => {
-	const a = new CostAccountant(1);
-	a.reserve({ kind: "judge", model: "gpt-4o", inputTokens: 100, outputTokens: 10, estimated: true });
-	return a.entryCount() === 0;
-})());
-check("wouldExceed() is the non-throwing form", (() => {
-	const a = new CostAccountant(0.01);
-	return (
-		a.wouldExceed({ kind: "judge", model: "gpt-4o", inputTokens: 1_000_000, outputTokens: 0, estimated: true }) &&
-		!a.wouldExceed({ kind: "judge", model: "gpt-4o", inputTokens: 10, outputTokens: 0, estimated: true })
-	);
-})());
+check(
+	"reserve() throws CostCapError on a projected breach",
+	reserved instanceof CostCapError,
+);
+check(
+	"…BEFORE the call: nothing was recorded, no money spent",
+	acctR.entryCount() === 0 && acctR.totalUsd() === 0,
+);
+check(
+	"…and the error says so (projected, call NOT made)",
+	reserved?.projected === true && reserved.message.includes("NOT made"),
+);
+check(
+	"reserve() is silent when the projection fits under the cap",
+	(() => {
+		const a = new CostAccountant(1);
+		a.reserve({
+			kind: "judge",
+			model: "gpt-4o",
+			inputTokens: 100,
+			outputTokens: 10,
+			estimated: true,
+		});
+		return a.entryCount() === 0;
+	})(),
+);
+check(
+	"wouldExceed() is the non-throwing form",
+	(() => {
+		const a = new CostAccountant(0.01);
+		return (
+			a.wouldExceed({
+				kind: "judge",
+				model: "gpt-4o",
+				inputTokens: 1_000_000,
+				outputTokens: 0,
+				estimated: true,
+			}) &&
+			!a.wouldExceed({
+				kind: "judge",
+				model: "gpt-4o",
+				inputTokens: 10,
+				outputTokens: 0,
+				estimated: true,
+			})
+		);
+	})(),
+);
 // The answer harness reserves the WORST CASE before POSTing the real route —
 // the spend happens inside the dev server, where a post-hoc record() is useless.
 let answerReserved = false;
@@ -1221,14 +1688,18 @@ try {
 } catch (err) {
 	answerReserved = err instanceof CostCapError;
 }
-check("reserveAnswerCost aborts a server request the cap cannot afford", answerReserved);
+check(
+	"reserveAnswerCost aborts a server request the cap cannot afford",
+	answerReserved,
+);
 check(
 	"every server request is reserved before it is made",
 	(() => {
 		const src = readSrc("scripts/rag-eval/run.ts");
 		return (
 			src.split("reserveAnswer(").length - 1 >= 5 && // one per askServer call site
-			src.indexOf("reserveAnswer(cost, rec.question") < src.indexOf("await askServer(rec.question)")
+			src.indexOf("reserveAnswer(cost, rec.question") <
+				src.indexOf("await askServer(rec.question)")
 		);
 	})(),
 );
@@ -1246,21 +1717,38 @@ const capErr = new CostCapError(9, 2, {
 	estimated: true,
 });
 const wrapped = new RetrievalError("embedding", capErr);
-check("a bare instanceof check MISSES a wrapped cap error (this is the bug)", !(wrapped instanceof CostCapError));
-check("asCostCapError UNWRAPS it out of RetrievalError", asCostCapError(wrapped) === capErr);
-check("asCostCapError is identity for an unwrapped cap error", asCostCapError(capErr) === capErr);
-check("asCostCapError returns null for a genuine outage", asCostCapError(new RetrievalError("match", new Error("db down"))) === null);
-check("asCostCapError tolerates a cyclic cause chain without hanging", (() => {
-	const a = new Error("a") as Error & { cause?: unknown };
-	const b = new Error("b") as Error & { cause?: unknown };
-	a.cause = b;
-	b.cause = a;
-	return asCostCapError(a) === null;
-})());
+check(
+	"a bare instanceof check MISSES a wrapped cap error (this is the bug)",
+	!(wrapped instanceof CostCapError),
+);
+check(
+	"asCostCapError UNWRAPS it out of RetrievalError",
+	asCostCapError(wrapped) === capErr,
+);
+check(
+	"asCostCapError is identity for an unwrapped cap error",
+	asCostCapError(capErr) === capErr,
+);
+check(
+	"asCostCapError returns null for a genuine outage",
+	asCostCapError(new RetrievalError("match", new Error("db down"))) === null,
+);
+check(
+	"asCostCapError tolerates a cyclic cause chain without hanging",
+	(() => {
+		const a = new Error("a") as Error & { cause?: unknown };
+		const b = new Error("b") as Error & { cause?: unknown };
+		a.cause = b;
+		b.cause = a;
+		return asCostCapError(a) === null;
+	})(),
+);
 check(
 	"both runners unwrap before deciding (run.ts + generate-golden.ts)",
 	readSrc("scripts/rag-eval/run.ts").includes("asCostCapError(err)") &&
-		readSrc("scripts/rag-eval/generate-golden.ts").includes("asCostCapError(err)"),
+		readSrc("scripts/rag-eval/generate-golden.ts").includes(
+			"asCostCapError(err)",
+		),
 );
 
 // ---------------------------------------------------------------------------
@@ -1269,19 +1757,40 @@ section("16. Issue 5 — production daily-cap headroom is checked in PREFLIGHT")
 // The answer harness POSTs the REAL route, and a bypassed call still INCREMENTS
 // the shared GLOBAL_DAILY_CAP counter. Reading it only in finalize reports the
 // damage after doing it — and a battery can circuit-break production.
-check("each server request is projected at 2 daily-cap calls (embedding + completion)", DAILY_CAP_CALLS_PER_REQUEST === 2);
-check("a 75-question baseline projects 150 calls", projectDailyCapCalls(75) === 150);
+check(
+	"each server request is projected at 2 daily-cap calls (embedding + completion)",
+	DAILY_CAP_CALLS_PER_REQUEST === 2,
+);
+check(
+	"a 75-question baseline projects 150 calls",
+	projectDailyCapCalls(75) === 150,
+);
 check(
 	"a run is REFUSED when the remaining headroom cannot absorb the projection",
-	headroomBlocksRun({ available: true, callsToday: 1900, cap: 2000, remaining: 100 }, 150),
+	headroomBlocksRun(
+		{ available: true, callsToday: 1900, cap: 2000, remaining: 100 },
+		150,
+	),
 );
 check(
 	"a run proceeds when headroom is sufficient",
-	!headroomBlocksRun({ available: true, callsToday: 100, cap: 2000, remaining: 1900 }, 150),
+	!headroomBlocksRun(
+		{ available: true, callsToday: 100, cap: 2000, remaining: 1900 },
+		150,
+	),
 );
 check(
 	"an UNREADABLE counter warns but does not block (a Redis outage is not a breach)",
-	!headroomBlocksRun({ available: false, callsToday: 0, cap: 2000, remaining: 2000, reason: "no creds" }, 150),
+	!headroomBlocksRun(
+		{
+			available: false,
+			callsToday: 0,
+			cap: 2000,
+			remaining: 2000,
+			reason: "no creds",
+		},
+		150,
+	),
 );
 check(
 	"run.ts reads the headroom in PREFLIGHT, before the first server request — not only at finalize",
@@ -1297,7 +1806,9 @@ check(
 );
 check(
 	"…and aborts the run rather than silently eating the users' budget",
-	readSrc("scripts/rag-eval/run.ts").includes("headroomBlocksRun(headroomAtStart, projectedServerCalls)"),
+	readSrc("scripts/rag-eval/run.ts").includes(
+		"headroomBlocksRun(headroomAtStart, projectedServerCalls)",
+	),
 );
 
 // ---------------------------------------------------------------------------
@@ -1318,19 +1829,33 @@ const deps17: JudgeDeps = { openai: stubOpenAI([FAITH_JSON]), cost: cost17 };
 // every run (mandatory `trigger: regenerate-assistant-message` + a
 // non-deterministic answerer) → a re-run MISSES. This is the "cache cannot hit"
 // property, asserted so nobody re-adds the "re-runs cost cents" claim.
-const s1 = await judgeFaithfulness(deps17, { question: `q17-${nonce6}`, answer: "run-1 answer text", chunks: CTX });
-const s2 = await judgeFaithfulness(deps17, { question: `q17-${nonce6}`, answer: "run-2 answer text (regenerated, differs)", chunks: CTX });
+const s1 = await judgeFaithfulness(deps17, {
+	question: `q17-${nonce6}`,
+	answer: "run-1 answer text",
+	chunks: CTX,
+});
+const s2 = await judgeFaithfulness(deps17, {
+	question: `q17-${nonce6}`,
+	answer: "run-2 answer text (regenerated, differs)",
+	chunks: CTX,
+});
 check(
 	"a REGENERATED answer misses the judge cache — re-runs pay FULL judge price",
 	!s1.cached && !s2.cached && chatCalls === 2,
 	{ chatCalls },
 );
-check("…so the cost model must not claim otherwise", !readSrc("scripts/rag-eval/judge.ts").includes("makes re-runs cents"));
+check(
+	"…so the cost model must not claim otherwise",
+	!readSrc("scripts/rag-eval/judge.ts").includes("makes re-runs cents"),
+);
 check(
 	"the false claim is struck from the spec too",
 	(() => {
 		const spec = readSrc("docs/orchestration/specs/item-2-rag-eval.md");
-		return spec.includes("~~this is what makes re-runs cents~~") && spec.includes("zero cache hits");
+		return (
+			spec.includes("~~this is what makes re-runs cents~~") &&
+			spec.includes("zero cache hits")
+		);
 	})(),
 );
 
@@ -1338,7 +1863,11 @@ check(
 // output), so they DO hit across runs. That is the cache's real value, and why
 // it stays.
 chatCalls = 0;
-const GOLDEN_JSON = JSON.stringify({ reasons: "r", question: "What must a licensee do?", ground_truth_answer: "It must do X." });
+const GOLDEN_JSON = JSON.stringify({
+	reasons: "r",
+	question: "What must a licensee do?",
+	ground_truth_answer: "It must do X.",
+});
 const cost17b = new CostAccountant(1);
 const deps17b: JudgeDeps = { openai: stubOpenAI([GOLDEN_JSON]), cost: cost17b };
 const stableArgs = {
@@ -1349,7 +1878,9 @@ const stableArgs = {
 	system: "s",
 	user: "u",
 	validate: (p: unknown) =>
-		typeof (p as { question?: unknown }).question === "string" ? { ok: true } : null,
+		typeof (p as { question?: unknown }).question === "string"
+			? { ok: true }
+			: null,
 };
 const g1 = await judged(deps17b, stableArgs);
 const g2 = await judged(deps17b, stableArgs);
@@ -1364,7 +1895,9 @@ check(
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-section("18. Issue 2 — each retrieval metric scores the STAGE its definition requires");
+section(
+	"18. Issue 2 — each retrieval metric scores the STAGE its definition requires",
+);
 
 // The bug: round 1 moved the rank-sensitive metrics onto the RetrievalTrace seam
 // (right), then scored them over `trace.pool` — the UNFILTERED merged candidate
@@ -1454,7 +1987,9 @@ check(
 check(
 	"OOS: scoring THAT would report hit@8 = 1 for a question production REFUSED (the bug)",
 	hitRateAtK(
-		deriveEnvelopeAtK(oosTrace, 8).slice(0, 8).map((c) => c.id),
+		deriveEnvelopeAtK(oosTrace, 8)
+			.slice(0, 8)
+			.map((c) => c.id),
 		OOS_GOLD,
 		8,
 	) === 1,
@@ -1498,7 +2033,8 @@ check(
 );
 check(
 	"scoreRetrievalStages: a measurable item carries NO exclusion reason",
-	bfScores.envelopeExcludedReason === null && bfScores.mrrExcludedReason === null,
+	bfScores.envelopeExcludedReason === null &&
+		bfScores.mrrExcludedReason === null,
 );
 // A gold chunk that IS eligible ranks honestly at its post-filter position.
 const eligibleScores = scoreRetrievalStages({
@@ -1529,7 +2065,8 @@ check(
 );
 check(
 	"…with a DISTINCT reason per stage (the envelope and the pool vanish for different causes)",
-	oosScores.envelopeExcludedReason === "no_envelope_emitted:oos_or_guard_branch" &&
+	oosScores.envelopeExcludedReason ===
+		"no_envelope_emitted:oos_or_guard_branch" &&
 		oosScores.mrrExcludedReason === "oos_gate:no_eligible_pool",
 	oosScores,
 );
@@ -1544,7 +2081,8 @@ check(
 	"scoreRetrievalStages: no gold chunk → EXCLUDED (an empty denominator is not a 0)",
 	noGoldScores.hit_rate_at_k === null &&
 		noGoldScores.context_recall_at_k === null &&
-		noGoldScores.envelopeExcludedReason === "no_gold_chunks:denominator_is_empty",
+		noGoldScores.envelopeExcludedReason ===
+			"no_gold_chunks:denominator_is_empty",
 );
 
 // K-SWEEP. The OOS gate fires on the raw pool's top-1 and is k-INDEPENDENT, so
@@ -1555,7 +2093,10 @@ check(
 	"kSweepExclusion flags an OOS item at every k",
 	kSweepExclusion(oosTrace, OOS_GOLD) === "oos_gate:no_envelope_at_any_k",
 );
-check("kSweepExclusion passes a normal item", kSweepExclusion(bfTrace, GOLD_BELOW) === null);
+check(
+	"kSweepExclusion passes a normal item",
+	kSweepExclusion(bfTrace, GOLD_BELOW) === null,
+);
 for (const k of [3, 5, 8, 10]) {
 	const s = scoreEnvelopeAtK({
 		trace: oosTrace,
@@ -1565,11 +2106,19 @@ for (const k of [3, 5, 8, 10]) {
 	});
 	check(
 		`ksweep k=${k}: an OOS item is EXCLUDED, not scored 1 against the refused pool`,
-		s.hit_rate === null && s.context_recall === null && s.context_precision === null && s.retrieved_ids.length === 0,
+		s.hit_rate === null &&
+			s.context_recall === null &&
+			s.context_precision === null &&
+			s.retrieved_ids.length === 0,
 		s,
 	);
 }
-const sweepOk = scoreEnvelopeAtK({ trace: bfTrace, goldIds: new Set([2]), k: 8, excludedReason: null });
+const sweepOk = scoreEnvelopeAtK({
+	trace: bfTrace,
+	goldIds: new Set([2]),
+	k: 8,
+	excludedReason: null,
+});
 check(
 	"ksweep: a normal item scores the ENVELOPE at k, and names that stage",
 	sweepOk.stage === "envelope" && sweepOk.hit_rate === 1,
@@ -1580,7 +2129,9 @@ const stageRows = rowsFor(baselineRun).map((r) => r.category);
 check(
 	"every reported retrieval row NAMES its stage",
 	stageRows.some((c) => c.includes("[stage: envelope shown to the LLM]")) &&
-		stageRows.some((c) => c.includes("[stage: post-filter similarity-ranked pool]")),
+		stageRows.some((c) =>
+			c.includes("[stage: post-filter similarity-ranked pool]"),
+		),
 	stageRows,
 );
 check(
@@ -1606,7 +2157,8 @@ section("19. Issue 4 — our own boilerplate must not be judged as model output"
 // citation support were systematically DEFLATED, and only on the weak-retrieval
 // questions, i.e. the hardest ones. A metric deflated by our own plumbing is
 // exactly as dishonest as one inflated by a vacuous pass.
-const MODEL_ANSWER = "Licensees shall conduct a panel walkdown [REGDOC-2.3.4 §3.2.3].";
+const MODEL_ANSWER =
+	"Licensees shall conduct a panel walkdown [REGDOC-2.3.4 §3.2.3].";
 const WITH_DISCLAIMER = `${KNOWLEDGE_HUB_LIMITED_CONTEXT}${MODEL_ANSWER}`;
 
 check(
@@ -1620,13 +2172,14 @@ check(
 );
 check(
 	"…and does NOT strip the disclaimer's words from the MIDDLE of a real answer",
-	stripLimitedContextPrefix(`The corpus has limited matches in the indexed corpus. ${MODEL_ANSWER}`).startsWith(
-		"The corpus has limited",
-	),
+	stripLimitedContextPrefix(
+		`The corpus has limited matches in the indexed corpus. ${MODEL_ANSWER}`,
+	).startsWith("The corpus has limited"),
 );
 check(
 	"…and does not touch the model's own low-confidence line (that IS model output)",
-	stripLimitedContextPrefix(KNOWLEDGE_HUB_LOW_CONFIDENCE) === KNOWLEDGE_HUB_LOW_CONFIDENCE,
+	stripLimitedContextPrefix(KNOWLEDGE_HUB_LOW_CONFIDENCE) ===
+		KNOWLEDGE_HUB_LOW_CONFIDENCE,
 );
 
 // The judged text is what a claim decomposer sees. Pin the property that matters:
@@ -1639,7 +2192,8 @@ check(
 // Branch detection is the ONE consumer that must still see the raw text.
 check(
 	"branch detection still sees the RAW text (it exists to find this very prefix)",
-	classifyBranch({ text: WITH_DISCLAIMER, hasSourcesFrame: true }) === "limited_context",
+	classifyBranch({ text: WITH_DISCLAIMER, hasSourcesFrame: true }) ===
+		"limited_context",
 );
 check(
 	"…and the disclaimer is still NOT a refusal — the model answered",
@@ -1684,11 +2238,15 @@ check(
 );
 check(
 	"…and branch classification is the ONE consumer still given the raw text",
-	RUN_SRC4.includes("classifyBranch({ text: a.text, hasSourcesFrame: a.sources !== null })"),
+	RUN_SRC4.includes(
+		"classifyBranch({ text: a.text, hasSourcesFrame: a.sources !== null })",
+	),
 );
 check(
 	"negative rejection still scores the RAW text (it must see the route's own lines)",
-	RUN_SRC4.includes("const verdict = scoreRejection({\n\t\t\t\tstatus: a.status,\n\t\t\t\ttext: a.text,"),
+	RUN_SRC4.includes(
+		"const verdict = scoreRejection({\n\t\t\t\tstatus: a.status,\n\t\t\t\ttext: a.text,",
+	),
 );
 
 // ---------------------------------------------------------------------------
@@ -1707,7 +2265,8 @@ const CITING_B = "Licensees must X [REGDOC-2.2.5 §3.1].";
 
 check(
 	"citationSetKey is NULL for a zero-citation answer (it used to be the empty string)",
-	citationSetKey(REFUSAL) === null && citationSetKey("no citations here") === null,
+	citationSetKey(REFUSAL) === null &&
+		citationSetKey("no citations here") === null,
 );
 check(
 	"…and still a real, order-insensitive key when the answer DOES cite",
@@ -1731,7 +2290,8 @@ check(
 check(
 	"…and TARr is EXCLUDED too — the guard/OOS branch emits a CONSTANT and never calls the model",
 	allVacuousConsistency.tarr_exact_text_agreement === null &&
-		allVacuousConsistency.tarr_excluded_reason?.includes("no_llm_call") === true,
+		allVacuousConsistency.tarr_excluded_reason?.includes("no_llm_call") ===
+			true,
 	allVacuousConsistency,
 );
 check(
@@ -1803,18 +2363,22 @@ const bothRefused = scoreParaphrasePair({
 check(
 	"scoreParaphrasePair: two refusals EXCLUDE retrieval Jaccard, not score it 1.0",
 	bothRefused.retrieval_jaccard === null &&
-		bothRefused.jaccard_excluded_reason?.startsWith("no_envelope:both") === true,
+		bothRefused.jaccard_excluded_reason?.startsWith("no_envelope:both") ===
+			true,
 	bothRefused,
 );
 check(
 	"…EXCLUDE citation stability, not score it 1.0 (two uncitable answers share no set)",
 	bothRefused.citation_set_stable === null &&
-		bothRefused.citation_stability_excluded_reason?.startsWith("zero_citations:both") === true,
+		bothRefused.citation_stability_excluded_reason?.startsWith(
+			"zero_citations:both",
+		) === true,
 );
 check(
 	"…and EXCLUDE answer-equivalence — the judge's own rubric calls two refusals 'equivalent'",
 	bothRefused.skipEquivalenceJudge &&
-		bothRefused.equivalence_excluded_reason?.startsWith("refusal:both") === true,
+		bothRefused.equivalence_excluded_reason?.startsWith("refusal:both") ===
+			true,
 );
 check(
 	"…with all three FULL-denominator coverage companions recording the zero",
@@ -1879,7 +2443,8 @@ check(
 const emptyBody = rej({ text: "" });
 check(
 	"an empty 200 response is NOT MEASURABLE (excluded), not a false rejection FAILURE",
-	emptyBody.success === null && emptyBody.reason.includes("empty_response_body"),
+	emptyBody.success === null &&
+		emptyBody.reason.includes("empty_response_body"),
 	emptyBody,
 );
 check(
@@ -1902,17 +2467,32 @@ const consistencyRun = {
 		golden_set: { sha256: "x", records: 2 },
 	},
 	items: [
-		{ metrics: { citation_set_agreement: 1, tarr_exact_text_agreement: 1, citation_coverage_across_repeats: 1 } },
+		{
+			metrics: {
+				citation_set_agreement: 1,
+				tarr_exact_text_agreement: 1,
+				citation_coverage_across_repeats: 1,
+			},
+		},
 		// all 5 repeats refused, citing nothing: EXCLUDED from both agreements.
-		{ metrics: { citation_set_agreement: null, tarr_exact_text_agreement: null, citation_coverage_across_repeats: 0 } },
+		{
+			metrics: {
+				citation_set_agreement: null,
+				tarr_exact_text_agreement: null,
+				citation_coverage_across_repeats: 0,
+			},
+		},
 	],
 } as unknown as Parameters<typeof rowsFor>[0];
 const cRows = rowsFor(consistencyRun);
-const cRow = (c: string): Row => cRows.find((r) => r.category.startsWith(c)) as Row;
+const cRow = (c: string): Row =>
+	cRows.find((r) => r.category.startsWith(c)) as Row;
 const citeAgree = cRow("Consistency (citation-set agreement");
 check(
 	"consistency: citation-set agreement = 100% over n=1 — the uncitable item is EXCLUDED, not a free 1",
-	citeAgree.measured === "100.0%" && citeAgree.n === "1" && citeAgree.excluded.startsWith("1 —"),
+	citeAgree.measured === "100.0%" &&
+		citeAgree.n === "1" &&
+		citeAgree.excluded.startsWith("1 —"),
 	citeAgree,
 );
 check(
@@ -1934,19 +2514,40 @@ const paraphraseRun = {
 	items: [
 		{
 			paraphrases: [
-				{ metrics: { retrieval_jaccard: 0.5, citation_set_stable: 1, answer_equivalent: true, both_sides_have_envelope: 1, both_sides_cited: 1, both_sides_answered: 1 } },
+				{
+					metrics: {
+						retrieval_jaccard: 0.5,
+						citation_set_stable: 1,
+						answer_equivalent: true,
+						both_sides_have_envelope: 1,
+						both_sides_cited: 1,
+						both_sides_answered: 1,
+					},
+				},
 				// both sides refused: every metric EXCLUDED, all three coverages 0.
-				{ metrics: { retrieval_jaccard: null, citation_set_stable: null, answer_equivalent: null, both_sides_have_envelope: 0, both_sides_cited: 0, both_sides_answered: 0 } },
+				{
+					metrics: {
+						retrieval_jaccard: null,
+						citation_set_stable: null,
+						answer_equivalent: null,
+						both_sides_have_envelope: 0,
+						both_sides_cited: 0,
+						both_sides_answered: 0,
+					},
+				},
 			],
 		},
 	],
 } as unknown as Parameters<typeof rowsFor>[0];
 const pRows = rowsFor(paraphraseRun);
-const pRow = (c: string): Row => pRows.find((r) => r.category.startsWith(c)) as Row;
+const pRow = (c: string): Row =>
+	pRows.find((r) => r.category.startsWith(c)) as Row;
 const jacRow = pRow("Paraphrase retrieval Jaccard");
 check(
 	"paraphrase: Jaccard = 50% over n=1 — the both-refused pair is EXCLUDED, not scored 1.0",
-	jacRow.measured === "50.0%" && jacRow.n === "1" && jacRow.excluded.startsWith("1 —"),
+	jacRow.measured === "50.0%" &&
+		jacRow.n === "1" &&
+		jacRow.excluded.startsWith("1 —"),
 	jacRow,
 );
 const stabRow = pRow("Paraphrase citation-set stability");
@@ -1963,8 +2564,15 @@ check(
 );
 check(
 	"paraphrase: three FULL-denominator coverage rows keep the exclusions honest",
-	["Paraphrase envelope coverage", "Paraphrase citation coverage", "Paraphrase answer coverage"].every(
-		(c) => pRow(c) !== undefined && pRow(c).n === "2" && pRow(c).measured === "50.0%",
+	[
+		"Paraphrase envelope coverage",
+		"Paraphrase citation coverage",
+		"Paraphrase answer coverage",
+	].every(
+		(c) =>
+			pRow(c) !== undefined &&
+			pRow(c).n === "2" &&
+			pRow(c).measured === "50.0%",
 	),
 	pRows.map((r) => `${r.category}=${r.measured}/n=${r.n}`),
 );
@@ -1975,15 +2583,32 @@ const allVacuousParaphrase = rowsFor({
 	items: [
 		{
 			paraphrases: [
-				{ metrics: { retrieval_jaccard: null, citation_set_stable: null, answer_equivalent: null, both_sides_have_envelope: 0, both_sides_cited: 0, both_sides_answered: 0 } },
+				{
+					metrics: {
+						retrieval_jaccard: null,
+						citation_set_stable: null,
+						answer_equivalent: null,
+						both_sides_have_envelope: 0,
+						both_sides_cited: 0,
+						both_sides_answered: 0,
+					},
+				},
 			],
 		},
 	],
 } as unknown as Parameters<typeof rowsFor>[0]);
 check(
 	"a paraphrase run where everything refused prints n/a over n=0 — NOT 100% stability",
-	(allVacuousParaphrase.find((r) => r.category.startsWith("Paraphrase retrieval Jaccard")) as Row).measured === "n/a" &&
-		(allVacuousParaphrase.find((r) => r.category.startsWith("Paraphrase citation-set stability")) as Row).measured === "n/a",
+	(
+		allVacuousParaphrase.find((r) =>
+			r.category.startsWith("Paraphrase retrieval Jaccard"),
+		) as Row
+	).measured === "n/a" &&
+		(
+			allVacuousParaphrase.find((r) =>
+				r.category.startsWith("Paraphrase citation-set stability"),
+			) as Row
+		).measured === "n/a",
 	allVacuousParaphrase.map((r) => `${r.category}=${r.measured}`),
 );
 const allVacuousConsistencyRows = rowsFor({
@@ -1992,8 +2617,16 @@ const allVacuousConsistencyRows = rowsFor({
 } as unknown as Parameters<typeof rowsFor>[0]);
 check(
 	"a consistency run where every repeat cited nothing prints n/a — NOT 100% agreement",
-	(allVacuousConsistencyRows.find((r) => r.category.startsWith("Consistency (citation-set agreement")) as Row).measured === "n/a" &&
-		(allVacuousConsistencyRows.find((r) => r.category.startsWith("Consistency (TARr")) as Row).measured === "n/a",
+	(
+		allVacuousConsistencyRows.find((r) =>
+			r.category.startsWith("Consistency (citation-set agreement"),
+		) as Row
+	).measured === "n/a" &&
+		(
+			allVacuousConsistencyRows.find((r) =>
+				r.category.startsWith("Consistency (TARr"),
+			) as Row
+		).measured === "n/a",
 );
 
 // (e) FINAL AUDIT — the same vacuous-pass shape in baseline's JUDGED metrics.
@@ -2006,9 +2639,25 @@ const claimRun = {
 	...consistencyRun,
 	manifest: { ...consistencyRun.manifest, experiment: "baseline" },
 	items: [
-		{ fallback_taken: null, metrics: { faithfulness: 1, faithfulness_claim_coverage: 1, citation_support: 1, citation_support_claim_coverage: 1 } },
+		{
+			fallback_taken: null,
+			metrics: {
+				faithfulness: 1,
+				faithfulness_claim_coverage: 1,
+				citation_support: 1,
+				citation_support_claim_coverage: 1,
+			},
+		},
 		// A refusal: claims nothing, cites nothing → EXCLUDED from both judged means.
-		{ fallback_taken: "oos_or_guard", metrics: { faithfulness: null, faithfulness_claim_coverage: 0, citation_support: null, citation_support_claim_coverage: 0 } },
+		{
+			fallback_taken: "oos_or_guard",
+			metrics: {
+				faithfulness: null,
+				faithfulness_claim_coverage: 0,
+				citation_support: null,
+				citation_support_claim_coverage: 0,
+			},
+		},
 	],
 } as unknown as Parameters<typeof rowsFor>[0];
 const claimRows = rowsFor(claimRun);
@@ -2024,12 +2673,14 @@ const claimRow = (c: string): Row =>
 	};
 check(
 	"faithfulness = 100% over n=1 — the no-claims refusal is EXCLUDED, not scored",
-	claimRow("Faithfulness").measured === "100.0%" && claimRow("Faithfulness").n === "1",
+	claimRow("Faithfulness").measured === "100.0%" &&
+		claimRow("Faithfulness").n === "1",
 	claimRow("Faithfulness"),
 );
 check(
 	"…and a FULL-denominator claim-coverage row (n=2, 50%) is what makes that exclusion visible",
-	claimRow("Claim coverage").measured === "50.0%" && claimRow("Claim coverage").n === "2",
+	claimRow("Claim coverage").measured === "50.0%" &&
+		claimRow("Claim coverage").n === "2",
 	claimRow("Claim coverage"),
 );
 check(
@@ -2102,7 +2753,10 @@ await withFetch(502, "<html>Bad Gateway</html>", async () => {
 		threw502 = true;
 	}
 });
-check("ANY 5xx throws, not just 500 (a bare proxy 502 is still a server failure)", threw502);
+check(
+	"ANY 5xx throws, not just 500 (a bare proxy 502 is still a server failure)",
+	threw502,
+);
 
 let threw429 = false;
 await withFetch(429, '{"error":"rate_limited"}', async () => {
@@ -2141,7 +2795,9 @@ const okRefusalSse = `data: ${JSON.stringify({ type: "text-delta", delta: KNOWLE
 const okRefusal = await withFetch(200, okRefusalSse, () => askServer("q"));
 check(
 	"a GENUINE oos_or_guard refusal (non-empty canonical text, no sources) is kind 'ok', NOT malformed",
-	okRefusal.kind === "ok" && okRefusal.text.length > 0 && okRefusal.sources === null,
+	okRefusal.kind === "ok" &&
+		okRefusal.text.length > 0 &&
+		okRefusal.sources === null,
 	okRefusal,
 );
 
@@ -2149,7 +2805,17 @@ const okNormalSse =
 	`data: ${JSON.stringify({ type: "text-delta", delta: "Licensees shall X [REGDOC-2.3.4 §3.2]." })}\n` +
 	`data: ${JSON.stringify({
 		type: "data-sources",
-		data: { chunks: [{ id: 1, regdoc_id: "REGDOC-2.3.4", section_number: "3.2", similarity: 0.8, snippet: "…" }] },
+		data: {
+			chunks: [
+				{
+					id: 1,
+					regdoc_id: "REGDOC-2.3.4",
+					section_number: "3.2",
+					similarity: 0.8,
+					snippet: "…",
+				},
+			],
+		},
 	})}\n`;
 const okNormal = await withFetch(200, okNormalSse, () => askServer("q"));
 check(
@@ -2165,7 +2831,8 @@ check(
 const guardReason = hardErrorReasonFor({ kind: "guard_rejected", status: 400 });
 check(
 	"hardErrorReasonFor: guard_rejected names the HTTP status and is NEVER mislabeled oos_or_guard",
-	guardReason?.includes("guard_rejected_http_400") === true && !guardReason?.includes("oos_or_guard"),
+	guardReason?.includes("guard_rejected_http_400") === true &&
+		!guardReason?.includes("oos_or_guard"),
 	guardReason,
 );
 const malformedReason = hardErrorReasonFor({ kind: "malformed", status: 200 });
@@ -2208,7 +2875,8 @@ const legitOosScores = scoreRetrievalStages({
 });
 check(
 	"…while a GENUINE oos_or_guard item (no hardErrorReason given) still carries its own label",
-	legitOosScores.envelopeExcludedReason === "no_envelope_emitted:oos_or_guard_branch",
+	legitOosScores.envelopeExcludedReason ===
+		"no_envelope_emitted:oos_or_guard_branch",
 	legitOosScores,
 );
 
@@ -2233,7 +2901,7 @@ check(
 	"…and tags a 4xx 'guard_rejected' distinctly from a 2xx malformed response",
 	readSrc("scripts/rag-eval/answer.ts").includes('kind: "guard_rejected"') &&
 		readSrc("scripts/rag-eval/answer.ts").includes(
-			"const malformed = parsed.text.trim() === \"\" && parsed.sources === null;",
+			'const malformed = parsed.text.trim() === "" && parsed.sources === null;',
 		),
 );
 
@@ -2277,12 +2945,17 @@ check(
 );
 check(
 	"relevancyExclusionReason: a hard error (issue 2) always wins over sourcesIsNull",
-	relevancyExclusionReason({ sourcesIsNull: false, hardError: "hard_error:x" }) === "hard_error:x",
+	relevancyExclusionReason({
+		sourcesIsNull: false,
+		hardError: "hard_error:x",
+	}) === "hard_error:x",
 );
 
 check(
 	"noContextExclusionReason: an EMPTY context (0 chunks) is excluded structurally",
-	noContextExclusionReason({ contextChunkCount: 0 })?.includes("empty_context") === true,
+	noContextExclusionReason({ contextChunkCount: 0 })?.includes(
+		"empty_context",
+	) === true,
 );
 check(
 	"noContextExclusionReason: a non-empty context is judged normally",
@@ -2290,13 +2963,20 @@ check(
 );
 check(
 	"noContextExclusionReason: a hard error always wins",
-	noContextExclusionReason({ contextChunkCount: 5, hardError: "hard_error:y" }) === "hard_error:y",
+	noContextExclusionReason({
+		contextChunkCount: 5,
+		hardError: "hard_error:y",
+	}) === "hard_error:y",
 );
 
 // The structural skip outcome run.ts constructs — noClaims=true / score=null,
 // NEVER a judged 0. This is what eliminates "judge-luck": the OOS constant no
 // longer needs the judge to correctly recognize it as a meta-statement.
-const structuralFaith: FaithfulnessValue = { claims: [], score: null, noClaims: true };
+const structuralFaith: FaithfulnessValue = {
+	claims: [],
+	score: null,
+	noClaims: true,
+};
 check(
 	"the structural skip outcome is noClaims=true / score=null (never a judged/guessed 0)",
 	structuralFaith.noClaims === true && structuralFaith.score === null,
@@ -2365,9 +3045,15 @@ const relevancyRun = {
 		golden_set: { sha256: "x", records: 2 },
 	},
 	items: [
-		{ fallback_taken: null, metrics: { answer_relevancy: 0.9, relevancy_measurable: 1 } },
+		{
+			fallback_taken: null,
+			metrics: { answer_relevancy: 0.9, relevancy_measurable: 1 },
+		},
 		// oos_or_guard: no LLM call, relevancy excluded — NOT scored 0.
-		{ fallback_taken: "oos_or_guard", metrics: { answer_relevancy: null, relevancy_measurable: 0 } },
+		{
+			fallback_taken: "oos_or_guard",
+			metrics: { answer_relevancy: null, relevancy_measurable: 0 },
+		},
 	],
 } as unknown as Parameters<typeof rowsFor>[0];
 const relevancyRows = rowsFor(relevancyRun);
@@ -2375,7 +3061,8 @@ const relevancyRow = (c: string): Row =>
 	relevancyRows.find((r) => r.category.startsWith(c)) as Row;
 check(
 	"Answer relevancy = 90% over n=1 — the oos_or_guard item is EXCLUDED, not scored 0",
-	relevancyRow("Answer relevancy").measured === "90.0%" && relevancyRow("Answer relevancy").n === "1",
+	relevancyRow("Answer relevancy").measured === "90.0%" &&
+		relevancyRow("Answer relevancy").n === "1",
 	relevancyRow("Answer relevancy"),
 );
 check(
@@ -2398,7 +3085,8 @@ section(
 // negative experiment's citation extraction now reads the SAME
 // stripped/judged text baseline does.
 
-const NEG_MODEL_ANSWER = "The NRC (a US body) is out of scope [REGDOC-2.3.4 §3.2].";
+const NEG_MODEL_ANSWER =
+	"The NRC (a US body) is out of scope [REGDOC-2.3.4 §3.2].";
 const NEG_WITH_DISCLAIMER = `${KNOWLEDGE_HUB_LIMITED_CONTEXT}${NEG_MODEL_ANSWER}`;
 
 check(
@@ -2427,7 +3115,9 @@ check(
 // pinned in §19; re-asserted here for locality to this fix.
 check(
 	"…while scoreRejection (which must see the route's own lines) still reads RAW text",
-	RUN_SRC5.includes('const verdict = scoreRejection({\n\t\t\t\tstatus: a.status,\n\t\t\t\ttext: a.text,'),
+	RUN_SRC5.includes(
+		"const verdict = scoreRejection({\n\t\t\t\tstatus: a.status,\n\t\t\t\ttext: a.text,",
+	),
 );
 // Baseline's own call site is unchanged by this fix — pin it here too so a
 // future edit cannot regress baseline while "fixing" negative.
@@ -2472,7 +3162,8 @@ async function withCapturedErrors<T>(
 	}
 }
 
-const UPSTASH_DEAD = "fetch failed: getaddrinfo ENOTFOUND charming-lioness.upstash.io";
+const UPSTASH_DEAD =
+	"fetch failed: getaddrinfo ENOTFOUND charming-lioness.upstash.io";
 let cacheGetCalls = 0;
 const rejectingRedis = {
 	get: async () => {
@@ -2548,7 +3239,13 @@ check(
 const writeCaptured = await withCapturedErrors(async () => {
 	let threw: string | null = null;
 	try {
-		await cacheWrite(CKEY, { text: "x" }, 60, "kh_cache_write_error", rejectingRedis);
+		await cacheWrite(
+			CKEY,
+			{ text: "x" },
+			60,
+			"kh_cache_write_error",
+			rejectingRedis,
+		);
 		await cacheDelete(CKEY, "kh_cache_invalidate_error", rejectingRedis);
 	} catch (err) {
 		threw = (err as Error).message;
@@ -2626,7 +3323,12 @@ check(
 const stripComments = (src: string) =>
 	src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const QUERY_ROUTE_CODE = stripComments(
-	readSrc("app/api/knowledge-hub/query/route.ts"),
+	readSrc("lib/knowledge-hub/query-handler.ts"),
+);
+// Phase 12 v2 handlers (KH_SOURCE_CORPUS=v2) must hold the same line.
+const QUERY_V2_CODE = stripComments(readSrc("lib/knowledge-hub/query-v2.ts"));
+const ARTIFACT_V2_CODE = stripComments(
+	readSrc("lib/knowledge-hub/artifact-v2.ts"),
 );
 const ARTIFACT_ROUTE_CODE = stripComments(
 	readSrc("app/api/knowledge-hub/artifact/route.ts"),
@@ -2657,6 +3359,21 @@ check(
 	QUERY_ROUTE_CODE.includes(
 		'void cacheDelete(cKey, "kh_cache_invalidate_error")',
 	),
+);
+check(
+	"the v2 chat and artifact handlers use only the fail-open cache helpers (read, write, invalidate)",
+	QUERY_V2_CODE.includes(
+		'await cacheRead<CachedAnswerV2>(cKey, "kh_cache_read_error")',
+	) &&
+		QUERY_V2_CODE.includes("void cacheWrite(") &&
+		QUERY_V2_CODE.includes(
+			'void cacheDelete(cKey, "kh_cache_invalidate_error")',
+		) &&
+		ARTIFACT_V2_CODE.includes("await cacheRead<CachedArtifactV2>(") &&
+		ARTIFACT_V2_CODE.includes("void cacheWrite(") &&
+		![QUERY_V2_CODE, ARTIFACT_V2_CODE].some(
+			(c) => c.includes("getRedis") || c.includes("redis.get"),
+		),
 );
 
 // ---------------------------------------------------------------------------
@@ -2882,11 +3599,10 @@ async function silenced<T>(run: () => Promise<T>): Promise<T> {
 	markRedisHealthy();
 	handlerCalls = 0;
 
-	const downGuard = withGuard(
-		{ route: "knowledge-hub/query" },
-		payingHandler,
-		{ redis: deadRedis, createSupabase: fakeSupabaseAuth },
-	);
+	const downGuard = withGuard({ route: "knowledge-hub/query" }, payingHandler, {
+		redis: deadRedis,
+		createSupabase: fakeSupabaseAuth,
+	});
 
 	const downStatuses: number[] = [];
 	let deniedBody: { error?: string; message?: string } = {};
@@ -2968,11 +3684,10 @@ async function silenced<T>(run: () => Promise<T>): Promise<T> {
 	markRedisHealthy();
 	handlerCalls = 0;
 
-	const upGuard = withGuard(
-		{ route: "knowledge-hub/query" },
-		payingHandler,
-		{ redis: healthyRedis, createSupabase: fakeSupabaseAuth },
-	);
+	const upGuard = withGuard({ route: "knowledge-hub/query" }, payingHandler, {
+		redis: healthyRedis,
+		createSupabase: fakeSupabaseAuth,
+	});
 
 	const upStatuses: number[] = [];
 	await silenced(async () => {

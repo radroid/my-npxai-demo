@@ -6,6 +6,7 @@ import {
 	ErrorPrimitive,
 	MessagePrimitive,
 	ThreadPrimitive,
+	useAui,
 	useAuiState,
 } from "@assistant-ui/react";
 import {
@@ -29,17 +30,32 @@ import { Reasoning } from "@/components/assistant-ui/reasoning";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import {
-	type CitationSource,
 	CitationSourcesProvider,
+	type CitationSourcesValue,
 } from "@/components/knowledge-hub/citation-sources";
+import { ReferenceLinks } from "@/components/knowledge-hub/ReferenceLinks";
+import {
+	SourcesPanel,
+	type SourcesPanelProps,
+} from "@/components/knowledge-hub/SourcesPanel";
 import { Button } from "@/components/ui/button";
+import type { CollectionId } from "@/lib/sources/catalog";
+import {
+	isSourcesPayloadV2,
+	type ScopeNoticePayload,
+} from "@/lib/sources/payload";
+import type { ScopeOptions } from "@/lib/sources/scope-options";
+import { useSourceScope } from "@/lib/sources/scope-store";
 
 // `composerHeader` is an additive slot rendered immediately above the
 // composer (item-1 slice 1.2 — the Knowledge Hub mode toggle). Default
 // undefined renders markup identical to the prop-less Thread.
-export const Thread: FC<{ composerHeader?: ReactNode }> = ({
-	composerHeader,
-}) => (
+// `sourceOptions` (Phase 12) is non-null only on the multi-source corpus; it
+// switches the welcome copy and starters to the source-neutral versions.
+export const Thread: FC<{
+	composerHeader?: ReactNode;
+	sourceOptions?: ScopeOptions | null;
+}> = ({ composerHeader, sourceOptions = null }) => (
 	<ThreadPrimitive.Root
 		className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
 		style={{
@@ -56,7 +72,7 @@ export const Thread: FC<{ composerHeader?: ReactNode }> = ({
 			className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4"
 		>
 			<AuiIf condition={(s) => s.thread.isEmpty}>
-				<ThreadWelcome />
+				<ThreadWelcome sourceOptions={sourceOptions} />
 			</AuiIf>
 
 			<ThreadPrimitive.Messages>
@@ -122,33 +138,81 @@ const STARTER_QUESTIONS: Array<{ title: string; prompt: string }> = [
 	},
 ];
 
-const ThreadWelcome: FC = () => (
+// Phase 12 starters: one per enabled collection beyond CNSC, plus a
+// comparison when two or more regimes are on (Auto routes each by what it
+// names — they double as a demonstration of the source selector).
+const MULTI_SOURCE_STARTERS: Partial<
+	Record<CollectionId, { title: string; prompt: string }>
+> = {
+	nrc: {
+		title: "US occupational dose limits (10 CFR 20.1201)",
+		prompt:
+			"What are the annual occupational dose limits for adults under 10 CFR 20.1201?",
+	},
+	onr: {
+		title: "UK ALARP guidance (ONR)",
+		prompt:
+			"How does the ONR technical assessment guide define demonstrating that risks are ALARP?",
+	},
+	eu: {
+		title: "Euratom periodic safety review",
+		prompt:
+			"How often does the Euratom nuclear safety directive require a periodic safety review?",
+	},
+};
+
+function startersFor(options: ScopeOptions | null) {
+	if (!options) return STARTER_QUESTIONS;
+	const ids = options.collections.map((c) => c.id);
+	const extra = ids
+		.map((id) => MULTI_SOURCE_STARTERS[id])
+		.filter((x): x is { title: string; prompt: string } => Boolean(x));
+	if (ids.includes("cnsc") && ids.includes("nrc")) {
+		extra.push({
+			title: "Compare CNSC and NRC",
+			prompt:
+				"Compare the CNSC and NRC occupational dose limits for nuclear energy workers.",
+		});
+	}
+	return [
+		...STARTER_QUESTIONS.slice(0, 6 - Math.min(extra.length, 4)),
+		...extra.slice(0, 4),
+	];
+}
+
+const ThreadWelcome: FC<{ sourceOptions: ScopeOptions | null }> = ({
+	sourceOptions,
+}) => (
 	<div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
 		<div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
 			<div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
 				<h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-2xl duration-200">
-					CNSC Knowledge Hub
+					{sourceOptions ? "Regulatory Knowledge Hub" : "CNSC Knowledge Hub"}
 				</h1>
 				<p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-muted-foreground text-xl delay-75 duration-200">
-					Ask a regulatory question — answers cite REGDOC + section.
+					{sourceOptions
+						? `Ask a regulatory question — answers cite the exact document, edition and section. Sources: ${sourceOptions.collections.map((c) => c.label).join(", ")}.`
+						: "Ask a regulatory question — answers cite REGDOC + section."}
 				</p>
 				<p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 mt-3 animate-in fill-mode-both text-muted-foreground text-sm delay-100 duration-200">
 					Or start with one of these:
 				</p>
 			</div>
 		</div>
-		<StarterQuestions />
+		<StarterQuestions starters={startersFor(sourceOptions)} />
 	</div>
 );
 
-const StarterQuestions: FC = () => (
+const StarterQuestions: FC<{
+	starters: Array<{ title: string; prompt: string }>;
+}> = ({ starters }) => (
 	// ThreadPrimitive.Suggestion handles the race guard internally: its trigger
 	// checks `thread.isRunning` at click time and no-ops if a run is in flight,
 	// replacing our old launchedRef + setLaunched state. It also calls
 	// `thread.append()` directly instead of stuffing the composer and calling
 	// send, so the text never flashes in the input box.
 	<div className="aui-thread-welcome-suggestions grid w-full @md:grid-cols-2 gap-2 pb-4">
-		{STARTER_QUESTIONS.map((s) => (
+		{starters.map((s) => (
 			<ThreadPrimitive.Suggestion key={s.prompt} prompt={s.prompt} send asChild>
 				<button
 					type="button"
@@ -227,7 +291,24 @@ const MessageError: FC = () => (
 	</MessagePrimitive.Error>
 );
 
-const EMPTY_CITATION_SOURCES: CitationSource[] = [];
+const EMPTY_CITATION_SOURCES: CitationSourcesValue = { legacy: [], v2: null };
+
+type DataPartLike = {
+	type?: string;
+	name?: string;
+	data?: unknown;
+};
+
+// assistant-ui converts an AI SDK `data-<name>` part into
+// { type: "data", name, data }; tolerate the raw `data-<name>` shape too
+// (older persisted messages) so neither form loses its sources.
+function findDataPart(parts: unknown, name: string): unknown {
+	const ps = parts as DataPartLike[] | undefined;
+	return ps?.find(
+		(p) =>
+			(p?.type === "data" && p.name === name) || p?.type === `data-${name}`,
+	)?.data;
+}
 
 // Thinking verbs shown while the model is processing but before the first
 // token arrives. Regulatory-flavored to match the Knowledge Hub tone —
@@ -309,19 +390,29 @@ const AssistantMessage: FC = () => {
 	// throws `getSnapshot should be cached` → maximum update depth exceeded.
 	// Derive in useMemo instead so the memoized array identity is stable.
 	const messageParts = useAuiState((s) => s.message.parts);
-	const citationSources = useMemo<CitationSource[]>(() => {
-		const parts = messageParts as unknown as Array<{
-			type?: string;
-			data?: { chunks?: CitationSource[] };
-		}>;
-		const sources = parts?.find(
-			(p) => p?.type === "data-sources" && Array.isArray(p.data?.chunks),
-		)?.data?.chunks;
-		return sources ?? EMPTY_CITATION_SOURCES;
-	}, [messageParts]);
+	const sourcesData = useMemo(
+		() => findDataPart(messageParts, "sources"),
+		[messageParts],
+	);
+	const notice = useMemo(
+		() =>
+			findDataPart(messageParts, "scope-notice") as
+				| ScopeNoticePayload
+				| undefined,
+		[messageParts],
+	);
+	const citationSources = useMemo<CitationSourcesValue>(() => {
+		if (isSourcesPayloadV2(sourcesData)) {
+			return { legacy: [], v2: sourcesData.sources };
+		}
+		const chunks = (sourcesData as { chunks?: unknown } | undefined)?.chunks;
+		return Array.isArray(chunks)
+			? { legacy: chunks as CitationSourcesValue["legacy"], v2: null }
+			: EMPTY_CITATION_SOURCES;
+	}, [sourcesData]);
 
 	return (
-		<CitationSourcesProvider sources={citationSources}>
+		<CitationSourcesProvider value={citationSources}>
 			<MessagePrimitive.Root
 				className="aui-assistant-message-root fade-in slide-in-from-bottom-1 relative mx-auto w-full max-w-(--thread-max-width) animate-in py-3 duration-150"
 				data-role="assistant"
@@ -334,12 +425,17 @@ const AssistantMessage: FC = () => {
 							if (part.type === "reasoning") return <Reasoning {...part} />;
 							if (part.type === "tool-call")
 								return part.toolUI ?? <ToolFallback {...part} />;
-							// `data` parts (including our data-sources payload) are
-							// handled via makeAssistantDataUI in KnowledgeHubShell.
+							// Data parts (sources, scope notice) render below, after the
+							// text, whatever order they arrived in: v2 sends its sources
+							// FIRST so citation chips resolve while the answer streams.
 							return null;
 						}}
 					</MessagePrimitive.Parts>
 					<StreamingCaret />
+					{notice ? <ScopeNoticeActions notice={notice} /> : null}
+					{sourcesData ? (
+						<SourcesPanel data={sourcesData as SourcesPanelProps["data"]} />
+					) : null}
 					<MessageError />
 				</div>
 
@@ -348,6 +444,55 @@ const AssistantMessage: FC = () => {
 				</div>
 			</MessagePrimitive.Root>
 		</CitationSourcesProvider>
+	);
+};
+
+// One-click recovery from a scope notice: switch the source selector (a
+// lasting choice — the labels say so) and re-ask the same question. The
+// transport reads the new scope at send time; markScopeSwitch tells the
+// server this regenerate is a scope change, so it may serve a cached answer.
+const ScopeNoticeActions: FC<{ notice: ScopeNoticePayload }> = ({ notice }) => {
+	const aui = useAui();
+	const pin = useSourceScope((s) => s.pin);
+	const setAuto = useSourceScope((s) => s.setAuto);
+	const mode = useSourceScope((s) => s.scope.mode);
+	const isRunning = useAuiState((s) => s.thread.isRunning);
+	const markScopeSwitch = useSourceScope((s) => s.markScopeSwitch);
+	const retry = (apply: () => void) => {
+		apply();
+		markScopeSwitch();
+		aui.message().reload();
+	};
+	const hasRefs = (notice.references?.length ?? 0) > 0;
+	if (notice.suggestions.length === 0 && mode === "auto" && !hasRefs)
+		return null;
+	return (
+		<>
+			<ReferenceLinks references={notice.references} />
+			<div className="mt-2 flex flex-wrap gap-2">
+				{notice.suggestions.map((s) => (
+					<button
+						key={s.id}
+						type="button"
+						disabled={isRunning}
+						onClick={() => retry(() => pin(s.id))}
+						className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+					>
+						Switch to {s.label} and retry
+					</button>
+				))}
+				{mode === "pinned" ? (
+					<button
+						type="button"
+						disabled={isRunning}
+						onClick={() => retry(setAuto)}
+						className="rounded-full border border-border bg-surface-2 px-3 py-1 text-fg text-xs transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+					>
+						Switch to Auto and retry
+					</button>
+				) : null}
+			</div>
+		</>
 	);
 };
 

@@ -1,0 +1,30 @@
+{
+	"id": "eu-dir-2014-87@oj-2014-07-25",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "616d3ccf0c167edef54a1a87f09752558c18d4ea2dd0d3c4d028455daf57361c",
+	"chunks": 23,
+	"requirement_chunks": 13,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"Recitals",
+		"Art. 1 Article 1",
+		"Art. 2 Article 2",
+		"Art. 3 Article 3",
+		"Art. 4 Article 4"
+	],
+	"report": {
+		"adapter": "eu-xhtml",
+		"parser_version": "eu-xhtml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 5,
+		"paragraphs": 52,
+		"chars": 38413,
+		"alpha_ratio": 0.823,
+		"word_like_ratio": 0.988
+	},
+	"published_at": "2026-10-01T23:22:33.119Z"
+}

@@ -2,34 +2,49 @@
 
 import { createContext, useContext } from "react";
 import type { SourceChunk } from "@/components/knowledge-hub/SourcesPanel";
+import type { SourceRecord } from "@/lib/sources/citations";
 
 // Context bridging the current assistant message's `data-sources` part
-// down to inline CitationChip renders. Populated by AssistantMessage via
-// useAuiState(); consumed by MarkdownText's CitationChip so each
-// [REGDOC-X.X.X §Y.Z] chip resolves to the real CNSC URL.
+// down to inline citation renders in MarkdownText. Populated by
+// AssistantMessage from the message parts.
+//   legacy — saved CNSC-only answers: [REGDOC-X.X.X §Y.Z] chips resolve by
+//            document + section against these chunks.
+//   v2     — multi-source answers: [[S1]] chips resolve by snippet id
+//            against these records (null when the message has no v2
+//            payload, e.g. every pre-Phase-12 thread).
 export type CitationSource = Pick<
 	SourceChunk,
 	"regdoc_id" | "section_number" | "section_title" | "url"
 >;
 
-const CitationSourcesContext = createContext<CitationSource[] | null>(null);
+export interface CitationSourcesValue {
+	legacy: CitationSource[];
+	v2: SourceRecord[] | null;
+}
+
+const EMPTY: CitationSourcesValue = { legacy: [], v2: null };
+const CitationSourcesContext = createContext<CitationSourcesValue>(EMPTY);
 
 export function CitationSourcesProvider({
-	sources,
+	value,
 	children,
 }: {
-	sources: CitationSource[];
+	value: CitationSourcesValue;
 	children: React.ReactNode;
 }) {
 	return (
-		<CitationSourcesContext.Provider value={sources}>
+		<CitationSourcesContext.Provider value={value}>
 			{children}
 		</CitationSourcesContext.Provider>
 	);
 }
 
 export function useCitationSources(): CitationSource[] {
-	return useContext(CitationSourcesContext) ?? [];
+	return useContext(CitationSourcesContext).legacy;
+}
+
+export function useSnippetSources(): SourceRecord[] | null {
+	return useContext(CitationSourcesContext).v2;
 }
 
 export function findCitationMatch(

@@ -16,7 +16,13 @@ import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button
 import {
 	findCitationMatch,
 	useCitationSources,
+	useSnippetSources,
 } from "@/components/knowledge-hub/citation-sources";
+import {
+	DOCUMENT_KIND_LABELS,
+	isAllowedSourceUrl,
+} from "@/lib/sources/catalog";
+import type { SourceRecord } from "@/lib/sources/citations";
 import { cn } from "@/lib/utils";
 
 const MarkdownTextImpl = () => {
@@ -72,20 +78,37 @@ const useCopyToClipboard = ({
 
 // Matches Appendix D.5 citation regex. Used to find inline [REGDOC-X.X.X]
 // or [REGDOC-X.X.X §Y.Z] patterns in the streamed markdown and render them
-// as pill chips instead of plain text.
+// as pill chips instead of plain text. Kept for saved (pre-Phase-12) threads.
 const CITATION_RE = /\[REGDOC-\d+(?:\.\d+){1,3}(?:\s+§[\d.]+)?\]/g;
+// v2 snippet-id citations — the grammar of lib/sources/citations.ts
+// SNIPPET_CITATION_RE ([[S1]], [[S1, S3]], and the [S1] slip).
+const SNIPPET_RE =
+	/\[\[\s*(S\d{1,2}(?:\s*[,;]\s*S\d{1,2})*)\s*\]\]|\[(S\d{1,2})\]/g;
+// Any other [[…]] (lib/sources/citations.ts MALFORMED_CITATION_RE): a
+// citation-looking slip such as "[[8 CFR 20.1201]]" renders as unverified.
+const MALFORMED_RE =
+	/\[\[(?!\s*(?:S\d{1,2}\s*(?:[,;]\s*S\d{1,2}\s*)*\]\]|REGDOC))([^[\]\n<>]{1,80})\]\]/g;
+const ANY_CITATION_RE = new RegExp(
+	`${SNIPPET_RE.source}|${MALFORMED_RE.source}|${CITATION_RE.source}`,
+	"g",
+);
+
+const CHIP_BASE =
+	"mx-0.5 inline-flex items-center rounded-full border px-1.5 py-0 font-mono text-[0.7em] leading-[1.4] align-baseline";
+const CHIP_REQUIREMENT =
+	"border-requirement/40 bg-requirement/10 text-requirement";
+const CHIP_GUIDANCE = "border-guidance/40 bg-guidance/10 text-guidance";
 
 function CitationChip({ label }: { label: string }) {
 	const sources = useCitationSources();
 	const match = findCitationMatch(sources, label);
 	const inner = label.slice(1, -1);
-	const baseClass =
-		"mx-0.5 inline-flex items-center rounded-full border border-requirement/40 bg-requirement/10 px-1.5 py-0 font-mono text-[0.7em] text-requirement leading-[1.4] align-baseline";
+	const baseClass = `${CHIP_BASE} ${CHIP_REQUIREMENT}`;
 	const tooltip = match?.section_title
 		? `${inner} — ${match.section_title}`
 		: `CNSC citation: ${inner}`;
 
-	if (match?.url) {
+	if (match?.url && isAllowedSourceUrl(match.url)) {
 		return (
 			<a
 				href={match.url}
@@ -107,8 +130,78 @@ function CitationChip({ label }: { label: string }) {
 	);
 }
 
-// Walks component children, splits any string node on the citation regex,
-// and wraps matches in <CitationChip />. Non-string nodes pass through.
+function snippetTooltip(s: SourceRecord): string {
+	const kind = DOCUMENT_KIND_LABELS[s.document_kind] ?? s.document_kind;
+	const parts = [
+		s.title + (s.section_title ? ` — ${s.section_title}` : ""),
+		[s.publisher, kind, s.edition].filter(Boolean).join(" · "),
+	];
+	if (s.status !== "current") parts.push(`${s.status} edition`);
+	if (s.legal_force === "nonbinding") parts.push("Not binding");
+	return parts.join("\n");
+}
+
+// One [[S…]] group → one chip per id. Everything shown comes from the
+// server's data-sources payload; an id it did not hand out renders as an
+// explicit "unverified" marker, never as a guess.
+function SnippetCitation({ ids, raw }: { ids: string[]; raw: string }) {
+	const sources = useSnippetSources();
+	// A message without a v2 payload (every pre-Phase-12 thread) has no ids to
+	// resolve against — show the text as written, not an "unverified" chip.
+	if (!sources) return <>{raw}</>;
+	return (
+		<>
+			{ids.map((sid, i) => {
+				const key = `${sid}-${i}`;
+				const s = sources?.find((x) => x.sid === sid);
+				if (!s) {
+					return (
+						<span
+							key={key}
+							data-citation="unresolved"
+							className={`${CHIP_BASE} border-dashed border-border text-fg-muted`}
+							title="This citation does not match a retrieved source"
+						>
+							unverified
+						</span>
+					);
+				}
+				const requirement =
+					s.requirement_type === "requirement" &&
+					s.legal_force !== "nonbinding";
+				const cls = `${CHIP_BASE} ${requirement ? CHIP_REQUIREMENT : CHIP_GUIDANCE}`;
+				if (isAllowedSourceUrl(s.url)) {
+					return (
+						<a
+							key={key}
+							href={s.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							data-citation="true"
+							className={`${cls} cursor-pointer no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+							title={snippetTooltip(s)}
+						>
+							{s.chip}
+						</a>
+					);
+				}
+				return (
+					<span
+						key={key}
+						data-citation="true"
+						className={cls}
+						title={snippetTooltip(s)}
+					>
+						{s.chip}
+					</span>
+				);
+			})}
+		</>
+	);
+}
+
+// Walks component children, splits any string node on the citation
+// grammars, and wraps matches in chips. Non-string nodes pass through.
 function renderWithCitations(children: ReactNode): ReactNode {
 	const out: ReactNode[] = [];
 	let chipKey = 0;
@@ -117,74 +210,98 @@ function renderWithCitations(children: ReactNode): ReactNode {
 			out.push(child);
 			return;
 		}
-		const parts = child.split(CITATION_RE);
-		const matches = child.match(CITATION_RE) ?? [];
-		parts.forEach((segment, i) => {
-			if (segment) out.push(segment);
-			const m = matches[i];
-			if (m) {
-				// biome-ignore lint/suspicious/noArrayIndexKey: chips are generated in render order and the chip text itself is not unique within a single message
-				out.push(<CitationChip key={`c-${idx}-${chipKey++}-${m}`} label={m} />);
+		let last = 0;
+		for (const m of child.matchAll(ANY_CITATION_RE)) {
+			const at = m.index ?? 0;
+			if (at > last) out.push(child.slice(last, at));
+			const group = m[1] ?? m[2];
+			const key = `c-${idx}-${chipKey++}`;
+			if (group) {
+				const ids = group
+					.split(/[,;]/)
+					.map((x) => x.trim())
+					.filter(Boolean);
+				out.push(<SnippetCitation key={key} ids={ids} raw={m[0]} />);
+			} else if (m[3] !== undefined) {
+				// Never an id the server handed out: "unverified" on a v2
+				// message, the text as written on a legacy one.
+				out.push(<SnippetCitation key={key} ids={[m[3].trim()]} raw={m[0]} />);
+			} else {
+				out.push(<CitationChip key={key} label={m[0]} />);
 			}
-		});
+			last = at + m[0].length;
+		}
+		if (last < child.length) out.push(child.slice(last));
 	});
 	return out;
 }
 
 const defaultComponents = memoizeMarkdownComponents({
-	h1: ({ className, ...props }) => (
+	h1: ({ className, children, ...props }) => (
 		<h1
 			className={cn(
 				"aui-md-h1 mb-2 scroll-m-20 font-semibold text-base first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h1>
 	),
-	h2: ({ className, ...props }) => (
+	h2: ({ className, children, ...props }) => (
 		<h2
 			className={cn(
 				"aui-md-h2 mt-3 mb-1.5 scroll-m-20 font-semibold text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h2>
 	),
-	h3: ({ className, ...props }) => (
+	h3: ({ className, children, ...props }) => (
 		<h3
 			className={cn(
 				"aui-md-h3 mt-2.5 mb-1 scroll-m-20 font-semibold text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h3>
 	),
-	h4: ({ className, ...props }) => (
+	h4: ({ className, children, ...props }) => (
 		<h4
 			className={cn(
 				"aui-md-h4 mt-2 mb-1 scroll-m-20 font-medium text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h4>
 	),
-	h5: ({ className, ...props }) => (
+	h5: ({ className, children, ...props }) => (
 		<h5
 			className={cn(
 				"aui-md-h5 mt-2 mb-1 font-medium text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h5>
 	),
-	h6: ({ className, ...props }) => (
+	h6: ({ className, children, ...props }) => (
 		<h6
 			className={cn(
 				"aui-md-h6 mt-2 mb-1 font-medium text-sm first:mt-0 last:mb-0",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</h6>
 	),
 	p: ({ className, children, ...props }) => (
 		<p
@@ -197,15 +314,48 @@ const defaultComponents = memoizeMarkdownComponents({
 			{renderWithCitations(children)}
 		</p>
 	),
-	a: ({ className, ...props }) => (
-		<a
-			className={cn(
-				"aui-md-a text-primary underline underline-offset-2 hover:text-primary/80",
-				className,
-			)}
-			{...props}
-		/>
-	),
+	// Model-written links (markdown links and GFM-autolinked bare URLs) are
+	// live only for the official-source allowlist — the same rule as chips,
+	// the Sources panel and artifacts. Retrieved text can carry third-party
+	// or injected URLs ("download the updated guide at …"); those render as
+	// their label text only. A bare URL's label IS the URL, so it stays
+	// readable; a labelled link's target is not shown. In-page anchors (GFM
+	// footnotes) stay links.
+	a: ({ className, href, children, ...props }) =>
+		href?.startsWith("#") ? (
+			<a
+				className={cn("aui-md-a text-primary underline", className)}
+				{...props}
+				href={href}
+			>
+				{children}
+			</a>
+		) : isAllowedSourceUrl(href) ? (
+			<a
+				className={cn(
+					"aui-md-a text-primary underline underline-offset-2 hover:text-primary/80",
+					className,
+				)}
+				{...props}
+				href={href}
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				{children}
+			</a>
+		) : (
+			<span
+				className="aui-md-a-blocked break-all"
+				title="Link not opened: only official source links are clickable"
+			>
+				{children}
+			</span>
+		),
+	// Never load a model-written image: an injected ![](https://…) would be
+	// fetched with no click (the same exfiltration channel the link gate
+	// closes). The alt text is shown instead.
+	img: ({ alt }) =>
+		alt ? <span className="aui-md-img-blocked italic">{alt}</span> : null,
 	blockquote: ({ className, ...props }) => (
 		<blockquote
 			className={cn(
@@ -248,23 +398,33 @@ const defaultComponents = memoizeMarkdownComponents({
 			{...props}
 		/>
 	),
-	th: ({ className, ...props }) => (
+	th: ({ className, children, ...props }) => (
 		<th
 			className={cn(
 				"aui-md-th bg-muted px-2 py-1 text-left font-medium first:rounded-tl-lg last:rounded-tr-lg [[align=center]]:text-center [[align=right]]:text-right",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</th>
 	),
-	td: ({ className, ...props }) => (
+	td: ({ className, children, ...props }) => (
 		<td
 			className={cn(
 				"aui-md-td border-muted-foreground/20 border-b border-l px-2 py-1 text-left last:border-r [[align=center]]:text-center [[align=right]]:text-right",
 				className,
 			)}
 			{...props}
-		/>
+		>
+			{renderWithCitations(children)}
+		</td>
+	),
+	strong: ({ children, ...props }) => (
+		<strong {...props}>{renderWithCitations(children)}</strong>
+	),
+	em: ({ children, ...props }) => (
+		<em {...props}>{renderWithCitations(children)}</em>
 	),
 	tr: ({ className, ...props }) => (
 		<tr

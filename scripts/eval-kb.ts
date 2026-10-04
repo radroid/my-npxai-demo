@@ -13,15 +13,26 @@
 //   bun run eval:kb --suite all        # ship + hard suites together
 //   bun run eval:kb --only 17,18,19    # run a subset
 //   bun run eval:kb --debug            # print raw response text on failures
+//   bun run eval:kb --scope cnsc       # v2 corpus (KH_SOURCE_CORPUS=v2):
+//                                      # send a pinned scope ("auto" for Auto)
+//
+// v2 answers cite snippet ids ([[S1]]). The grader resolves each id against
+// the data-sources payload the same response carried and grades the
+// RESOLVED labels ("[REGDOC-2.3.4 §3.2.3]") with the unchanged rules below;
+// an id that does not resolve fails the case outright.
 
 import fs from "node:fs";
 import path from "node:path";
 import {
+	isLowConfidenceText,
+	isRefusalText,
 	KNOWLEDGE_HUB_LOW_CONFIDENCE,
 	KNOWLEDGE_HUB_OUT_OF_SCOPE,
 } from "../lib/prompts";
+import { SNIPPET_CITATION_RE } from "../lib/sources/citations";
+import { isSourcesPayloadV2 } from "../lib/sources/payload";
 
-interface EvalCase {
+export interface EvalCase {
 	id: number;
 	suite?: "ship" | "hard";
 	category: string;
@@ -87,7 +98,7 @@ function parseSuite(argv: string[]): "ship" | "hard" | "all" {
 	return "ship";
 }
 
-function loadCases(): EvalCase[] {
+export function loadCases(): EvalCase[] {
 	const filePath = path.resolve(process.cwd(), "evals/knowledge-hub.jsonl");
 	const raw = fs.readFileSync(filePath, "utf8");
 	return raw
@@ -108,8 +119,18 @@ function loadCases(): EvalCase[] {
 		});
 }
 
+function parseScopeFlag(argv: string[]): Record<string, unknown> | undefined {
+	const idx = argv.indexOf("--scope");
+	if (idx === -1) return undefined;
+	const v = argv[idx + 1]?.trim().toLowerCase();
+	if (!v || v === "auto") return { mode: "auto" };
+	return { mode: "pinned", collection: v };
+}
+const SCOPE = parseScopeFlag(process.argv);
+
 function buildBody(question: string): Record<string, unknown> {
 	return {
+		...(SCOPE ? { scope: SCOPE } : {}),
 		id: `eval-${crypto.randomUUID()}`,
 		messages: [
 			{
@@ -144,9 +165,22 @@ async function callEndpoint(question: string): Promise<{
 
 // Parse the AI SDK v6 UIMessage stream response (SSE: "data: {...}" lines)
 // and reconstruct the accumulated assistant text.
-function parseStreamedText(raw: string): string {
+export function parseStreamedText(raw: string): string {
+	return parseStream(raw).text;
+}
+
+export interface ParsedStream {
+	text: string;
+	/** data-sources payload (legacy { chunks } or v2 { version: 2, … }). */
+	sources: unknown;
+	notice: unknown;
+}
+
+export function parseStream(raw: string): ParsedStream {
 	const lines = raw.split("\n");
 	let accumulated = "";
+	let sources: unknown = null;
+	let notice: unknown = null;
 	for (const line of lines) {
 		const trimmed = line.trim();
 		if (!trimmed.startsWith("data:")) continue;
@@ -156,12 +190,46 @@ function parseStreamedText(raw: string): string {
 			const obj = JSON.parse(payload);
 			if (obj?.type === "text-delta" && typeof obj.delta === "string") {
 				accumulated += obj.delta;
+			} else if (obj?.type === "data-sources") {
+				sources = obj.data;
+			} else if (obj?.type === "data-scope-notice") {
+				notice = obj.data;
 			}
 		} catch {
 			// Non-JSON data frames (start/end markers) — ignore
 		}
 	}
-	return accumulated;
+	return { text: accumulated, sources, notice };
+}
+
+/**
+ * Replace v2 snippet-id citations with their server-resolved labels so the
+ * legacy graders below see "[REGDOC-2.3.4 §3.2.3]". Returns the ids that did
+ * not resolve (a hallucinated S9 with 8 snippets).
+ */
+export function resolveSnippetCitations(
+	text: string,
+	payload: unknown,
+): { text: string; unresolved: string[]; cited: number } {
+	if (!isSourcesPayloadV2(payload)) {
+		const ids = [...text.matchAll(SNIPPET_CITATION_RE)];
+		return { text, unresolved: ids.map((m) => m[0]), cited: ids.length };
+	}
+	const unresolved: string[] = [];
+	let cited = 0;
+	const out = text.replace(SNIPPET_CITATION_RE, (_m, group, single) => {
+		const labels: string[] = [];
+		for (const id of String(group ?? single ?? "").split(/[,;]/)) {
+			const sid = id.trim();
+			if (!sid) continue;
+			cited += 1;
+			const hit = payload.sources.find((s) => s.sid === sid);
+			if (hit) labels.push(`[${hit.chip}]`);
+			else unresolved.push(sid);
+		}
+		return labels.join(" ");
+	});
+	return { text: out, unresolved, cited };
 }
 
 function extractCitations(
@@ -191,8 +259,11 @@ function checkBehavior(
 	text: string,
 ): CheckResult {
 	const lower = text.toLowerCase();
-	const hasLowConf = text.includes(KNOWLEDGE_HUB_LOW_CONFIDENCE);
-	const hasOOS = text.includes(KNOWLEDGE_HUB_OUT_OF_SCOPE);
+	// isRefusalText / isLowConfidenceText also recognise the v2 wording and
+	// the deterministic scope notice ("outside the selected sources").
+	const hasLowConf =
+		text.includes(KNOWLEDGE_HUB_LOW_CONFIDENCE) || isLowConfidenceText(text);
+	const hasOOS = text.includes(KNOWLEDGE_HUB_OUT_OF_SCOPE) || isRefusalText(text);
 	switch (expected) {
 		case "answer":
 			// Pass if the response isn't purely the canonical fallback text.
@@ -320,14 +391,23 @@ function checkDeny(phrases: string[], text: string): CheckResult {
 	return { pass: true };
 }
 
-function grade(
+export function grade(
 	c: EvalCase,
 	status: number,
-	text: string,
+	rawText: string,
+	sourcesPayload: unknown = null,
 ): { pass: boolean; reason: string } {
 	if (status < 200 || status >= 300) {
 		return { pass: false, reason: `http_${status}` };
 	}
+	const resolved = resolveSnippetCitations(rawText, sourcesPayload);
+	if (resolved.unresolved.length > 0) {
+		return {
+			pass: false,
+			reason: `unresolved_citation:${resolved.unresolved.join(",")}`,
+		};
+	}
+	const text = resolved.text;
 	const citations = extractCitations(text);
 
 	const checks: Array<[string, () => CheckResult]> = [
@@ -390,8 +470,9 @@ async function main(): Promise<void> {
 	for (const c of cases) {
 		try {
 			const { status, body, latencyMs } = await callEndpoint(c.question);
-			const text = parseStreamedText(body);
-			const verdict = grade(c, status, text);
+			const parsed = parseStream(body);
+			const text = parsed.text;
+			const verdict = grade(c, status, text, parsed.sources);
 			const r: EvalResult = {
 				id: c.id,
 				category: c.category,
@@ -490,4 +571,4 @@ async function main(): Promise<void> {
 	}
 }
 
-await main();
+if (import.meta.main) await main();

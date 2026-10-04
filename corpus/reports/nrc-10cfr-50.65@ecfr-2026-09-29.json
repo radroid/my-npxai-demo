@@ -1,0 +1,29 @@
+{
+	"id": "nrc-10cfr-50.65@ecfr-2026-09-29",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "23ded9390ae83d94f12e4094ef794e339ceca291f62c9124ad67d7a8a054ef87",
+	"chunks": 5,
+	"requirement_chunks": 4,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"§ 50.65 Requirements for monitoring the effectiveness of maintenance at nuclear power plants.",
+		"(a)",
+		"(b)",
+		"(c)"
+	],
+	"report": {
+		"adapter": "ecfr-xml",
+		"parser_version": "ecfr-xml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 4,
+		"paragraphs": 12,
+		"chars": 4180,
+		"alpha_ratio": 0.809,
+		"word_like_ratio": 0.986
+	},
+	"published_at": "2026-10-01T23:22:15.717Z"
+}

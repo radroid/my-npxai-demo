@@ -111,8 +111,10 @@ for (const file of khFiles) {
 // =============================================================================
 
 const threadSrc = readSrc("../components/assistant-ui/thread.tsx");
+// Phase 12 added a second optional prop (sourceOptions, default null =
+// legacy copy); composerHeader itself must stay optional with no default.
 const threadSig = threadSrc.match(
-	/export const Thread: FC<\{ composerHeader\?: ReactNode \}> = \(\{([^)]*)\}\) => \(/,
+	/export const Thread: FC<\{\s*composerHeader\?: ReactNode;\s*sourceOptions\?: ScopeOptions \| null;\s*\}> = \(\{([^)]*)\}\) => \(/,
 );
 check(
 	"Thread's composerHeader prop type is optional ReactNode",
@@ -120,7 +122,9 @@ check(
 );
 check(
 	"composerHeader destructured with NO default value",
-	threadSig !== null && !/=/.test(threadSig[1]),
+	threadSig !== null &&
+		/(^|,)\s*composerHeader\s*(,|$)/.test(threadSig[1]) &&
+		!/composerHeader\s*=/.test(threadSig[1]),
 	threadSig?.[1],
 );
 const footerBody = threadSrc.match(
@@ -186,6 +190,45 @@ if (reconcileEffect) {
 	check(
 		"the ref is updated to the new id after the check",
 		/prevThreadIdRef\.current = activeThreadId;/.test(body),
+	);
+}
+
+// =============================================================================
+// (e) Phase 12 review fix: model-written markdown links (and GFM-autolinked
+//     bare URLs) are live ONLY for allowlisted official-source URLs.
+// =============================================================================
+
+{
+	const md = stripComments(
+		readSrc("../components/assistant-ui/markdown-text.tsx"),
+	);
+	const anchor = md.match(/\ba: \(\{[^)]*\}\) =>([\s\S]*?)\n\timg:/);
+	const branches = anchor?.[1].split(") : (") ?? [];
+	const blocked = branches[branches.length - 1] ?? "";
+	check(
+		"markdown `a` renders an external link only when isAllowedSourceUrl(href)",
+		anchor !== null &&
+			/isAllowedSourceUrl\(href\)\s*\?/.test(anchor[1]) &&
+			// the only other live branch is an in-page anchor (GFM footnotes)
+			/href\?\.startsWith\("#"\)\s*\?/.test(anchor[1]) &&
+			branches.length === 2,
+		anchor?.[1]?.slice(0, 200),
+	);
+	check(
+		"…and the non-allowlisted branch renders no <a>",
+		blocked.includes("<span") && !blocked.includes("<a"),
+	);
+	check(
+		"…and our target/rel win over any spread prop",
+		anchor !== null &&
+			anchor[1].indexOf("{...props}", anchor[1].indexOf("isAllowedSourceUrl")) <
+				anchor[1].indexOf('rel="noopener noreferrer"'),
+	);
+	const img = md.match(/\n\timg: ([\s\S]*?)\n\tblockquote:/);
+	check(
+		"markdown `img` never renders an <img> (no zero-click fetch of a model URL)",
+		img !== null && !img[1].includes("<img") && !img[1].includes("src"),
+		img?.[1],
 	);
 }
 

@@ -36,6 +36,7 @@ import {
 	getAuthSnapshot,
 	useAuth,
 } from "@/lib/auth-context";
+import { currentScopeBody } from "@/lib/sources/scope-store";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 // Module-level fetch wrapper. Runs outside React's render, reads auth via
@@ -93,6 +94,10 @@ function useKnowledgeHubThreadRuntime() {
 			new AssistantChatTransport({
 				api: "/api/knowledge-hub/query",
 				fetch: chatFetch,
+				// Phase 12 source scope, read at SEND time so changing the
+				// selector never rebuilds the transport. The legacy corpus path
+				// ignores the field.
+				body: currentScopeBody,
 			}),
 		[],
 	);

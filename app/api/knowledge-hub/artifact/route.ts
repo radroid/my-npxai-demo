@@ -20,11 +20,13 @@ import {
 import { cacheRead, cacheWrite } from "@/lib/cache";
 import { buildContextEnvelope } from "@/lib/context-envelope";
 import { recordOpenAICall, withGuard } from "@/lib/guard";
+import { artifactV2 } from "@/lib/knowledge-hub/artifact-v2";
 import { logGuardEvent } from "@/lib/logger";
 import { getArtifactModel, getOpenAIClient } from "@/lib/openai";
 import {
 	KNOWLEDGE_HUB_ARTIFACT_SYSTEM,
 	KNOWLEDGE_HUB_OUT_OF_SCOPE,
+	KNOWLEDGE_HUB_OUT_OF_SCOPE_V2,
 	PROMPT_VERSION,
 } from "@/lib/prompts";
 import {
@@ -33,6 +35,7 @@ import {
 	RetrievalError,
 	retrieveChunks,
 } from "@/lib/retrieval";
+import { getSourceCorpusMode } from "@/lib/sources/config";
 import {
 	artifactInputSchema,
 	decodeBase64Probe,
@@ -124,6 +127,8 @@ export const POST = withGuard(
 
 		const query = stripHtmlTags(sanitizeQueryText(parsed.data.query));
 		const model = getArtifactModel();
+		// Phase 12 rollout flag; "legacy" keeps this route on the path below.
+		const corpusMode = getSourceCorpusMode();
 
 		ctx.logFields.prompt_version = PROMPT_VERSION;
 		ctx.logFields.query_len = query.length;
@@ -154,7 +159,22 @@ export const POST = withGuard(
 			ctx.logFields.jailbreak_blocked = true;
 			ctx.logFields.fallback_taken = true;
 			ctx.logFields.output_tokens = 0;
-			return sseErrorResponse("out_of_scope", KNOWLEDGE_HUB_OUT_OF_SCOPE);
+			return sseErrorResponse(
+				"out_of_scope",
+				corpusMode === "v2"
+					? KNOWLEDGE_HUB_OUT_OF_SCOPE_V2
+					: KNOWLEDGE_HUB_OUT_OF_SCOPE,
+			);
+		}
+
+		if (corpusMode === "v2") {
+			return artifactV2({
+				query,
+				rawScope: (body as { scope?: unknown } | null)?.scope,
+				model,
+				ctx,
+				supabase,
+			});
 		}
 
 		// Cache hit check — skips embed + RPC + LLM for repeat queries. Fail-open

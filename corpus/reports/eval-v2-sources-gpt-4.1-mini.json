@@ -1,0 +1,741 @@
+{
+	"ran_at": "2026-10-02T01:24:23.644Z",
+	"collections": "cnsc,nrc,onr,eu",
+	"chat_model": "gpt-4.1-mini",
+	"prompt_version": "2026-10-01.v2.3",
+	"sources": {
+		"summary": "45/46",
+		"tuned_on": "24/24",
+		"regression": "4/4",
+		"held_out": "4/4",
+		"blind": "13/14",
+		"authority_flags": 7,
+		"rows": [
+			{
+				"id": "v2-auto-default-cnsc",
+				"category": "auto-default",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:cnsc",
+				"cited": [
+					"REGDOC-2.3.4 §3.2.3"
+				],
+				"authority_flags": [],
+				"ms": 2710,
+				"answer": "The requirements for shift turnover at a reactor facility are as follows:\n\n- The licensee shall establish processes for conducting a safe and controlled transfer of responsibilities between shifts.\n- The processes shall include, at a minimum:\n  - Panel walkdowns (as applicable) and review of displays (such as screens and annunciators)\n  - Review of operating logs\n  - Review of systems or equipment undergoing maintenance or testing evolutions that are carrying over to the next shift\n  - Checklists\n  - Briefing of any challenges to operations and deviations from normal operating conditions\n  - Verification that the minimum shift complement is met (see REGDOC-2.2.5, Minimum Staff Complement Footnote 24)\n\nAdditionally, it is recommended that the shift turnover process identifies:\n- The persons involved\n- Their responsibilities\n- The locations and conduct of shift turnover\n- Method of reporting facility status, including provisions for special circumstances such as abnormal facility status and staff unavailability\n\nShift briefings should be conducted so that the expectations and objectives of the supervisors responsible for overseeing operations are effectively communicated to and understood by all staff under supervision. The use of human performance tools such as 3-way communications, phonetic alphabet, and verbalization is recommended for shift turnover and briefings [[S1]]."
+			},
+			{
+				"id": "v2-auto-nrc-dose-limits",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 20.1201(a)",
+					"10 CFR 20.1201(b)"
+				],
+				"authority_flags": [],
+				"ms": 2514,
+				"answer": "The annual occupational dose limits for individual adults under 10 CFR 20.1201 are:\n\n- The more limiting of:\n  - Total effective dose equivalent (TEDE) equal to 5 rems (0.05 Sv); or\n  - The sum of the deep-dose equivalent (DDE) and the committed dose equivalent (CDE) to any individual organ or tissue other than the lens of the eye equal to 50 rems (0.5 Sv).\n\n- Annual limits to the lens of the eye, skin of the whole body, and skin of the extremities:\n  - Lens dose equivalent (LDE) of 15 rems (0.15 Sv).\n  - Shallow-dose equivalent (SDE) of 50 rem (0.5 Sv) to the skin of the whole body or to the skin of any extremity[[S1]].\n\nAdditionally, doses received in excess of these annual limits, including those from accidents, emergencies, and planned special exposures, must be subtracted from the limits for planned special exposures that the individual may receive during the current year and lifetime[[S2]]."
+			},
+			{
+				"id": "v2-auto-nrc-rg834",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.34 §A",
+					"RG 8.34 §C.1.1"
+				],
+				"authority_flags": [],
+				"ms": 3327,
+				"answer": "NRC Regulatory Guide 8.34 describes an approach acceptable to the NRC staff for monitoring and determining radiation doses to occupationally exposed individuals, to meet the requirements of 10 CFR Part 20, \"Standards for Protection against Radiation\" [[S2]].\n\nSpecifically, it states that external monitoring is expected for occupationally exposed adults in these circumstances:\n- Likely to receive an occupational dose exceeding 10 percent of the adult’s annual dose limits,\n- Any individual entering a high or very high radiation area (per 10 CFR 20.1502(a)(4)),\n- Assessment of an unplanned, unintended dose when a monitoring device was not provided, to demonstrate compliance with dose limits [[S5]].\n\nFor occupationally exposed minors, monitoring is expected if exposures are likely to exceed specified dose levels (0.1 rem deep dose equivalent, 0.15 rem lens dose equivalent, or 0.5 rem shallow dose equivalent) [[S5]].\n\nFor declared pregnant workers (DPW), monitoring is expected if the deep dose equivalent is likely to exceed 0.1 rem during the entire pregnancy [[S5]].\n\nThe guide also references related NRC Regulatory Guides that provide additional guidance on recording and reporting doses, bioassay programs, respiratory protection, air sampling, dose to embryo/fetus, and control of access to high radiation areas [[S3]][[S4]].\n\nRG 8.34 is nonbinding guidance describing acceptable methods but allows for alternative methods if supported by a basis for license issuance or continuance [[S4]].\n\nIn summary, RG 8.34 provides guidance on when and how to monitor occupational radiation doses to ensure compliance with NRC dose limits and related regulations [[S2]][[S5]]."
+			},
+			{
+				"id": "v2-auto-nrc-appb",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 50 App. B §III"
+				],
+				"authority_flags": [],
+				"ms": 3458,
+				"answer": "Under 10 CFR 50 Appendix B, the design control criterion requires that:\n\n- Measures be established to assure that applicable regulatory requirements and the design bases or functional design criteria for safety-related structures, systems, and components are correctly translated into specifications, drawings, procedures, and instructions.\n- These measures include provisions to assure that appropriate quality standards are specified and included in design documents and that deviations from such standards are controlled.\n- Measures must be established for the selection and review for suitability of materials, parts, equipment, and processes essential to the safety-related functions.\n- Measures must be established for the identification and control of design interfaces and coordination among participating design organizations, including procedures for review, approval, release, distribution, and revision of documents involving design interfaces.\n- The design control measures must provide for verifying or checking the adequacy of design by design reviews, alternate or simplified calculations, or suitable testing programs.\n- The verifying or checking process must be performed by individuals or groups other than those who performed the original design, though they may be from the same organization.\n- If a test program is used to verify a specific design feature, it must include suitable qualification testing of a prototype under the most adverse design conditions.\n- Design control measures apply to items such as reactor physics, stress, thermal, hydraulic, and accident analyses; compatibility of materials; accessibility for inspection, maintenance, and repair; and delineation of acceptance criteria for inspections and tests.\n- Design changes, including field changes, must be subject to design control measures commensurate with those applied to the original design and be approved by the organization that performed the original design unless another responsible organization is designated [[S1]][[S2]]."
+			},
+			{
+				"id": "v2-auto-nrc-rg121",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 1.21 §A",
+					"RG 1.21 §B",
+					"RG 1.21 §C.1.1",
+					"RG 1.21 §C.1.4"
+				],
+				"authority_flags": [],
+				"ms": 3166,
+				"answer": "NRC Regulatory Guide 1.21 states that it provides methods considered acceptable by the NRC staff for measuring, evaluating, and reporting licensed (plant-related) radioactivity in liquid and gaseous effluents and solid radioactive waste shipments from nuclear power plants and spent fuel storage facilities. It also addresses assessing and reporting the public dose to demonstrate compliance with relevant regulations such as 10 CFR Part 20 and 40 CFR Part 190 [[S3]].\n\nThe guide describes important concepts for planning and implementing an effluent and solid radioactive waste program, including monitoring methods, identification of principal radionuclides, representative sampling, radioactivity measurements, quality assurance, and public dose assessments [[S2]].\n\nIt further explains that licensees must submit the Annual Radioactive Effluent Release Report (ARERR) before May 1 and the Annual Radiological Environmental Operating Report (AREOR) by May 15 each year (unless otherwise specified by licensing basis). These reports demonstrate compliance with technical specifications and regulatory requirements, effectiveness of effluent controls, compliance with ALARA criteria, and the relationship between radioactive material discharged and resultant radiation dose to individuals [[S6]].\n\nThe guide also references detailed implementation guidance for effluent monitoring programs in NUREG-1301 and NUREG-1302, which provide specifics on sampling frequencies, analysis methods, and reporting [[S7]][[S8]].\n\nIn summary, RG 1.21 provides comprehensive guidance on how to measure, evaluate, and report radioactive material in liquid and gaseous effluents to ensure regulatory compliance and protection of the public [[S3]][[S6]]."
+			},
+			{
+				"id": "v2-auto-nrc-marssim",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"NUREG-1575 Vol. 1 §1.1",
+					"NUREG-1575 Vol. 1 §2.1",
+					"NUREG-1575 Vol. 1 §O",
+					"NUREG-1575 Vol. 1 §2.5",
+					"NUREG-1575 Vol. 2 §I"
+				],
+				"authority_flags": [],
+				"ms": 2602,
+				"answer": "The purpose of MARSSIM (NUREG-1575) is to provide a standardized, performance-based approach for planning, implementing, and assessing radiological surveys of surface soils and building surfaces at sites with potential residual radioactive material. It aims to demonstrate compliance with dose- or risk-based release criteria through a structured Radiation Survey and Site Investigation (RSSI) process consisting of planning, implementation, assessment, and decision-making phases. MARSSIM supports decision-making by describing generally acceptable methods for survey design, data quality assurance, survey execution, statistical data interpretation, and documentation. It focuses on final status surveys following scoping, characterization, and remediation activities to confirm that release criteria are met. MARSSIM does not address other media such as groundwater or subsurface soil, nor does it provide guidance on determining action levels or derived concentration guideline levels, which must come from the appropriate regulator. The manual is a consensus document developed by multiple federal agencies and uses \"should\" as recommendations rather than requirements, allowing site-specific application of its guidance [[S1]][[S3]][[S6]][[S7]][[S8]]."
+			},
+			{
+				"id": "v2-auto-nrc-maint-rule",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 50.65(a)",
+					"10 CFR 50.65(b)"
+				],
+				"authority_flags": [],
+				"ms": 3037,
+				"answer": "10 CFR 50.65 requires licensees to monitor the performance or condition of structures, systems, or components (SSCs) against licensee-established goals to provide reasonable assurance that these SSCs are capable of fulfilling their intended functions. The monitoring program must include:\n\n- Safety-related SSCs that are relied upon to remain functional during and following design basis events to ensure the integrity of the reactor coolant pressure boundary, the capability to shut down the reactor and maintain it in a safe shutdown condition, or to prevent or mitigate accident consequences that could result in potential offsite exposure.\n- Nonsafety-related SSCs that:\n  - Are relied upon to mitigate accidents or transients or are used in plant emergency operating procedures (EOPs);\n  - Whose failure could prevent safety-related SSCs from fulfilling their safety-related function; or\n  - Whose failure could cause a reactor scram or actuation of a safety-related system.\n\nMonitoring is not required if it has been demonstrated that the performance or condition of an SSC is effectively controlled through appropriate preventive maintenance. The monitoring activities, goals, and preventive maintenance must be evaluated at least every refueling cycle, not exceeding 24 months, taking into account industry-wide operating experience. Before performing maintenance activities, the licensee must assess and manage the increase in risk that may result from the proposed maintenance activities, focusing on SSCs significant to public health and safety as identified by a risk-informed evaluation process [[S1]][[S2]][[S3]]."
+			},
+			{
+				"id": "v2-auto-nrc-legal-force",
+				"category": "legal-force",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.10 §D",
+					"RG 8.7 §D"
+				],
+				"authority_flags": [],
+				"ms": 2000,
+				"answer": "NRC Regulatory Guide 8.10 is not legally binding on US licensees. It is a nonbinding regulatory guide that provides guidance on maintaining occupational and public radiation exposures as low as reasonably achievable (ALARA). Licensees may voluntarily use the guidance to demonstrate compliance with underlying NRC regulations, but the NRC staff does not expect or require licensees to use it unless they make a change to their licensing basis. The staff also does not intend to impose or backfit the guidance through regulatory actions such as orders, generic communications, or rules requiring its use. Furthermore, unless the guide is part of the licensing basis, failure to comply with its positions does not constitute a violation [[S1]][[S2]][[S8]]."
+			},
+			{
+				"id": "v2-pinned-nrc-fetus",
+				"category": "pinned-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.13 §D.2",
+					"10 CFR 20.1208(a)",
+					"10 CFR 20.1208(d)"
+				],
+				"authority_flags": [],
+				"ms": 1860,
+				"answer": "The dose limit for the embryo/fetus of a declared pregnant woman is 0.5 rem (5 millisievert) during the entire pregnancy. If the woman has already received a dose exceeding 0.5 rem (5 mSv) between conception and the declaration of pregnancy, an additional dose of 0.05 rem (0.5 mSv) is allowed during the remainder of the pregnancy. The licensee must also make efforts to avoid substantial variation above a uniform monthly dose rate to ensure the total dose does not exceed this limit [[S1]][[S5]][[S7]]."
+			},
+			{
+				"id": "v2-auto-onr-alarp",
+				"category": "auto-onr",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:onr",
+				"cited": [
+					"NS-TAST-GD-005 §6.1",
+					"NS-TAST-GD-005 §5.1.4",
+					"NS-TAST-GD-005 §5.3.3",
+					"ONR SAPs §9",
+					"NS-TAST-GD-005 §2"
+				],
+				"authority_flags": [
+					{
+						"sentence": "Written safety cases, where required, must present evidence that risks have been reduced to ALARP, and inspectors assess these using a risk-informed and proportionate approach [[S2]][[S3]][[S7]][[S1]].",
+						"cited": [
+							"NS-TAST-GD-005 §6.1",
+							"NS-TAST-GD-005 §5.1.4",
+							"NS-TAST-GD-005 §5.3.3"
+						]
+					}
+				],
+				"ms": 2541,
+				"answer": "The ONR technical assessment guide NS-TAST-GD-005 states that demonstrating risks are ALARP is primarily a qualitative process involving a weighing of the sacrifice (in money, time, or trouble) involved in implementing further safety measures against the risk reduction achieved. The dutyholder must present objective, balanced, and properly reasoned arguments, supported by evidence, explaining why further risk reduction is not reasonably practicable because the sacrifice would be grossly disproportionate to the benefit gained. Quantitative methods, such as cost-benefit analysis (CBA), can support but should not be the sole basis of the ALARP judgement. The dutyholder has a legal obligation to carry out suitable and sufficient risk assessments and implement measures to reduce risks to ALARP on an ongoing basis, alongside other statutory requirements. Written safety cases, where required, must present evidence that risks have been reduced to ALARP, and inspectors assess these using a risk-informed and proportionate approach [[S2]][[S3]][[S7]][[S1]].\n\nAdditionally, the guide explains that ALARP and SFAIRP (so far as is reasonably practicable) are interchangeable terms in this context, and meeting relevant good practice in engineering, operation, and safety management is fundamental to demonstrating ALARP [[S4]][[S5]].\n\n_Legal-force note: NS-TAST-GD-005 §6.1; NS-TAST-GD-005 §5.1.4; NS-TAST-GD-005 §5.3.3 are non-binding guidance. Where this answer says \"required\" or \"must\" citing only them, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._"
+			},
+			{
+				"id": "v2-auto-onr-saps-did",
+				"category": "auto-onr",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:onr",
+				"cited": [
+					"ONR SAPs §23"
+				],
+				"authority_flags": [],
+				"ms": 4010,
+				"answer": "The ONR Safety Assessment Principles (SAPs) state that defence in depth is a key engineering principle for nuclear facilities, aiming to prevent faults or, if prevention fails, to ensure detection, limit potential consequences, and stop escalation. Defence in depth should be applied so that:\n\n- Deviations from normal operation and failures of structures, systems, and components are prevented.\n- Any deviations from normal operation are allowed for by safety margins that enable timely detection and action to prevent escalation.\n- Inherent safety features, failsafe design, and safety measures protect against fault conditions progressing into accidents.\n- Additional measures mitigate the consequences of accidents, especially severe accidents.\n\nDefence in depth is generally applied in five levels, which should be as far as practicable independent from one another, ensuring that if one level fails, it will be compensated for or corrected by the subsequent level. The five levels are:\n\n1. Prevention of abnormal operation and failures by design.\n2. Prevention and control of abnormal operation and detection of failures.\n3. Control of faults within the design basis to protect against escalation to an accident.\n4. Control of severe plant conditions exceeding the design basis, including mitigation of severe accidents.\n5. Mitigation of radiological consequences of significant releases of radioactive material, including emergency response.\n\nAn important aspect of defence in depth is the provision of multiple, and as far as practicable independent, physical barriers to the release of radioactive material to the environment, ensuring confinement at specified locations. The number of barriers depends on the magnitude of the radiological hazard and the consequences of their failure.\n\nThe SAPs also emphasize that safety should be secured by safety measures ranked by preference as near as possible to:\n\n- Passive safety measures not relying on control systems, active safety systems, or human intervention.\n- Automatically initiated active engineered safety measures.\n- Active engineered safety measures manually brought into service.\n- Administrative safety measures.\n- Mitigation safety measures (e.g., filtration or scrubbing).\n\nThe availability and reliability of safety measures should be commensurate with the significance of the radiological hazards and their safety functions within the defence in depth hierarchy.\n\nOverall, defence in depth provides a series of independent barriers (inherent features, equipment, and procedures) aimed at preventing faults initially and ensuring appropriate protection or mitigation of accidents if prevention fails [[S1]][[S2]][[S7]]."
+			},
+			{
+				"id": "v2-auto-eu-psr",
+				"category": "auto-eu",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:eu",
+				"cited": [
+					"Directive 2009/71/Euratom §Art. 8c"
+				],
+				"authority_flags": [],
+				"ms": 1289,
+				"answer": "The Euratom nuclear safety directive requires that the safety of nuclear installations be systematically and regularly re-assessed at least every 10 years. This periodic safety review aims to ensure compliance with the current design basis and to identify further safety improvements, taking into account ageing issues, operational experience, recent research results, and developments in international standards [[S7]]."
+			},
+			{
+				"id": "v2-auto-eu-waste",
+				"category": "auto-eu",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:eu",
+				"cited": [
+					"Directive 2011/70/Euratom §Art. 12"
+				],
+				"authority_flags": [],
+				"ms": 3168,
+				"answer": "Under Directive 2011/70/Euratom, a Member State's national programme for spent fuel and radioactive waste must include all of the following:\n\n- The overall objectives of the Member State’s national policy in respect of spent fuel and radioactive waste management;\n- The significant milestones and clear timeframes for the achievement of those milestones in light of the over-arching objectives of the national programme;\n- An inventory of all spent fuel and radioactive waste and estimates for future quantities, including those from decommissioning, clearly indicating the location and amount of the radioactive waste and spent fuel in accordance with appropriate classification of the radioactive waste;\n- The concepts or plans and technical solutions for spent fuel and radioactive waste management from generation to disposal;\n- The concepts or plans for the post-closure period of a disposal facility’s lifetime, including the period during which appropriate controls are retained and the means to be employed to preserve knowledge of that facility in the longer term;\n- The research, development and demonstration activities that are needed in order to implement solutions for the management of spent fuel and radioactive waste;\n- The responsibility for the implementation of the national programme and the key performance indicators to monitor progress towards implementation;\n- An assessment of the national programme costs and the underlying basis and hypotheses for that assessment, which must include a profile over time;\n- The financing scheme(s) in force;\n- A transparency policy or process as referred to in Article 10;\n- If any, the agreement(s) concluded with a Member State or a third country on management of spent fuel or radioactive waste, including on the use of disposal facilities.\n\nAdditionally, the national programme together with the national policy may be contained in a single document or in a number of documents [[S2]]."
+			},
+			{
+				"id": "v2-compare-cnsc-nrc-dose",
+				"category": "compare",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "compare:cnsc+nrc",
+				"cited": [
+					"REGDOC-3.5.3 §5.6",
+					"REGDOC-2.7.1 §14",
+					"REGDOC-2.7.1 §7",
+					"RG 8.29 §D.2"
+				],
+				"authority_flags": [
+					{
+						"sentence": "- The NRC requires monitoring and reporting of doses if a worker is likely to receive more than 10% of the annual dose limits, and workers must be informed of their doses [[S7]].",
+						"cited": [
+							"RG 8.29 §D.2"
+						]
+					}
+				],
+				"ms": 5502,
+				"answer": "Here is a comparison of occupational dose limits for nuclear energy workers (NEWs) between the CNSC (Canada) and the NRC (United States):\n\n### CNSC (Canada)\n- The CNSC sets dose limits consistent with ICRP recommendations and requires licensees to implement radiation protection programs applying the ALARA principle [[S2]].\n- Equivalent dose limits for NEWs are specified in the Radiation Protection Regulations (RPR) and include:\n  - Lens of the eye: 50 mSv per one-year dosimetry period [[S3]].\n  - Skin: 500 mSv per one-year dosimetry period [[S3]].\n  - Hands and feet: 500 mSv per one-year dosimetry period [[S3]].\n- The CNSC requires licensees to ensure that NEWs do not exceed these equivalent dose limits [[S3]].\n- The CNSC also requires licensees to provide NEWs with information on applicable dose limits and their dose levels [[S4]].\n- The CNSC dose limits for the lens of the eye align with the ICRP recommendation of 20 mSv averaged over 5 years with no single year exceeding 50 mSv, but the CNSC limit for NEWs is 50 mSv in a one-year period [[S1]].\n\n### NRC (United States)\n- The NRC dose limits in 10 CFR Part 20 are based on ICRP and NCRP recommendations and aim to keep occupational radiation risks comparable to other industries [[S5]].\n- The NRC dose limits for occupational exposure are:\n  - Effective dose equivalent: 0.1 Sv (10 rem) over a 5-year period, with no more than 0.05 Sv (5 rem) in any single year [[S5]].\n- The NRC does not currently plan to reduce these limits further [[S6]].\n- Planned special exposures are limited to 0.25 Sv (25 rem) in a worker's lifetime and are only allowed in exceptional situations [[S8]].\n- The NRC expects licensees to keep exposures ALARA and often establish administrative control levels below regulatory limits to provide safety margins [[S8]].\n- The NRC requires monitoring and reporting of doses if a worker is likely to receive more than 10% of the annual dose limits, and workers must be informed of their doses [[S7]].\n\n### Summary of Key Differences\n- The CNSC specifies equivalent dose limits for specific tissues (lens, skin, hands, feet) with relatively high limits for skin and extremities (500 mSv/year), while the NRC primarily specifies effective dose limits averaged over 5 years (100 mSv/5 years, max 50 mSv/year).\n- The CNSC lens of the eye limit for NEWs is 50 mSv per year, consistent with ICRP thresholds, while the NRC's effective dose limits are lower but do not specify lens dose limits in these excerpts.\n- The NRC includes provisions for planned special exposures with a lifetime limit of 25 rem (0.25 Sv), which is not mentioned in the CNSC excerpts.\n- Both regulators emphasize the ALARA principle and require dose monitoring and worker information, but the CNSC explicitly requires licensees to inform NEWs of their dose levels and dose limits [[S4]], while the NRC states this as an expectation [[S7]].\n\nThis comparison is based on the current regulatory documents and guides from the CNSC and NRC [[S1]][[S3]][[S4]][[S5]][[S6]][[S7]][[S8]].\n\n_Legal-force note: RG 8.29 §D.2 is non-binding guidance. Where this answer says \"required\" or \"must\" citing only it, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._"
+			},
+			{
+				"id": "v2-compare-onr-cnsc-psr",
+				"category": "compare",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "compare:cnsc+onr",
+				"cited": [
+					"REGDOC-2.4.1 §4.6.2",
+					"REGDOC-3.5.3 §7.2",
+					"REGDOC-3.5.3 §5.2",
+					"NS-TAST-GD-001 §5.8.5",
+					"NS-TAST-GD-001 §5.8.9",
+					"ONR SAPs §23",
+					"NS-TAST-GD-001 §D"
+				],
+				"authority_flags": [],
+				"ms": 4908,
+				"answer": "The UK ONR and the Canadian CNSC differ in their approach and expectations regarding periodic safety reviews (PSRs) as follows:\n\n**Canada (CNSC):**  \n- The CNSC requires that the safety analysis be periodically reviewed and updated to reflect changes in plant configuration, conditions (including aging), operating parameters, procedures, research findings, and advances in knowledge. Updates are also required when new information reveals hazards different in nature, probability, or magnitude than previously presented [[S1]].  \n- The CNSC inspects and reviews operational activities and documentation to verify compliance with requirements, using a risk-informed approach. Licensees must notify the CNSC of changes and promptly address any deficiencies [[S2]].  \n- The CNSC expects continuous improvement and ongoing risk reduction by licensees, including continuous evaluation and management of hazards and safety issues [[S4]].  \n- There is no explicit fixed periodicity for PSRs stated in the provided CNSC documents, but the emphasis is on periodic review and update of safety analysis as conditions change.\n\n**United Kingdom (ONR):**  \n- ONR expects PSRs normally within ten years of fuel loading or active commissioning, with the dutyholder responsible for defining and justifying the periodicity. ONR would not expect PSRs more than ten years apart without robust justification [[S5]].  \n- ONR allows for continuous review programmes that spread the work of the PSR over the review period, with scheduled reviews of specific topics. The continuous review programme can complement but does not replace the ten-yearly PSR [[S6]].  \n- PSRs are deeper and more comprehensive than interim safety reviews, including comparison with modern standards and identification of improvements. Interim safety reviews are expected every few years to ensure the safety case remains valid [[S7]].  \n- ONR expects the dutyholder to demonstrate that the full scope of PSR expectations is met, whether through periodic PSRs or continuous review programmes [[S6]].  \n- ONR may publish assessments and regulatory intentions about PSRs and expects completion of identified work within about three years after submission [[S8]].\n\n**Summary of Differences:**  \n- The UK ONR explicitly expects PSRs about every ten years with interim reviews every few years, and supports continuous review programmes to complement the PSR process [[S5]][[S6]][[S7]].  \n- The CNSC requires periodic review and update of safety analysis but does not specify a fixed PSR interval in the provided documents; it emphasizes updates based on changes and new information [[S1]][[S2]].  \n- ONR’s approach includes formal regulatory interaction and public communication around PSRs, including press releases and assessment publications [[S8]], which is not described in the CNSC excerpts.  \n- CNSC emphasizes continuous improvement and risk management as an ongoing process [[S4]], while ONR formalizes this through structured PSRs and interim reviews [[S7]].\n\nThus, ONR has a more explicitly defined PSR periodicity and structured review programme, while CNSC focuses on periodic updates driven by changes and new information without a stated fixed interval in the provided excerpts."
+			},
+			{
+				"id": "v2-ambiguous-two-regimes",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "notice:ambiguous",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 2,
+				"answer": "Your question mentions CNSC (Canada) and NRC (United States). Pick one in the source selector, or ask me to compare them (for example \"Compare CNSC and NRC on …\"). Answering from a mix of regimes without that would be outside the selected sources."
+			},
+			{
+				"id": "v2-pinned-mismatch",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "notice:pinned_mismatch",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1,
+				"answer": "Sources are pinned to CNSC (Canada), but your question asks about NRC (United States) — outside the selected sources. Switch the source selector to NRC or Auto to search it."
+			},
+			{
+				"id": "v2-pinned-stays-fixed",
+				"category": "pinned-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.29 §D.2",
+					"RG 8.34 §B",
+					"RG 1.21 §C.5",
+					"RG 1.21 §C.5.3",
+					"NUREG-2215 §9.5.4",
+					"NUREG-2215 §6.5.4",
+					"NUREG-1757 Vol. 1 §6"
+				],
+				"authority_flags": [],
+				"ms": 3233,
+				"answer": "The NRC dose limits for occupational exposure are based on recommendations from the International Commission on Radiological Protection (ICRP) and the National Council on Radiation Protection and Measurements (NCRP). For example, NRC's current occupational dose limits include an annual dose equivalent (LDE) of 5 rem (50 mSv) for stochastic effects, with higher limits for non-stochastic effects (e.g., 50 rem or 500 mSv), and specific limits for skin and extremities (e.g., 15 rem LDE and 50 rem SDE) as described in 10 CFR Part 20 and related guidance documents [[S1]][[S6]][[S7]].\n\nFor public dose limits, NRC regulations in 10 CFR 20.1301 set limits for individual members of the public, including doses from licensed radioactive materials and radiation sources other than background radiation. These limits include contributions from current-year effluents, direct radiation, and accumulated radioactivity from prior years [[S2]][[S4]].\n\nIn the context of spent fuel dry storage, NRC dose limits differ between normal/off-normal conditions (10 CFR 72.104) and accident conditions (10 CFR 72.106), with dose limits based on ICRP methodologies from different publications (ICRP-2 for normal conditions and ICRP-26 for accident conditions) [[S3]][[S5]].\n\nThe NRC also emphasizes the principle of keeping doses \"as low as reasonably achievable (ALARA)\" in all cases [[S8]].\n\nRegarding the CNSC's dose limits, the selected sources do not include information on the CNSC or Canadian regulatory dose limits, so I don't have enough from the indexed NRC regulatory documents to compare NRC dose limits with those of the CNSC.\n\nIn summary, NRC dose limits are grounded in ICRP and NCRP recommendations, with specific numeric limits for occupational and public exposures, and distinct criteria for normal and accident conditions in storage facilities, but a direct comparison with CNSC limits cannot be provided from the NRC sources searched here."
+			},
+			{
+				"id": "v2-iaea-reference-only",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "notice:reference_only",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 5,
+				"answer": "IAEA safety standards are catalogued as reference links only — their text is not stored here, so quoting them is outside the selected sources. This assistant currently answers from: CNSC (Canada), NRC (United States), ONR (United Kingdom) and EU / Euratom (European Union)."
+			},
+			{
+				"id": "v2-not-indexed",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "notice:not_indexed",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 2,
+				"answer": "That regulator's documents are not indexed, so this is outside the selected sources. This assistant currently answers from: CNSC (Canada), NRC (United States), ONR (United Kingdom) and EU / Euratom (European Union)."
+			},
+			{
+				"id": "v2-fukushima-not-enabled",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "notice:not_enabled",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 0,
+				"answer": "Fukushima (Japan · lessons learned) sources are not available yet, so this is outside the selected sources. This assistant currently answers from: CNSC (Canada), NRC (United States), ONR (United Kingdom) and EU / Euratom (European Union)."
+			},
+			{
+				"id": "v2-aerb-not-enabled",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "notice:not_enabled",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1,
+				"answer": "AERB (India) sources are not available yet, so this is outside the selected sources. This assistant currently answers from: CNSC (Canada), NRC (United States), ONR (United Kingdom) and EU / Euratom (European Union)."
+			},
+			{
+				"id": "v2-pinned-nrc-oos",
+				"category": "oos",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [],
+				"per_collection": [
+					{
+						"collection": "nrc",
+						"topSim": 0.1494,
+						"chunks": 20
+					}
+				],
+				"authority_flags": [],
+				"ms": 640,
+				"answer": "This assistant only answers questions about the indexed regulatory documents. Your question appears to be outside that scope. (Searched: NRC.)"
+			},
+			{
+				"id": "v2-fake-citation-injection",
+				"category": "adversarial",
+				"pass": true,
+				"reason": "ok",
+				"split": "tuned_on",
+				"scope_key": "single:nrc",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1134,
+				"answer": "I don't have enough from the indexed regulatory documents to answer that with confidence."
+			},
+			{
+				"id": "v2-near-nrc-73-54",
+				"category": "near-oos",
+				"pass": true,
+				"reason": "ok",
+				"split": "regression",
+				"scope_key": "single:nrc",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1263,
+				"answer": "I don't have enough from the indexed regulatory documents to answer that with confidence."
+			},
+			{
+				"id": "v2-near-nrc-part55",
+				"category": "near-oos",
+				"pass": true,
+				"reason": "ok",
+				"split": "held_out",
+				"scope_key": "single:nrc",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1306,
+				"answer": "I don't have enough from the indexed regulatory documents to answer that with confidence. The provided snippets do not include specific requirements from 10 CFR Part 55 regarding reactor operator licensing examinations."
+			},
+			{
+				"id": "v2-near-onr-nisr",
+				"category": "near-oos",
+				"pass": true,
+				"reason": "ok",
+				"split": "held_out",
+				"scope_key": "single:onr",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1026,
+				"answer": "I don't have enough from the indexed regulatory documents to answer that with confidence."
+			},
+			{
+				"id": "v2-near-eu-radon",
+				"category": "near-oos",
+				"pass": true,
+				"reason": "ok",
+				"split": "held_out",
+				"scope_key": "single:eu",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 955,
+				"answer": "I don't have enough from the indexed regulatory documents to answer that with confidence."
+			},
+			{
+				"id": "v2-auto-nrc-operator-training",
+				"category": "auto-nrc",
+				"pass": true,
+				"reason": "ok",
+				"split": "held_out",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 50.120(b)",
+					"10 CFR 50.54(i)",
+					"10 CFR 50.54(m)"
+				],
+				"authority_flags": [],
+				"ms": 4714,
+				"answer": "The U.S. NRC requires the following for operator training at nuclear power plants:\n\n- Each operating license applicant and license holder must establish, implement, and maintain a training program at least 18 months prior to fuel load or initial fuel loading. This program must meet the requirements of 10 CFR 50.120 paragraphs (b)(2) and (b)(3) [[S1]].\n- The training program must be derived from a systems approach to training as defined in 10 CFR 55.4 and provide for training and qualification of specific categories of personnel, including non-licensed operators, shift supervisors, shift technical advisors, instrument and control technicians, electrical and mechanical maintenance personnel, radiological protection technicians, chemistry technicians, and engineering support personnel [[S1]].\n- The training program must incorporate instructional requirements necessary to provide qualified personnel to operate and maintain the facility safely in all modes of operation, comply with the facility license, technical specifications, and applicable regulations, and be periodically evaluated and revised to reflect industry experience and changes to the facility, procedures, regulations, and quality assurance requirements. Licensee management must periodically review the program for effectiveness, and sufficient records must be maintained and available for NRC inspection [[S1]].\n- Only licensed operators or senior operators as provided in part 55 of the NRC regulations may manipulate the controls of the facility [[S4]].\n- Within 3 months after issuance of an operating license or combined license, the licensee must have an operator requalification program that meets the requirements of 10 CFR 55.59(c). The licensee may not decrease the scope of an approved operator requalification program without specific Commission authorization [[S4]].\n- A senior operator licensed pursuant to part 55 must be present at the facility or readily available on call at all times during operation, and present during initial start-up, approach to power, recovery from unplanned shutdowns, refueling, or as prescribed in the facility license [[S3]].\n- Minimum licensed operator staffing requirements are specified based on the number of operating units and control rooms, including the number of senior operators and operators required on site [[S3]].\n- During core alterations such as fuel loading or transfer, a person holding a senior operator license or a senior operator license limited to fuel handling must be present to directly supervise the activity and not be assigned other duties [[S2]].\n\nThese requirements ensure that personnel are properly trained, qualified, and present to operate nuclear power plants safely under all conditions [[S1]][[S2]][[S3]][[S4]]."
+			},
+			{
+				"id": "v2-absent-doc-mixed",
+				"category": "absent-doc",
+				"pass": true,
+				"reason": "ok",
+				"split": "regression",
+				"scope_key": "single:nrc",
+				"cited": [
+					"10 CFR 20.1201(a)",
+					"10 CFR 20.1201(b)"
+				],
+				"authority_flags": [],
+				"ms": 2906,
+				"answer": "10 CFR 20.1201 requires that licensees control the occupational dose to individual adults, except for planned special exposures under § 20.1206, to the following dose limits:\n\n- An annual limit, which is the more limiting of:\n  - The total effective dose equivalent being equal to 5 rems (0.05 Sv); or\n  - The sum of the deep-dose equivalent and the committed dose equivalent to any individual organ or tissue other than the lens of the eye being equal to 50 rems (0.5 Sv).\n- The annual limits to the lens of the eye, to the skin of the whole body, and to the skin of the extremities, which are:\n  - A lens dose equivalent of 15 rems (0.15 Sv), and\n  - A shallow-dose equivalent of 50 rem (0.5 Sv) to the skin of the whole body or to the skin of any extremity.\n\nAdditionally, doses received in excess of the annual limits, including doses received during accidents, emergencies, and planned special exposures, must be subtracted from the limits for planned special exposures that the individual may receive during the current year and during the individual's lifetime [[S1]][[S2]].\n\nRegarding 10 CFR 73.54, the indexed regulatory documents do not include this section, so I don't have enough from the indexed regulatory documents to answer that with confidence."
+			},
+			{
+				"id": "v2-compare-unindexed",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "regression",
+				"scope_key": "notice:not_indexed",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 3,
+				"answer": "I can't compare against that regulator — its documents are not indexed, so that comparison is outside the selected sources. This assistant currently answers from: CNSC (Canada), NRC (United States), ONR (United Kingdom) and EU / Euratom (European Union)."
+			},
+			{
+				"id": "v2-iaea-reference-link",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "regression",
+				"scope_key": "notice:reference_only",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1,
+				"answer": "IAEA safety standards are catalogued as reference links only — their text is not stored here, so quoting them is outside the selected sources. This assistant currently answers from: CNSC (Canada), NRC (United States), ONR (United Kingdom) and EU / Euratom (European Union)."
+			},
+			{
+				"id": "ho-rg813-prenatal-duty",
+				"category": "authority",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.13 §A",
+					"RG 8.13 §C.2",
+					"RG 8.13 §C.3"
+				],
+				"authority_flags": [
+					{
+						"sentence": "Specifically, for prenatal radiation exposure, 10 CFR 20.1208 requires licensees to ensure that the dose to an embryo/fetus during the entire pregnancy of a declared pregnant woman does not exceed 0.5 rem (5 mSv) and to make efforts to avoid substantial variation above a uniform monthly exposure rat",
+						"cited": [
+							"RG 8.13 §A"
+						]
+					}
+				],
+				"ms": 4189,
+				"answer": "The NRC regulations in 10 CFR Part 19, Section 19.12, require licensees to provide instruction to workers about the health protection problems associated with exposure to radiation and/or radioactive material, including precautions or procedures to minimize exposure and the purposes and functions of protective devices employed. This instruction must be commensurate with the potential radiological health protection problems present in the workplace. Specifically, for prenatal radiation exposure, 10 CFR 20.1208 requires licensees to ensure that the dose to an embryo/fetus during the entire pregnancy of a declared pregnant woman does not exceed 0.5 rem (5 mSv) and to make efforts to avoid substantial variation above a uniform monthly exposure rate to that woman [[S1]].\n\nRegulatory Guide 8.13 supplements these regulations by providing information to help licensees instruct workers about prenatal radiation exposure. It states that licensees should provide workers with a copy of the guide and its Appendix, explain the contents, and offer opportunities to ask questions and request additional information. This information should also be given to any worker or supervisor who may be affected by a declaration of pregnancy or who may need to take action in response. Classroom instruction may supplement the written information, and instructors should have some knowledge of biological effects of radiation to answer questions beyond the guide's content. Videotaped presentations may be used, and licensees may credit instruction received within the past year at other licensed facilities or courses [[S2]].\n\nThe guide also recommends that the instruction describe the licensee's specific policy on declared pregnant women, including how the policy may affect a woman's work situation after she has filed a written declaration of pregnancy. It should identify who to contact for additional information and who should receive the written declaration [[S6]].\n\nIn summary, RG 8.13 states that licensees should:\n\n- Provide written and/or classroom instruction about prenatal radiation exposure to workers and supervisors potentially affected.\n- Explain the contents of the guide and allow questions.\n- Describe the licensee's policy on declared pregnant women and related work situation changes.\n- Identify contacts for information and recipients of pregnancy declarations.\n- Ensure compliance with dose limits for declared pregnant women as per 10 CFR 20.1208 [[S1]][[S2]][[S6]].\n\nWhile RG 8.13 itself is nonbinding guidance, it supplements the NRC's binding regulatory requirements that licensees provide appropriate instruction and control radiation dose to declared pregnant women [[S1]].\n\n_Legal-force note: RG 8.13 §A is non-binding guidance. Where this answer says \"required\" or \"must\" citing only it, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._"
+			},
+			{
+				"id": "ho-nureg1757-fin-assurance",
+				"category": "authority",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:nrc",
+				"cited": [
+					"NUREG-1757 Vol. 3 §4",
+					"NUREG-1757 Vol. 3 §8"
+				],
+				"authority_flags": [],
+				"ms": 2797,
+				"answer": "NUREG-1757, Vol. 3, Rev. 1, states guidance on how NRC licensees and license applicants can demonstrate financial assurance for decommissioning. It provides acceptable methods and approaches for financial assurance, including the use of financial instruments such as trusts, letters of credit, surety bonds, and guarantees. The document also discusses the use of a Decommissioning Funding Plan (DFP) based on a site-specific cost estimate or prescribed amounts specified in NRC regulations.\n\nHowever, NUREG-1757 also notes that for certain sites where the licensee provides a viable alternative approach or alternative basis for the cost estimate, the DFP may be approved if the approach provides sufficient assurance of funding for decommissioning. This implies that licensees are not strictly limited to the methods described in NUREG-1757, as long as the alternative approach provides sufficient assurance of funding and is acceptable to the NRC staff.\n\nIn summary, while NUREG-1757 provides detailed guidance and acceptable methods for demonstrating financial assurance, a materials licensee may use some other approach if it can demonstrate to the NRC that the alternative provides sufficient assurance of funding for decommissioning [[S1]][[S5]][[S7]]."
+			},
+			{
+				"id": "ho-gd035-operating-rules",
+				"category": "authority",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:onr",
+				"cited": [
+					"NS-TAST-GD-035 §3.1",
+					"NS-TAST-GD-001 §3.1",
+					"NS-TAST-GD-035 §5.3",
+					"NS-TAST-GD-035 §4.1"
+				],
+				"authority_flags": [],
+				"ms": 3337,
+				"answer": "ONR's guidance states that Licence Condition 23 (LC23) requires the licensee to produce an adequate safety case that identifies the limits and conditions necessary to keep the facility within a safe operating envelope in respect of any operation that may affect safety. These limits and conditions constitute the operating rules (ORs). The licensee should ensure ongoing compliance with its ORs and take appropriate action if any are exceeded, with incidents recorded, investigated, and reported under LC7. The requirements of LC23 apply to all limits and conditions in the safety case, not only those formally labelled as \"operating rules\" [[S1]][[S4]].\n\nThe guidance further states that when assessing OR identification or implementation, inspectors should confirm the licensee’s ORs adequately cover:\n\n- all the permitted operating modes;\n- all identified sources of hazard;\n- all identified fault sequences;\n- all levels of the defence in depth hierarchy;\n- all claimed plant and equipment, operating ranges and the resources and support services required; and\n- all human-related claims, including specific Suitably Qualified and Experienced Persons (SQEP) requirements and staffing levels [[S5]].\n\nAdditionally, the Safety Assessment Principles (SAPs) set ONR’s expectations that safety cases should identify operating limits and conditions and show how they will be implemented effectively. ORs should be usable, measurable, and clearly linked to safety case assumptions. They should cover safety settings, configuration and availability requirements, and the safe operating envelope, informed by Design Basis Analysis (DBA), Probabilistic Safety Analysis (PSA), and Severe Accident Analysis (SAA) where appropriate [[S8]].\n\nIn summary, ONR's guidance expects licensees to set limits and conditions for nuclear safety that comprehensively cover operational modes, hazards, fault sequences, defence in depth, equipment, and human factors, and to ensure these are clearly defined and linked to the safety case [[S1]][[S5]][[S8]]."
+			},
+			{
+				"id": "ho-saps-worker-dose-targets",
+				"category": "authority",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:onr",
+				"cited": [
+					"ONR SAPs §23",
+					"ONR SAPs §9"
+				],
+				"authority_flags": [
+					{
+						"sentence": "Operators must still ensure doses are reduced ALARP, which is a legal duty under the Health and Safety at Work Act (HSW Act) [[S1]][[S2]][[S4]].",
+						"cited": [
+							"ONR SAPs §23",
+							"ONR SAPs §9"
+						]
+					}
+				],
+				"ms": 2586,
+				"answer": "The ONR's Safety Assessment Principles (SAPs) state that most of the numerical targets, including those for worker doses, are not mandatory but serve as benchmarks. Some Basic Safety Levels (BSLs) are legal limits under the Ionising Radiations Regulations 2017 (IRR17) and are identified as BSL(LL), but the majority of targets are guidance to indicate doses/risks which new facilities should meet and provide benchmarks for existing facilities. The Basic Safety Objectives (BSOs) are set at levels where ONR considers it not a good use of resources to pursue further improvements, but operators have an overriding duty to reduce risks to as low as reasonably practicable (ALARP) on a case-by-case basis, regardless of whether the BSOs are met. Therefore, it is generally inappropriate for operators to use the BSOs as design targets or to denote when ALARP levels have been achieved [[S1]][[S2]].\n\nIn summary, the numerical targets for worker dose in the SAPs are benchmarks rather than strict obligations, except where they correspond to legal limits in IRR17. Operators must still ensure doses are reduced ALARP, which is a legal duty under the Health and Safety at Work Act (HSW Act) [[S1]][[S2]][[S4]].\n\n_Legal-force note: ONR SAPs §23; ONR SAPs §9 are non-binding guidance. Where this answer says \"required\" or \"must\" citing only them, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._"
+			},
+			{
+				"id": "ho-regdoc225-shift-complement",
+				"category": "authority",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:cnsc",
+				"cited": [
+					"REGDOC-2.2.5",
+					"REGDOC-2.2.5 §3.1.1",
+					"REGDOC-2.2.5 §3.1.4"
+				],
+				"authority_flags": [],
+				"ms": 3105,
+				"answer": "Under REGDOC-2.2.5, a power reactor licensee is expected to determine the minimum staff complement through a systematic analysis and to formalize minimum staffing requirements in a procedure. The document states that the minimum staff complement should include certified operations personnel and other specialized workers as needed, and any decision not to include certain positions should be justified by the licensee. However, the specific mention of the minimum staff complement for nuclear power plants is presented as guidance (\"expected\") rather than a strict requirement. The overall document requires licensees to ensure the presence of a sufficient number of qualified workers at all times, which implies demonstrating a minimum staff complement, but the detailed composition for power reactors is guidance to be justified if deviated from [[S1]][[S4]][[S7]].\n\nTherefore, the licensee must demonstrate a minimum staff complement as a requirement, but the detailed inclusion of certain specialized positions in the minimum shift complement for power reactors is guidance rather than a binding requirement."
+			},
+			{
+				"id": "ho-eu-waste-directive-duty",
+				"category": "authority",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:eu",
+				"cited": [
+					"Directive 2011/70/Euratom §Art. 4",
+					"Directive 2011/70/Euratom §Art. 5",
+					"Directive 2011/70/Euratom §Art. 11",
+					"Directive 2011/70/Euratom"
+				],
+				"authority_flags": [],
+				"ms": 3666,
+				"answer": "The EU's Directive 2011/70/Euratom binds Member States, not nuclear operators directly. It requires each Member State to establish and maintain national policies and frameworks for spent fuel and radioactive waste management, including the implementation of national programmes.\n\nSpecifically:\n\n- The Directive places ultimate responsibility for management of spent fuel and radioactive waste on each Member State for materials generated within its jurisdiction [[S2]].\n- Member States must establish and maintain a national legislative, regulatory, and organisational framework that allocates responsibility and provides coordination among competent bodies. This framework includes systems of licensing, control, inspections, enforcement, and financing for spent fuel and radioactive waste management [[S5]].\n- The national programme that each Member State must implement shall cover all types of spent fuel and radioactive waste under its jurisdiction and all stages of management from generation to disposal [[S1]].\n- The national programme must be regularly reviewed and updated considering technical and scientific progress, recommendations, lessons learned, and good practices from peer reviews [[S1]].\n- National programmes should translate political decisions into clear provisions for timely implementation of all steps of spent fuel and radioactive waste management from generation to disposal [[S4]].\n- The Directive emphasizes that the national framework shall give primary responsibility for spent fuel and radioactive waste to their generators or, under specific circumstances, to a licence holder entrusted by competent bodies, but the Directive itself binds Member States to establish these frameworks and programmes [[S5]].\n\nIn summary, the Directive binds Member States to establish national programmes covering all types and stages of spent fuel and radioactive waste management, while the direct duties on operators are implemented through national frameworks established by Member States [[S1]][[S2]][[S5]]."
+			},
+			{
+				"id": "ho-cmp-emergency-nrc-cnsc",
+				"category": "compare",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "compare:cnsc+nrc",
+				"cited": [
+					"REGDOC-3.5.3 §5.3.1",
+					"REGDOC-2.10.1 §1.1",
+					"REGDOC-2.3.2 §2",
+					"10 CFR 50.54(gg)",
+					"10 CFR 50.54(q)",
+					"10 CFR 50.47(a)",
+					"NUREG-2215 §12.4.7.4"
+				],
+				"authority_flags": [],
+				"ms": 5116,
+				"answer": "The NRC (United States) and the CNSC (Canada) differ in their expectations for nuclear power plant licensees on emergency preparedness as follows:\n\n**CNSC (Canada):**  \n- The CNSC regulates licensees’ onsite emergency plans and requires arrangements with offsite authorities (municipal, provincial governments) as part of a whole-of-government approach to nuclear emergency planning.  \n- The CNSC’s role includes monitoring and evaluating licensees’ actions during emergencies, providing technical advice and regulatory directives, and informing government and public.  \n- The CNSC’s emergency preparedness program integrates nuclear operators, government agencies, first responders, and international organizations, with regular exercises involving simulated incidents.  \n- Prevention of nuclear emergencies is the licensee’s responsibility, while the CNSC regulates to prevent unreasonable risk. Mitigation involves equipment and procedures to reduce hazard impact. Preparedness includes developing response plans, training, maintaining facilities, exercises, and public awareness. Response actions protect workers and manage consequences onsite and offsite. Recovery restores affected organizations and communities.  \n- REGDOC-2.10.1 sets out emergency preparedness requirements and guidance for licensees of Class I nuclear facilities and uranium mines and mills.  \n- The CNSC expects coordination with offsite authorities and a comprehensive approach covering prevention, mitigation, preparedness, response, and recovery. [[S1]][[S2]][[S4]]\n\n**NRC (United States):**  \n- The NRC requires licensees to have adequate methods, systems, and equipment onsite for assessing and monitoring offsite consequences of a radiological emergency.  \n- Licensees must arrange medical services for contaminated and injured onsite individuals and provide radiological emergency response training to offsite responders who may assist onsite.  \n- The NRC requires licensees to retain records of emergency plan changes and submit reports of changes to the NRC.  \n- No initial operating or combined license is issued unless the NRC finds reasonable assurance that adequate protective measures can and will be taken in a radiological emergency.  \n- The NRC’s regulations specify emergency plan requirements and conditions of licenses, including provisions for emergency preparedness training, medical services, and monitoring systems.  \n- The NRC’s emergency preparedness includes classification of emergencies (e.g., Alert, Site Area Emergency) and requires plans to identify events that could trigger these classifications and describe response organization mobilization and escalation steps. [[S5]][[S6]][[S7]][[S8]]\n\n**Summary of Differences:**  \n- The CNSC emphasizes integration with offsite authorities and a whole-of-government approach, with a broad scope covering prevention through recovery and regular exercises.  \n- The NRC focuses on ensuring licensees have onsite capabilities for monitoring, medical services, training for offsite responders, and regulatory approval of emergency plans with detailed record-keeping and reporting requirements.  \n- The NRC explicitly requires a finding of reasonable assurance of adequate protective measures before issuing initial licenses, while the CNSC regulates licensees’ plans and coordinates emergency preparedness within a government framework.  \n- The NRC defines specific emergency classifications and expects plans to address these, while the CNSC’s guidance covers comprehensive emergency management phases.  \n\nThese points reflect the regulatory expectations from the NRC and CNSC as per their respective documents [[S1]][[S2]][[S4]][[S5]][[S6]][[S7]][[S8]]."
+			},
+			{
+				"id": "ho-cmp-reassessment-onr-eu",
+				"category": "compare",
+				"pass": false,
+				"reason": "kind:notice≠compare",
+				"split": "blind",
+				"scope_key": "notice:ambiguous",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 2,
+				"answer": "Your question mentions ONR (United Kingdom) and EU / Euratom (European Union). Pick one in the source selector, or ask me to compare them (for example \"Compare ONR and EU / Euratom on …\"). Answering from a mix of regimes without that would be outside the selected sources."
+			},
+			{
+				"id": "ho-part26-work-hours",
+				"category": "near-oos",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:nrc",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 1510,
+				"answer": "I don't have enough from the indexed regulatory documents to answer that with confidence. The provided snippets do not include information on work-hour limits under the NRC's fitness-for-duty rule in 10 CFR Part 26 for security officers at power reactors."
+			},
+			{
+				"id": "ho-regdoc2121-response-force",
+				"category": "near-oos",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:cnsc",
+				"cited": [
+					"REGDOC-2.12.3 §6.3.5",
+					"REGDOC-1.1.1 §4.12.5",
+					"REGDOC-1.1.1 §4.12.6"
+				],
+				"authority_flags": [],
+				"ms": 2215,
+				"answer": "The provided indexed regulatory documents do not include the specific requirements from CNSC's REGDOC-2.12.1 regarding the size and response times of the nuclear response force at high-security sites. However, related requirements in REGDOC-2.12.3 and REGDOC-1.1.1 indicate that:\n\n- The nuclear security description should include protection arrangements with offsite response forces, including estimates of the strengths of the proposed offsite response forces for situations ranging from initial response to full activation, and estimates of the lengths of time required to deliver various levels of planned responses [[S1]].\n\n- Security arrangements with offsite response forces should describe response time to an incident, and if the response time is not reasonable, additional controls should be described to ensure sufficient time for effective intervention [[S7]].\n\n- REGDOC-2.12.1 is referenced as the document containing criteria for nuclear security systems and devices at high-security sites [[S4]].\n\nFor detailed and specific requirements on the size and response times of the nuclear response force at high-security sites, the actual text of REGDOC-2.12.1 should be consulted, as the indexed snippets do not provide those details directly."
+			},
+			{
+				"id": "ho-rg834-with-rg838",
+				"category": "absent-doc",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 8.34 §C.1.1",
+					"RG 8.34 §C.1.2",
+					"RG 8.34 §C.2.1",
+					"RG 8.34 §A"
+				],
+				"authority_flags": [
+					{
+						"sentence": "- External monitoring is required for adults likely to receive an occupational dose in excess of 10 percent of the adult’s annual dose limits, for any individual entering a high or very high radiation area, and for assessment of unplanned, unintended doses when monitoring was not provided [[S1]].",
+						"cited": [
+							"RG 8.34 §C.1.1"
+						]
+					},
+					{
+						"sentence": "- For internal exposure, monitoring is required for adults likely to receive in 1 year an intake exceeding 10 percent of the applicable ALIs, for minors likely to receive a CEDE exceeding 0.1 rem (1 mSv) in 1 year, and for declared pregnant workers (DPWs) likely to receive a CEDE exceeding 0.1 rem (",
+						"cited": [
+							"RG 8.34 §C.1.2"
+						]
+					},
+					{
+						"sentence": "- External exposure monitoring is specifically required for adults likely to exceed any of the following annual doses (evaluated separately): 0.5 rem (5 mSv) TEDE, 5 rem (50 mSv) TODE, 1.5 rem (15 mSv) LDE, 5 rem (50 mSv) SDE to skin or extremities; for DPWs likely to exceed 0.1 rem (1 mSv) DDE duri",
+						"cited": [
+							"RG 8.34 §C.1.2"
+						]
+					}
+				],
+				"ms": 4308,
+				"answer": "Regulatory Guide 8.34 states the following monitoring criteria for when workers need individual dosimetry:\n\n- External monitoring is required for adults likely to receive an occupational dose in excess of 10 percent of the adult’s annual dose limits, for any individual entering a high or very high radiation area, and for assessment of unplanned, unintended doses when monitoring was not provided [[S1]].\n\n- For internal exposure, monitoring is required for adults likely to receive in 1 year an intake exceeding 10 percent of the applicable ALIs, for minors likely to receive a CEDE exceeding 0.1 rem (1 mSv) in 1 year, and for declared pregnant workers (DPWs) likely to receive a CEDE exceeding 0.1 rem (1 mSv) during the entire gestation period [[S3]][[S7]].\n\n- Licensees should evaluate potential exposure scenarios to determine if annual doses are likely to exceed monitoring criteria and may establish routine operational guidelines for categories of workers based on anticipated area access or work functions [[S2]].\n\n- External exposure monitoring is specifically required for adults likely to exceed any of the following annual doses (evaluated separately): 0.5 rem (5 mSv) TEDE, 5 rem (50 mSv) TODE, 1.5 rem (15 mSv) LDE, 5 rem (50 mSv) SDE to skin or extremities; for DPWs likely to exceed 0.1 rem (1 mSv) DDE during pregnancy; for minors likely to exceed 0.1 rem (1 mSv) DDE, 0.15 rem (1.5 mSv) LDE, or 0.5 rem (5 mSv) SDE to skin or extremities; and for all individuals entering a high or very high radiation area [[S7]].\n\nRegarding Regulatory Guide 8.38, it is not covered in the indexed regulatory documents provided, so I do not have enough information from the indexed regulatory documents to answer what RG 8.38 says about controlling access to high and very high radiation areas [[S4]][[S5]].\n\n_Legal-force note: RG 8.34 §C.1.1; RG 8.34 §C.1.2 are non-binding guidance. Where this answer says \"required\" or \"must\" citing only them, the binding obligation, if there is one, comes from the regulation or licence condition the guidance explains — check that source before relying on it._"
+			},
+			{
+				"id": "ho-pinned-onr-asks-nrc",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "notice:pinned_mismatch",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 2,
+				"answer": "Sources are pinned to ONR (United Kingdom), but your question asks about NRC (United States) — outside the selected sources. Switch the source selector to NRC or Auto to search it."
+			},
+			{
+				"id": "ho-cask-vendor-france",
+				"category": "incidental-country",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "single:nrc",
+				"cited": [
+					"RG 3.61 §10.1",
+					"RG 3.61 p. 1",
+					"NUREG-2215 §A"
+				],
+				"authority_flags": [],
+				"ms": 4168,
+				"answer": "The U.S. NRC expects a Topical Safety Analysis Report (TSAR) for a spent fuel dry storage cask to include the following key elements:\n\n- A complete, in-depth analysis of all relevant subjects, demonstrating the degree of skill, care, and effort used in planning all aspects of the project.\n- A description with all pertinent technical information and a safety assessment of the design bases of the cask and its components, detailed enough for the NRC staff to make an independent evaluation.\n- A detailed description of the quality assurance program associated with design and fabrication activities, including identification of components and systems to which it applies.\n- An analysis of anticipated operations, including consideration of human error, covering:\n  1. Preoperational tests,\n  2. Anticipated operations and maintenance,\n  3. Potential limiting conditions on the use of the cask, including limiting specifications on the fuel to be stored,\n  4. Considerations for facilitating decommissioning.\n- An analysis of the cask design in terms of potential hazards and the means employed to protect against these hazards, including associated margins of safety. This includes evaluating:\n  1. The cask's vulnerability to accidents during operations and from natural phenomena,\n  2. Radiation shielding,\n  3. Confinement and control of radioactive materials,\n  4. Reliability of the systems important to safety,\n  5. The radiological impact associated with normal operations, off-normal conditions, and accidents.\n- The TSAR should serve as the principal technical communication between the cask vendor and the NRC, establishing the design of the cask and plans for its use.\n- The TSAR should be updated if any changes in the cask design are made after submittal but before NRC review completion, to reflect the actual design.\n- While there is no regulatory requirement to submit a TSAR, the NRC staff uses it in the Safety Analysis Report (SAR) required under 10 CFR Part 72, and referencing an accepted TSAR can reduce license applicants' time, effort, and costs.\n\nThese expectations are described in NRC Regulatory Guide 3.61, which provides nonbinding guidance on the standard format and content for a TSAR for a spent fuel dry storage cask [[S1]][[S2]][[S3]][[S4]].\n\nAdditionally, the NRC staff reviews the SAR and TSAR to ensure compliance with 10 CFR Part 72 and related regulations, including radiation protection standards in 10 CFR Part 20, and evaluates the design, fabrication, and operational safety of the cask system [[S5]]."
+			},
+			{
+				"id": "ho-iaea-gsr7-text",
+				"category": "notice",
+				"pass": true,
+				"reason": "ok",
+				"split": "blind",
+				"scope_key": "notice:reference_only",
+				"cited": [],
+				"authority_flags": [],
+				"ms": 2,
+				"answer": "IAEA safety standards are catalogued as reference links only — their text is not stored here, so quoting them is outside the selected sources. This assistant currently answers from: CNSC (Canada), NRC (United States), ONR (United Kingdom) and EU / Euratom (European Union)."
+			}
+		]
+	}
+}

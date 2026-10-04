@@ -74,6 +74,31 @@ export function logRequest(fields: RequestLogFields): void {
 	emit("request", fields);
 }
 
+// One line per streamed answer, written when the stream FINISHES. The
+// request line above is emitted by withGuard as soon as the handler returns
+// its streaming Response — before the model has produced a token — so
+// anything known only at the end of the stream (output tokens, citation
+// validity) cannot ride on it. No user content, same hashing rules.
+export interface StreamEndFields {
+	route: string;
+	ip_hash: string;
+	tier: Tier;
+	user_hash?: string;
+	corpus_version?: string;
+	scope_key?: string;
+	output_tokens: number;
+	citations_total: number;
+	citations_unresolved: number;
+	/** v2: sentences with obligation language citing only nonbinding sources. */
+	authority_flags?: number;
+	output_guard_tripped: boolean;
+	cached_write: boolean;
+}
+
+export function logStreamEnd(fields: StreamEndFields): void {
+	emit("stream_end", fields);
+}
+
 export type GuardReason =
 	| "rate_limit"
 	| "rate_limit_degraded"

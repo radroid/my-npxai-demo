@@ -31,13 +31,15 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
-import { get_encoding } from "tiktoken";
 import { EMBEDDING_DIMENSIONS, OPENAI_MODELS } from "../lib/openai";
+import {
+	type Chunk,
+	type ChunkingStats,
+	chunkDoc,
+	type Doc,
+	freeEncoder,
+} from "./lib/chunker";
 
-const CHUNK_TARGET_TOKENS = 400;
-const CHUNK_OVERLAP_TOKENS = 60;
-const CHUNK_MIN_TOKENS = 40; // skip tiny orphan chunks (ToC remnants, etc.)
-const CHUNK_HARD_MAX_TOKENS = 700; // safety cap
 const EMBED_BATCH_SIZE = 100;
 const INSERT_BATCH_SIZE = 500;
 // Single source of truth: same model + dims the query path (lib/retrieval.ts)
@@ -61,189 +63,8 @@ function isLocalSupabaseUrl(url: string): boolean {
 	}
 }
 
-type ScrapedRequirementType = "informational" | "guidance" | "requirement";
-
-interface Paragraph {
-	text: string;
-	paragraph_number?: string;
-	requirement_type?: ScrapedRequirementType;
-}
-
-interface Section {
-	section_number: string;
-	section_title: string;
-	anchor?: string;
-	paragraphs: Paragraph[];
-}
-
-interface Doc {
-	regdoc_id: string;
-	title: string;
-	url: string;
-	source_type?: string;
-	scraped_at?: string;
-	sections: Section[];
-}
-
-interface Chunk {
-	regdoc_id: string;
-	title: string;
-	section_number: string | null;
-	section_title: string | null;
-	chunk_text: string;
-	chunk_index: number;
-	url: string | null;
-	requirement_type: "requirement" | "guidance";
-}
-
-// Appendix C.3 requirement-vs-guidance classifier. Run against the fully
-// assembled chunk, so it's robust to paragraph-boundary overlap.
-const REQUIREMENT_MARKERS = [
-	/\bshall\b/i,
-	/\bmust\b/i,
-	/\brequired to\b/i,
-	/\bis required\b/i,
-];
-const GUIDANCE_MARKERS = [
-	/\bshould\b/i,
-	/\bmay\b/i,
-	/\bis recommended\b/i,
-	/\bit is expected that\b/i,
-];
-
-function classifyRequirement(text: string): "requirement" | "guidance" {
-	if (REQUIREMENT_MARKERS.some((re) => re.test(text))) return "requirement";
-	if (GUIDANCE_MARKERS.some((re) => re.test(text))) return "guidance";
-	return "guidance";
-}
-
-const encoder = get_encoding("cl100k_base");
-function countTokens(text: string): number {
-	return encoder.encode(text).length;
-}
-
-// Sentence splitter — breaks on sentence terminators followed by whitespace
-// then a capital letter / digit / open-quote. Conservative; if it misses a
-// boundary, the chunker will still flush when the token budget is hit.
-function splitSentences(text: string): string[] {
-	const parts = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(])/);
-	return parts.map((s) => s.trim()).filter((s) => s.length > 0);
-}
-
-function assembleSectionText(section: Section): string {
-	return section.paragraphs
-		.map((p) => p.text?.trim() ?? "")
-		.filter((t) => t.length > 0)
-		.join("\n\n");
-}
-
-function buildSectionUrl(section: Section, doc: Doc): string {
-	if (section.anchor && section.anchor.length > 0) {
-		return `${doc.url}#${section.anchor}`;
-	}
-	return doc.url;
-}
-
-interface ChunkingStats {
-	totalSections: number;
-	emptySections: number;
-	chunksEmitted: number;
-	skippedTiny: number;
-}
-
-function chunkDoc(doc: Doc, stats: ChunkingStats): Chunk[] {
-	const out: Chunk[] = [];
-	let chunkIndex = 0;
-
-	for (const section of doc.sections) {
-		stats.totalSections++;
-		const sectionText = assembleSectionText(section);
-		if (!sectionText) {
-			stats.emptySections++;
-			continue;
-		}
-
-		const url = buildSectionUrl(section, doc);
-		const sentences = splitSentences(sectionText);
-
-		let bufferSentences: string[] = [];
-		let bufferTokens = 0;
-
-		const flush = () => {
-			if (bufferSentences.length === 0) return;
-			const text = bufferSentences.join(" ").trim();
-			const tokens = countTokens(text);
-			if (tokens < CHUNK_MIN_TOKENS) {
-				stats.skippedTiny++;
-				return;
-			}
-			out.push({
-				regdoc_id: doc.regdoc_id,
-				title: doc.title,
-				section_number: section.section_number?.length ? section.section_number : null,
-				section_title: section.section_title?.length ? section.section_title : null,
-				chunk_text: text,
-				chunk_index: chunkIndex++,
-				url,
-				requirement_type: classifyRequirement(text),
-			});
-			stats.chunksEmitted++;
-		};
-
-		for (const sentence of sentences) {
-			const sentTokens = countTokens(sentence);
-
-			// Overflow guard: even a single sentence can exceed the target.
-			// Emit what we have, then emit the oversized sentence as its own chunk.
-			if (sentTokens > CHUNK_HARD_MAX_TOKENS) {
-				flush();
-				bufferSentences = [];
-				bufferTokens = 0;
-				out.push({
-					regdoc_id: doc.regdoc_id,
-					title: doc.title,
-					section_number: section.section_number?.length ? section.section_number : null,
-					section_title: section.section_title?.length ? section.section_title : null,
-					chunk_text: sentence,
-					chunk_index: chunkIndex++,
-					url,
-					requirement_type: classifyRequirement(sentence),
-				});
-				stats.chunksEmitted++;
-				continue;
-			}
-
-			if (
-				bufferTokens + sentTokens > CHUNK_TARGET_TOKENS &&
-				bufferTokens >= CHUNK_TARGET_TOKENS - 100
-			) {
-				flush();
-
-				// Retain the trailing CHUNK_OVERLAP_TOKENS worth of sentences
-				// as the seed of the next chunk.
-				const overlap: string[] = [];
-				let overlapTokens = 0;
-				for (let i = bufferSentences.length - 1; i >= 0; i--) {
-					const s = bufferSentences[i]!;
-					const t = countTokens(s);
-					if (overlapTokens + t > CHUNK_OVERLAP_TOKENS) break;
-					overlap.unshift(s);
-					overlapTokens += t;
-				}
-				bufferSentences = overlap;
-				bufferTokens = overlapTokens;
-			}
-
-			bufferSentences.push(sentence);
-			bufferTokens += sentTokens;
-		}
-
-		flush();
-	}
-
-	return out;
-}
-
+// Chunking (Appendix C.3/C.4) lives in scripts/lib/chunker.ts, shared with
+// the Phase 12 manifest-driven publisher so the two paths cannot drift.
 async function embedBatch(client: OpenAI, texts: string[]): Promise<number[][]> {
 	let attempt = 0;
 	let delay = 1000;
@@ -344,7 +165,7 @@ async function main() {
 	}
 
 	if (DRY_RUN) {
-		encoder.free();
+		freeEncoder();
 		console.log("\n--dry-run: stopping before API/DB writes.");
 		console.log("Sample chunk:");
 		console.log(JSON.stringify(allChunks[0], null, 2).slice(0, 600));
@@ -505,12 +326,12 @@ async function main() {
 		}
 	}
 
-	encoder.free();
+	freeEncoder();
 	console.log("\n✅ Ingestion complete");
 }
 
 main().catch((err) => {
-	encoder.free();
+	freeEncoder();
 	console.error(err);
 	process.exit(1);
 });

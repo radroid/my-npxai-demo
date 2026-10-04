@@ -6,9 +6,15 @@
 // shared pipeline lives here in lib/.
 
 import type OpenAI from "openai";
-import type { RetrievedChunk } from "./context-envelope";
+import type { RetrievedChunk, SourceMeta } from "./context-envelope";
 import { type GuardedHandlerArgs, recordOpenAICall } from "./guard";
 import { EMBEDDING_DIMENSIONS, OPENAI_MODELS } from "./openai";
+import type {
+	CollectionId,
+	DocumentKind,
+	DocumentStatus,
+	LegalForce,
+} from "./sources/catalog";
 
 // D.3 fallback thresholds. Calibrated 2026-04-17 against scripts/probe-sims.ts:
 // LOW_SIM_OOS=0.40 lets single-word corpus-relevant queries (Q20 "turnover" at
@@ -31,6 +37,25 @@ export const MIN_CHUNK_SIM = 0.35;
 // in the user query. Calibrated so that a named-doc chunk at sim 0.55
 // ranks above an unrelated-doc chunk at sim 0.70.
 export const NAMED_DOC_BOOST = 0.2;
+// v2 named-document fetch (retrieveChunks, source.docRefGroups).
+const NAMED_DOC_FETCH_DOCS = 4;
+const NAMED_DOC_FETCH_PER_DOC = 2;
+// Expansion searches per question. Every eval question in the repo (333,
+// legacy and v2) produces at most 4, and for those the expansion list is
+// unchanged; the cap only bounds a crafted query that names dozens of
+// documents, which would otherwise mean one embedding input and one vector
+// scan per mention (legacy included — it is the same cost surface).
+export const MAX_EXPANSIONS = 6;
+// The binding-presence pass (source.bindingRefs): admit the best binding
+// chunk only when it is this close to the top match (and above the OOS
+// gate). Measured on the NRC eval questions (2026-10-01): every binding
+// chunk within 0.2 was the governing provision — 20.1201 for dose limits
+// (gaps 0.007-0.144), 20.1502 for monitoring (0.10-0.13), 20.1301 for
+// public dose (0.13); a 0.1 gap would drop the pinned dose-limit question
+// back to an all-guidance envelope.
+const BINDING_PRESENCE_GAP = 0.2;
+// match_source_chunks reads at most doc_refs[1:10].
+const DOC_REFS_PER_CALL = 10;
 
 // Recognizes "REGDOC-X.X", "REGDOC-X.X.X", "REGDOC 2.5.2", "NSCA" in user
 // query text. Returns the canonical regdoc_id form.
@@ -56,16 +81,133 @@ const CONCEPT_DOC_HINTS: Array<[RegExp, string]> = [
 // embeds very weakly against verbose natural-language questions.
 const QUERY_SECTION_RE = /(?:§|\bsection\s+|\bs\.\s*)(\d+(?:\.\d+){0,3})\b/gi;
 
-function extractMentionedDocs(query: string): Set<string> {
+// v2 (multi-source) document references, keyed by the collection whose
+// doc_ref grammar they produce. Each canonical form below is exactly the
+// `doc_ref` the source register stores for that document, so a mention can
+// boost its chunks the same way a REGDOC mention boosts CNSC chunks.
+//   NRC:  "RG 1.21", "NUREG-1575", "10 CFR 20.1201" — or a whole part,
+//         "10 CFR 20", which boosts every provision in that part.
+//   ONR:  "ONR SAPs", "NS-TAST-GD-005".
+//   EU:   "Directive 2009/71/Euratom".
+const V2_DOC_PATTERNS: Array<{
+	collection: CollectionId;
+	re: RegExp;
+	canon: (m: RegExpMatchArray) => string;
+}> = [
+	{
+		collection: "nrc",
+		re: /\b(?:RG|Reg(?:ulatory)?\.?\s+Guide)\s?(\d{1,2}\.\d{1,3})\b/gi,
+		canon: (m) => `RG ${m[1]}`,
+	},
+	{
+		collection: "nrc",
+		re: /\bNUREG[\s-]?(\d{3,4})\b/gi,
+		canon: (m) => `NUREG-${m[1]}`,
+	},
+	{
+		collection: "nrc",
+		re: /\b10\s*C\.?F\.?R\.?\s*(?:Part\s+|§\s*)?(\d{1,3})(?:\.(\d{1,4}))?\b/gi,
+		canon: (m) => (m[2] ? `10 CFR ${m[1]}.${m[2]}` : `10 CFR ${m[1]}`),
+	},
+	{
+		collection: "onr",
+		re: /\b(?:SAPs|Safety Assessment Principles)\b/gi,
+		canon: () => "ONR SAPs",
+	},
+	{
+		collection: "onr",
+		re: /\bNS-TAST-GD-(\d{3})\b/gi,
+		canon: (m) => `NS-TAST-GD-${m[1]}`,
+	},
+	{
+		collection: "eu",
+		re: /\bDirective\s+(\d{4})\/(\d{1,3})(?:\/Euratom)?\b/gi,
+		canon: (m) => `Directive ${m[1]}/${m[2]}/Euratom`,
+	},
+];
+
+// `collections` undefined = the legacy CNSC-only corpus: byte-identical to
+// the pre-Phase-12 extractor. Defined = the v2 corpus: CNSC grammar and CNSC
+// concept hints apply only when CNSC is in scope (an NRC-scoped answer must
+// never be told it "spans REGDOC-2.7.1"), and each other collection's
+// grammar only when that collection is in scope.
+function extractMentionedDocs(
+	query: string,
+	collections?: readonly CollectionId[],
+	withConceptHints = true,
+): Set<string> {
 	const out = new Set<string>();
-	for (const m of query.matchAll(QUERY_DOC_RE)) {
-		if (m[1]) out.add(`REGDOC-${m[1]}`);
-		else if (m[2]) out.add("NSCA");
+	const cnscInScope = !collections || collections.includes("cnsc");
+	if (cnscInScope) {
+		for (const m of query.matchAll(QUERY_DOC_RE)) {
+			if (m[1]) out.add(`REGDOC-${m[1]}`);
+			else if (m[2]) out.add("NSCA");
+		}
+		if (withConceptHints) {
+			for (const [re, doc] of CONCEPT_DOC_HINTS) {
+				if (re.test(query)) out.add(doc);
+			}
+		}
 	}
-	for (const [re, doc] of CONCEPT_DOC_HINTS) {
-		if (re.test(query)) out.add(doc);
+	if (collections) {
+		for (const p of V2_DOC_PATTERNS) {
+			if (!collections.includes(p.collection)) continue;
+			for (const m of query.matchAll(p.re)) out.add(p.canon(m));
+		}
 	}
 	return out;
+}
+
+/**
+ * Documents the question NAMES ("10 CFR 73.54", "REGDOC-2.3.4") — the
+ * mentions without the concept hints, which are inferred, not named. The v2
+ * envelope uses this to tell the model which named documents have no
+ * snippet, so it says so instead of attributing to them.
+ */
+export function extractNamedDocs(
+	query: string,
+	collections: readonly CollectionId[],
+): string[] {
+	// The same grammar as extractMentionedDocs (without concept hints), but
+	// ordered by where each document appears in the question: the named-doc
+	// fetch is capped, and the cap must drop the LAST-named documents, not
+	// whichever pattern happens to be checked last.
+	const found: Array<{ doc: string; at: number }> = [];
+	if (collections.includes("cnsc")) {
+		for (const m of query.matchAll(QUERY_DOC_RE)) {
+			if (m[1]) found.push({ doc: `REGDOC-${m[1]}`, at: m.index ?? 0 });
+			else if (m[2]) found.push({ doc: "NSCA", at: m.index ?? 0 });
+		}
+	}
+	for (const p of V2_DOC_PATTERNS) {
+		if (!collections.includes(p.collection)) continue;
+		for (const m of query.matchAll(p.re))
+			found.push({ doc: p.canon(m), at: m.index ?? 0 });
+	}
+	return [...new Set(found.sort((a, b) => a.at - b.at).map((f) => f.doc))];
+}
+
+// Does a chunk's doc ref satisfy a mentioned ref? Exact match, plus one
+// widening: a CFR PART mention ("10 CFR 20") matches every provision in it
+// ("10 CFR 20.1201"). Legacy refs (REGDOC-*, NSCA) never start with "10 CFR",
+// so on the legacy path this is exactly the old Set.has() check.
+// A mention names a document or a family of them: "10 CFR 20" covers
+// "10 CFR 20.1201"; "10 CFR 50" also covers "10 CFR 50 App. B"; a
+// multi-volume "NUREG-1757" covers "NUREG-1757 Vol. 2".
+export function refMatchesMention(ref: string, mention: string): boolean {
+	if (ref === mention) return true;
+	if (/^10 CFR \d+$/.test(mention)) {
+		return ref.startsWith(`${mention}.`) || ref.startsWith(`${mention} `);
+	}
+	return /^NUREG-\d+$/.test(mention) && ref.startsWith(`${mention} Vol.`);
+}
+
+function isMentioned(ref: string, mentioned: ReadonlySet<string>): boolean {
+	if (mentioned.has(ref)) return true;
+	for (const m of mentioned) {
+		if (refMatchesMention(ref, m)) return true;
+	}
+	return false;
 }
 
 function extractMentionedSections(query: string): string[] {
@@ -140,23 +282,48 @@ function buildExpansions(
 	query: string,
 	docs: Set<string>,
 	sections: string[],
+	named: ReadonlySet<string> = docs,
 ): string[] {
 	if (docs.size === 0) return [];
 	const noun = pickContextNoun(query);
 	const conceptSeeds = CONCEPT_EXPANSIONS.filter((c) => c.re.test(query)).map(
 		(c) => c.seed,
 	);
-	const out: string[] = [];
+	const perDoc: Array<{ focused: string[]; broad: string; named: boolean }> =
+		[];
 	for (const doc of docs) {
+		const focused: string[] = [];
 		if (sections.length > 0) {
 			for (const s of sections) {
-				out.push(noun ? `${doc} section ${s} ${noun}` : `${doc} section ${s}`);
+				focused.push(
+					noun ? `${doc} section ${s} ${noun}` : `${doc} section ${s}`,
+				);
 			}
 		}
-		for (const seed of conceptSeeds) out.push(`${doc} ${seed}`);
-		out.push(`${doc} ${query}`);
+		for (const seed of conceptSeeds) focused.push(`${doc} ${seed}`);
+		perDoc.push({ focused, broad: `${doc} ${query}`, named: named.has(doc) });
 	}
-	return out;
+	const out = perDoc.flatMap((d) => [...d.focused, d.broad]);
+	// Under the cap (every real question): exactly the historical list. Over
+	// it (a crafted or very long multi-document query): each document's
+	// BROAD expansion first — documents the question names before ones a
+	// concept hint inferred — then focused ones round-robin in the same
+	// order (detection order: CNSC REGDOCs, then other collections' ids).
+	// Past MAX_EXPANSIONS named documents, the last-detected get none.
+	if (out.length <= MAX_EXPANSIONS) return out;
+	const order = [
+		...perDoc.filter((d) => d.named),
+		...perDoc.filter((d) => !d.named),
+	];
+	const capped = order.map((d) => d.broad).slice(0, MAX_EXPANSIONS);
+	for (let i = 0; capped.length < MAX_EXPANSIONS; i++) {
+		const round = order.flatMap((d) =>
+			i < d.focused.length ? [d.focused[i]] : [],
+		);
+		if (round.length === 0) break;
+		capped.push(...round.slice(0, MAX_EXPANSIONS - capped.length));
+	}
+	return capped;
 }
 
 // ADDITIVE (item-2 PR #8 fix round 2, issue 3 — WALLET): the EXACT list of
@@ -177,10 +344,14 @@ function buildExpansions(
 //
 // retrieveChunks builds its own inputs through this same function, so the eval's
 // count and production's call can never drift.
-export function embeddingInputsFor(query: string): string[] {
-	const docs = extractMentionedDocs(query);
+export function embeddingInputsFor(
+	query: string,
+	collections?: readonly CollectionId[],
+): string[] {
+	const docs = extractMentionedDocs(query, collections);
 	const sections = extractMentionedSections(query);
-	return [query, ...buildExpansions(query, docs, sections)];
+	const named = extractMentionedDocs(query, collections, false);
+	return [query, ...buildExpansions(query, docs, sections, named)];
 }
 
 // Doc-diversity pass: when multiple docs are mentioned, seed the envelope
@@ -198,7 +369,9 @@ function selectDiverseEnvelope(
 	const out: RetrievedChunk[] = [];
 	const seen = new Set<number>();
 	for (const doc of mustInclude) {
-		const top = sorted.find((c) => c.regdoc_id === doc && !seen.has(c.id));
+		const top = sorted.find(
+			(c) => refMatchesMention(c.regdoc_id, doc) && !seen.has(c.id),
+		);
 		if (top) {
 			out.push(top);
 			seen.add(top.id);
@@ -288,6 +461,21 @@ export interface RetrievalDeps {
 	recordUsage?: (costUsd?: number) => Promise<void>;
 }
 
+// D.3 gate values as one bundle so the v2 corpus can calibrate them per
+// collection (lib/sources/thresholds.ts). Omitted = the CNSC-calibrated
+// constants above, i.e. exactly the legacy behaviour.
+export interface RetrievalThresholds {
+	oos: number;
+	disclaimer: number;
+	minChunk: number;
+}
+
+export const DEFAULT_THRESHOLDS: RetrievalThresholds = {
+	oos: LOW_SIM_OOS,
+	disclaimer: LOW_SIM_DISCLAIMER,
+	minChunk: MIN_CHUNK_SIM,
+};
+
 export interface RetrievalOptions {
 	// Envelope size is the ONLY caller-tunable knob: chat keeps its
 	// calibrated 8 (ENVELOPE_CHUNKS above); the artifact route passes 12
@@ -297,6 +485,99 @@ export interface RetrievalOptions {
 	// RetrievalTrace for eval instrumentation. Neither production route sets
 	// this, so their behavior and result shape are unchanged.
 	withTrace?: boolean;
+	// ADDITIVE (Phase 12): search the multi-source corpus (source_chunks via
+	// match_source_chunks) restricted to these collections. Omitted = the
+	// legacy CNSC table via match_regdoc_chunks, unchanged.
+	source?: {
+		collections: readonly CollectionId[];
+		includeHistorical?: boolean;
+		/**
+		 * Register doc_refs of the documents the question NAMES that exist in
+		 * these collections, one group per mention ("10 CFR 20" → every
+		 * indexed Part 20 provision). One extra search per group (primary
+		 * vector, best two chunks) joins the pool, so "What do 10 CFR 20.1201
+		 * and … require?" — identifiers, no topic — still retrieves 20.1201's
+		 * own text.
+		 */
+		docRefGroups?: readonly (readonly string[])[];
+		/**
+		 * The collection's binding documents, set only for a collection that
+		 * mixes binding regulations with nonbinding guidance (NRC: 10 CFR +
+		 * RGs/NUREGs). A guide's paraphrase of a rule usually out-ranks the
+		 * rule's own short text — "compare NRC dose limits" retrieves four
+		 * RG 8.29 chunks and no 10 CFR 20.1201 — and the model then states a
+		 * "limit" from the guide's ICRP discussion. When the envelope has no
+		 * binding chunk, the best one within BINDING_PRESENCE_GAP of the top
+		 * match takes the last slot.
+		 */
+		bindingRefs?: readonly string[];
+	};
+	// ADDITIVE (Phase 12): per-collection gate values; see DEFAULT_THRESHOLDS.
+	thresholds?: RetrievalThresholds;
+	// ADDITIVE (Phase 12): vectors for this call's embedding inputs, keyed by
+	// input text (from embedTexts over embeddingInputsFor). When every input
+	// is present the call makes no embedding request and records no usage —
+	// the caller already did both.
+	precomputedEmbeddings?: ReadonlyMap<string, number[]>;
+}
+
+// One row of match_source_chunks (supabase/migrations/20261001000000_*).
+interface SourceMatchRow {
+	id: number;
+	document_key: string;
+	doc_ref: string;
+	label: string;
+	title: string;
+	publisher: string;
+	jurisdiction: string;
+	collection: CollectionId;
+	document_kind: DocumentKind;
+	legal_force: LegalForce;
+	edition: string | null;
+	status: DocumentStatus;
+	as_of: string;
+	canonical_url: string;
+	attribution: string | null;
+	section_number: string | null;
+	section_title: string | null;
+	page_start: number | null;
+	page_end: number | null;
+	locator_url: string | null;
+	chunk_text: string;
+	requirement_type: "requirement" | "guidance" | null;
+	similarity: number;
+}
+
+function fromSourceRow(r: SourceMatchRow): RetrievedChunk {
+	const source: SourceMeta = {
+		document_key: r.document_key,
+		ref: r.doc_ref,
+		label: r.label,
+		title: r.title,
+		publisher: r.publisher,
+		jurisdiction: r.jurisdiction,
+		collection: r.collection,
+		document_kind: r.document_kind,
+		legal_force: r.legal_force,
+		edition: r.edition,
+		status: r.status,
+		as_of: r.as_of,
+		canonical_url: r.canonical_url,
+		page_start: r.page_start,
+		page_end: r.page_end,
+		attribution: r.attribution,
+	};
+	return {
+		id: r.id,
+		regdoc_id: r.doc_ref,
+		section_number: r.section_number,
+		section_title: r.section_title,
+		chunk_text: r.chunk_text,
+		url: r.locator_url ?? r.canonical_url,
+		requirement_type: r.requirement_type,
+		similarity: r.similarity,
+		source,
+	};
 }
 
 // ADDITIVE (item-2 DELTA D1): one entry per candidate chunk in the merged
@@ -328,6 +609,10 @@ export interface RetrievalTrace {
 	pool: TracePoolEntry[];
 	// ADDITIVE (item-2 PR #8 fix round 2, issue 2).
 	stages: RetrievalStages;
+	// ADDITIVE (Phase 12): the gate values this retrieval ran with, so replays
+	// (deriveEnvelopeAtK et al.) use the same ones. Absent on traces captured
+	// before Phase 12 — readers fall back to DEFAULT_THRESHOLDS.
+	thresholds?: RetrievalThresholds;
 }
 
 // ADDITIVE (item-2 PR #8 fix round 2, issue 2): the pipeline's three DISTINCT
@@ -390,10 +675,11 @@ export function envelopeIdsAtK(trace: RetrievalTrace, k: number): number[] {
 // order, so restore cosine order via rankPreBoost before filtering.
 export function postFilterRankedIdsFromTrace(trace: RetrievalTrace): number[] {
 	if (trace.decision === "oos") return [];
+	const minChunk = (trace.thresholds ?? DEFAULT_THRESHOLDS).minChunk;
 	return trace.pool
 		.slice()
 		.sort((a, b) => a.rankPreBoost - b.rankPreBoost)
-		.filter((e) => e.similarity >= MIN_CHUNK_SIM)
+		.filter((e) => e.similarity >= minChunk)
 		.map((e) => e.chunk.id);
 }
 
@@ -406,10 +692,11 @@ export function deriveEnvelopeAtK(
 	trace: RetrievalTrace,
 	k: number,
 ): RetrievedChunk[] {
+	const t = trace.thresholds ?? DEFAULT_THRESHOLDS;
 	const ranked = trace.pool.map((e) => e.chunk);
-	if (trace.topSim < LOW_SIM_OOS) return ranked;
+	if (trace.topSim < t.oos) return ranked;
 	return selectDiverseEnvelope(
-		ranked.filter((c) => c.similarity >= MIN_CHUNK_SIM),
+		ranked.filter((c) => c.similarity >= t.minChunk),
 		new Set(trace.mentionedDocs),
 		k,
 	);
@@ -433,40 +720,31 @@ export interface RetrievalResult {
 	mentionedDocs: string[];
 }
 
-export async function retrieveChunks(
-	query: string,
+/**
+ * Embed `inputs` (one OpenAI call) and record it against the daily
+ * circuit breaker. retrieveChunks' own embedding step, exported so compare
+ * mode can embed every side's inputs at once and pass the vectors in.
+ */
+export async function embedTexts(
+	inputs: string[],
 	deps: RetrievalDeps,
-	opts: RetrievalOptions,
-): Promise<RetrievalResult> {
-	const { supabase, openai } = deps;
-
-	const mentionedDocs = extractMentionedDocs(query);
-	const mentionedSections = extractMentionedSections(query);
-
-	// Build the list of embedding inputs. The primary input is always the
-	// original user query; additional "doc-focused" inputs are emitted for
-	// each mentioned doc so that chunks in heavy-legal or glossary docs
-	// (NSCA §48, REGDOC-3.5.3 §5.4) can surface even when they embed
-	// weakly against the verbose natural-language question.
-	//
-	// Routed through embeddingInputsFor() (fix round 2, issue 3) so the eval
-	// cost accountant charges the SAME list this call actually sends — one
-	// source of truth, no drift, no guessed multiplier.
-	const embedInputs = embeddingInputsFor(query);
-	const expansions = embedInputs.slice(1);
-
+): Promise<number[][]> {
+	const { openai } = deps;
 	let embeddings: number[][];
 	try {
 		const embResp = await openai.embeddings.create({
 			model: OPENAI_MODELS.embedding,
-			input: embedInputs,
+			input: inputs,
 			// FULL 3072 dims — must match the corpus embeddings written by
 			// scripts/ingest.ts and the halfvec(3072) column, or cosine search
 			// silently compares vectors from different spaces.
 			dimensions: EMBEDDING_DIMENSIONS,
 		});
-		embeddings = embResp.data.map((d) => d.embedding);
-		if (embeddings.length !== embedInputs.length) {
+		// By index, not position: compare mode maps these back to inputs.
+		embeddings = [...embResp.data]
+			.sort((a, b) => a.index - b.index)
+			.map((d) => d.embedding);
+		if (embeddings.length !== inputs.length) {
 			throw new Error("embedding count mismatch");
 		}
 	} catch (err) {
@@ -497,21 +775,165 @@ export async function retrieveChunks(
 		if (isCostCapError(err)) throw err;
 		console.error("retrieval_accounting_unavailable", err);
 	}
+	return embeddings;
+}
+
+// See RetrievalOptions.source.bindingRefs. Pure; a no-op on the legacy path
+// (no binding rows are ever fetched there). Never displaces the top chunk of
+// a document the question names (the named and diversity picks): a full
+// envelope gives up its lowest-ranked other chunk — possibly a named
+// document's second or later chunk, so "what does RG 8.29 say…" can still
+// carry the Part 20 provision the guide explains.
+export function withBindingPresence(
+	envelope: RetrievedChunk[],
+	bindingRows: readonly RetrievedChunk[],
+	topSim: number,
+	t: RetrievalThresholds,
+	size: number,
+	mentionedDocs: ReadonlySet<string> = new Set(),
+): RetrievedChunk[] {
+	if (bindingRows.length === 0) return envelope;
+	if (envelope.some((c) => c.source?.legal_force === "binding"))
+		return envelope;
+	const best = [...bindingRows].sort((a, b) => b.similarity - a.similarity)[0];
+	if (
+		!best ||
+		best.similarity < t.minChunk ||
+		best.similarity < t.oos ||
+		best.similarity < topSim - BINDING_PRESENCE_GAP ||
+		envelope.some((c) => c.id === best.id)
+	)
+		return envelope;
+	if (envelope.length < size) return [...envelope, best];
+	const protectedIdx = new Set<number>();
+	const seenDocs = new Set<string>();
+	envelope.forEach((c, i) => {
+		if (!isMentioned(c.regdoc_id, mentionedDocs) || seenDocs.has(c.regdoc_id))
+			return;
+		seenDocs.add(c.regdoc_id);
+		protectedIdx.add(i);
+	});
+	let drop = -1;
+	for (let i = envelope.length - 1; i >= 0; i--) {
+		if (!protectedIdx.has(i)) {
+			drop = i;
+			break;
+		}
+	}
+	if (drop < 0) return envelope;
+	return [...envelope.slice(0, drop), ...envelope.slice(drop + 1), best];
+}
+
+export async function retrieveChunks(
+	query: string,
+	deps: RetrievalDeps,
+	opts: RetrievalOptions,
+): Promise<RetrievalResult> {
+	const { supabase } = deps;
+	const t = opts.thresholds ?? DEFAULT_THRESHOLDS;
+	const collections = opts.source?.collections;
+
+	const mentionedDocs = extractMentionedDocs(query, collections);
+	const mentionedSections = extractMentionedSections(query);
+
+	// Build the list of embedding inputs. The primary input is always the
+	// original user query; additional "doc-focused" inputs are emitted for
+	// each mentioned doc so that chunks in heavy-legal or glossary docs
+	// (NSCA §48, REGDOC-3.5.3 §5.4) can surface even when they embed
+	// weakly against the verbose natural-language question.
+	//
+	// Routed through embeddingInputsFor() (fix round 2, issue 3) so the eval
+	// cost accountant charges the SAME list this call actually sends — one
+	// source of truth, no drift, no guessed multiplier.
+	const embedInputs = embeddingInputsFor(query, collections);
+	const expansions = embedInputs.slice(1);
+
+	// Compare mode embeds every side's inputs in one call up front and hands
+	// the vectors in (opts.precomputedEmbeddings), so a 3-way comparison costs
+	// one embedding request and one circuit-breaker increment, not three.
+	const pre = opts.precomputedEmbeddings;
+	const embeddings =
+		pre && embedInputs.every((i) => pre.has(i))
+			? embedInputs.map((i) => pre.get(i) as number[])
+			: await embedTexts(embedInputs, deps);
+
+	// One vector search. Legacy: match_regdoc_chunks over the CNSC table,
+	// call shape unchanged. v2: match_source_chunks, which filters to the
+	// requested, publicly searchable, rights-cleared, current documents
+	// BEFORE ranking (supabase/migrations/20261001000000_*).
+	const match = async (
+		embedding: number[],
+		count: number,
+		docRefs?: readonly string[],
+	): Promise<{ rows: RetrievedChunk[]; error: unknown }> => {
+		if (!opts.source) {
+			const { data, error } = await supabase.rpc("match_regdoc_chunks", {
+				query_embedding: embedding,
+				match_count: count,
+				min_similarity: 0, // D.3 thresholds applied handler-side; keep RPC permissive
+			});
+			return { rows: (data ?? []) as RetrievedChunk[], error };
+		}
+		const { data, error } = await supabase.rpc("match_source_chunks", {
+			query_embedding: embedding,
+			collection_ids: [...opts.source.collections],
+			match_count: count,
+			min_similarity: 0,
+			include_historical: opts.source.includeHistorical === true,
+			...(docRefs && docRefs.length > 0 ? { doc_refs: [...docRefs] } : {}),
+		});
+		return {
+			rows: ((data ?? []) as SourceMatchRow[]).map(fromSourceRow),
+			error,
+		};
+	};
+	const rpcName = opts.source ? "match_source_chunks" : "match_regdoc_chunks";
+
+	// v2: each named document's own best chunks (see source.docRefGroups).
+	// A PRESENCE guarantee, not a flood: NAMED_DOC_BOOST applies to every
+	// chunk of a named document, so admitting 20 of them would crowd out
+	// better matches from other documents ("…under the NSCA and its
+	// regulations…" filled 5 of 8 slots with low-similarity NSCA sections).
+	// Two per named mention, at most four mentions. These and the binding-
+	// presence lookups need only the primary vector, so they run alongside
+	// the primary search rather than after it (no added latency). Each call
+	// settles to {rows, error}: a thrown fetch cannot become an unhandled
+	// rejection if the primary search fails first.
+	const namedGroups = (opts.source?.docRefGroups ?? [])
+		.filter((g) => g.length > 0)
+		.slice(0, NAMED_DOC_FETCH_DOCS)
+		.map((g) => g.slice(0, DOC_REFS_PER_CALL));
+	const bindingRefs = opts.source?.bindingRefs ?? [];
+	const bindingGroups: (readonly string[])[] = [];
+	for (let i = 0; i < bindingRefs.length; i += DOC_REFS_PER_CALL)
+		bindingGroups.push(bindingRefs.slice(i, i + DOC_REFS_PER_CALL));
+	const settle = (
+		p: Promise<{ rows: RetrievedChunk[]; error: unknown }>,
+	): Promise<{ rows: RetrievedChunk[]; error: unknown }> =>
+		p.catch((error: unknown) => ({ rows: [], error }));
+	const sideFetches =
+		namedGroups.length + bindingGroups.length > 0
+			? Promise.all([
+					Promise.all(
+						namedGroups.map((refs) =>
+							settle(match(embeddings[0], NAMED_DOC_FETCH_PER_DOC, refs)),
+						),
+					),
+					Promise.all(
+						bindingGroups.map((refs) => settle(match(embeddings[0], 1, refs))),
+					),
+				])
+			: null;
 
 	// Primary retrieval: 20 chunks by open cosine sim.
-	const { data: primaryMatches, error: rpcErr } = await supabase.rpc(
-		"match_regdoc_chunks",
-		{
-			query_embedding: embeddings[0],
-			match_count: MATCH_COUNT,
-			min_similarity: 0, // D.3 thresholds applied handler-side; keep RPC permissive
-		},
+	const { rows: primaryPool, error: rpcErr } = await match(
+		embeddings[0],
+		MATCH_COUNT,
 	);
 	if (rpcErr) {
-		console.error("match_regdoc_chunks_error", rpcErr);
+		console.error(`${rpcName}_error`, rpcErr);
 		throw new RetrievalError("match", rpcErr);
 	}
-	const primaryPool = (primaryMatches ?? []) as RetrievedChunk[];
 
 	// Secondary retrieval: one RPC per mentioned doc, using the expansion
 	// embedding. Merged into the pool below. We pull the max allowed (20)
@@ -519,19 +941,28 @@ export async function retrieveChunks(
 	// narrower queries — NSCA §48 is a known example.
 	const expansionPools: RetrievedChunk[][] = [];
 	for (let i = 0; i < expansions.length; i++) {
-		const { data: expMatches, error: expErr } = await supabase.rpc(
-			"match_regdoc_chunks",
-			{
-				query_embedding: embeddings[i + 1],
-				match_count: 20,
-				min_similarity: 0,
-			},
+		const { rows: expMatches, error: expErr } = await match(
+			embeddings[i + 1],
+			20,
 		);
 		if (expErr) {
-			console.error("match_regdoc_chunks_expansion_error", expErr);
+			console.error(`${rpcName}_expansion_error`, expErr);
 			continue;
 		}
-		expansionPools.push((expMatches ?? []) as RetrievedChunk[]);
+		expansionPools.push(expMatches);
+	}
+	const namedPools: RetrievedChunk[][] = [];
+	const bindingRows: RetrievedChunk[] = [];
+	if (sideFetches) {
+		const [named, binding] = await sideFetches;
+		for (const { rows, error } of named) {
+			if (error) console.error(`${rpcName}_named_doc_error`, error);
+			else namedPools.push(rows);
+		}
+		for (const { rows, error } of binding) {
+			if (error) console.error(`${rpcName}_binding_error`, error);
+			else bindingRows.push(...rows);
+		}
 	}
 
 	// Merge + dedupe by chunk.id, keeping the highest observed similarity.
@@ -539,6 +970,13 @@ export async function retrieveChunks(
 	for (const c of [...primaryPool, ...expansionPools.flat()]) {
 		const existing = merged.get(c.id);
 		if (!existing || c.similarity > existing.similarity) merged.set(c.id, c);
+	}
+	// The pool mean (limited-context gate) is taken BEFORE the named fetch:
+	// those rows are admitted at any similarity to guarantee presence, and
+	// must not drag the topical pool's average down.
+	const searchedPool = Array.from(merged.values());
+	for (const c of namedPools.flat()) {
+		if (!merged.has(c.id)) merged.set(c.id, c);
 	}
 	const rawPool = Array.from(merged.values()).sort(
 		(a, b) => b.similarity - a.similarity,
@@ -556,30 +994,45 @@ export async function retrieveChunks(
 		.map((c) => ({
 			chunk: c,
 			score:
-				c.similarity + (mentionedDocs.has(c.regdoc_id) ? NAMED_DOC_BOOST : 0),
+				c.similarity +
+				(isMentioned(c.regdoc_id, mentionedDocs) ? NAMED_DOC_BOOST : 0),
 		}))
 		.sort((a, b) => b.score - a.score)
 		.map((r) => r.chunk);
 
-	const chunks =
-		topSim < LOW_SIM_OOS
+	const selected =
+		topSim < t.oos
 			? ranked
 			: selectDiverseEnvelope(
-					ranked.filter((c) => c.similarity >= MIN_CHUNK_SIM),
+					ranked.filter((c) => c.similarity >= t.minChunk),
 					mentionedDocs,
 					opts.envelopeChunks,
+				);
+	const chunks =
+		topSim < t.oos
+			? selected
+			: withBindingPresence(
+					selected,
+					bindingRows,
+					topSim,
+					t,
+					opts.envelopeChunks,
+					mentionedDocs,
 				);
 	const avgSim =
 		chunks.length > 0
 			? chunks.reduce((acc, c) => acc + c.similarity, 0) / chunks.length
 			: 0;
-	// Raw-pool mean (see RetrievalResult.poolAvgSim). `ranked` is the full
-	// merged candidate pool — the NAMED_DOC_BOOST only reorders it, so the
-	// mean is identical to the pre-boost pool's. In the OOS branch this
-	// equals `avgSim` exactly (there `chunks` IS the full pool).
+	// Raw-pool mean (see RetrievalResult.poolAvgSim) over the searched pool:
+	// the merged candidates minus named-fetch-only rows. The legacy path has
+	// no named fetch, so there this is the full pool exactly as before; the
+	// NAMED_DOC_BOOST only reorders, so it never moves the mean.
+	// Summed in `ranked` order, so the legacy value is bit-identical too.
+	const searchedIds = new Set(searchedPool.map((c) => c.id));
+	const meanPool = ranked.filter((c) => searchedIds.has(c.id));
 	const poolAvgSim =
-		ranked.length > 0
-			? ranked.reduce((acc, c) => acc + c.similarity, 0) / ranked.length
+		meanPool.length > 0
+			? meanPool.reduce((acc, c) => acc + c.similarity, 0) / meanPool.length
 			: 0;
 
 	// ADDITIVE (item-2 DELTA D1): trace is built AFTER every production value
@@ -590,24 +1043,21 @@ export async function retrieveChunks(
 		const preBoostRank = new Map<number, number>(
 			rawPool.map((c, i) => [c.id, i + 1]),
 		);
-		const oos = topSim < LOW_SIM_OOS;
+		const oos = topSim < t.oos;
 		trace = {
 			query,
 			expansions,
 			mentionedDocs: Array.from(mentionedDocs),
 			mentionedSections,
 			topSim,
-			decision: oos
-				? "oos"
-				: avgSim < LOW_SIM_DISCLAIMER
-					? "disclaimer"
-					: "normal",
+			decision: oos ? "oos" : avgSim < t.disclaimer ? "disclaimer" : "normal",
 			pool: ranked.map((c, i) => ({
 				chunk: c,
 				similarity: c.similarity,
-				boosted: mentionedDocs.has(c.regdoc_id),
+				boosted: isMentioned(c.regdoc_id, mentionedDocs),
 				score:
-					c.similarity + (mentionedDocs.has(c.regdoc_id) ? NAMED_DOC_BOOST : 0),
+					c.similarity +
+					(isMentioned(c.regdoc_id, mentionedDocs) ? NAMED_DOC_BOOST : 0),
 				rankPreBoost: preBoostRank.get(c.id) ?? 0,
 				rankPostBoost: i + 1,
 			})),
@@ -621,11 +1071,10 @@ export async function retrieveChunks(
 				rawRankedIds: rawPool.map((c) => c.id),
 				postFilterRankedIds: oos
 					? []
-					: rawPool
-							.filter((c) => c.similarity >= MIN_CHUNK_SIM)
-							.map((c) => c.id),
+					: rawPool.filter((c) => c.similarity >= t.minChunk).map((c) => c.id),
 				envelopeIds: oos ? [] : chunks.map((c) => c.id),
 			},
+			...(opts.thresholds ? { thresholds: opts.thresholds } : {}),
 		};
 	}
 

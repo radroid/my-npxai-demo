@@ -1,0 +1,50 @@
+{"collection":"nrc","kind":"in","query":"What information should a licensee record on NRC Form 5 for an individual's occupational dose?"}
+{"collection":"nrc","kind":"in","query":"How should air sampling be used to estimate worker intakes of airborne radioactive material?"}
+{"collection":"nrc","kind":"in","query":"What does an effective ALARA program at a materials licensee look like according to NRC guidance?"}
+{"collection":"nrc","kind":"in","query":"What should workers be told about the risks of occupational radiation exposure?"}
+{"collection":"nrc","kind":"in","query":"What is the annual dose limit for individual members of the public from a licensed operation?"}
+{"collection":"nrc","kind":"in","query":"When must a licensee monitor an adult worker's external occupational dose?"}
+{"collection":"nrc","kind":"in","query":"What must a radiological environmental monitoring program for a nuclear power plant include?"}
+{"collection":"nrc","kind":"in","query":"What should a license termination plan for a power reactor contain?"}
+{"collection":"nrc","kind":"in","query":"How does MARSSIM define a final status survey and survey units?"}
+{"collection":"nrc","kind":"in","query":"What financial assurance methods are acceptable for decommissioning a materials licensee?"}
+{"collection":"nrc","kind":"in","query":"What planning standards must onsite and offsite emergency plans for a power reactor meet?"}
+{"collection":"nrc","kind":"in","query":"What are the numerical design objectives for limiting radioactive effluents from light-water reactors?"}
+{"collection":"nrc","kind":"in","query":"What does the standard review plan say about the thermal evaluation of dry storage casks?"}
+{"collection":"nrc","kind":"in","query":"How should bioassay measurements be interpreted to estimate a worker's intake?"}
+{"collection":"onr","kind":"in","query":"What does ONR expect a safety case to contain and how should it be structured?"}
+{"collection":"onr","kind":"in","query":"How does ONR judge whether risks have been reduced so far as is reasonably practicable?"}
+{"collection":"onr","kind":"in","query":"What are ONR's expectations for examination, inspection, maintenance and testing of items important to safety?"}
+{"collection":"onr","kind":"in","query":"How should a licensee assure the competence of personnel doing safety-related work?"}
+{"collection":"onr","kind":"in","query":"What are operating rules, limits and conditions for nuclear safety in ONR guidance?"}
+{"collection":"onr","kind":"in","query":"What is a design authority and what capability must a licensee retain?"}
+{"collection":"onr","kind":"in","query":"What numerical targets do the Safety Assessment Principles set for normal operation doses to workers?"}
+{"collection":"onr","kind":"in","query":"What do the Safety Assessment Principles say about leadership and management for safety?"}
+{"collection":"onr","kind":"in","query":"How do the Safety Assessment Principles describe design basis analysis of faults?"}
+{"collection":"onr","kind":"in","query":"What engineering principles cover redundancy, diversity and segregation in the SAPs?"}
+{"collection":"eu","kind":"in","query":"What does the Nuclear Safety Directive require for the independence of the national regulatory authority?"}
+{"collection":"eu","kind":"in","query":"What is the high-level nuclear safety objective introduced by Directive 2014/87/Euratom?"}
+{"collection":"eu","kind":"in","query":"What are the requirements for topical peer reviews under the amended Nuclear Safety Directive?"}
+{"collection":"eu","kind":"in","query":"What must a national programme for spent fuel and radioactive waste management include?"}
+{"collection":"eu","kind":"in","query":"What transparency obligations apply to nuclear safety information for the public under Euratom directives?"}
+{"collection":"eu","kind":"in","query":"Who bears prime responsibility for the safety of a nuclear installation under Euratom law?"}
+{"collection":"eu","kind":"in","query":"How often must Member States report to the Commission on implementing the radioactive waste directive?"}
+{"collection":"eu","kind":"in","query":"What does the Nuclear Safety Directive require for on-site emergency preparedness and response?"}
+{"collection":"*","kind":"oos","query":"What is the melting point of uranium-235?"}
+{"collection":"*","kind":"oos","query":"How should I handle my manager being unreasonable?"}
+{"collection":"*","kind":"oos","query":"What's a good recipe for sourdough bread?"}
+{"collection":"*","kind":"oos","query":"Who won the 2018 FIFA World Cup?"}
+{"collection":"*","kind":"oos","query":"How do I reverse a linked list in Python?"}
+{"collection":"*","kind":"oos","query":"What are the income tax brackets in Ontario?"}
+{"collection":"*","kind":"oos","query":"Explain how a car's automatic transmission works."}
+{"collection":"*","kind":"oos","query":"What is the capital of Australia?"}
+{"collection":"*","kind":"oos","query":"How do I treat a sprained ankle?"}
+{"collection":"*","kind":"oos","query":"What are the best practices for search engine optimization?"}
+{"collection":"*","kind":"oos","query":"Translate 'good morning' into Japanese."}
+{"collection":"*","kind":"oos","query":"What's the difference between a Roth IRA and a traditional IRA?"}
+{"collection":"nrc","kind":"near","query":"What does 10 CFR 73.54 require for cyber security at nuclear power plants?"}
+{"collection":"nrc","kind":"near","query":"What does 10 CFR Part 55 require for reactor operator licensing examinations?"}
+{"collection":"onr","kind":"near","query":"What does the Nuclear Industries Security Regulations require of a licensee?"}
+{"collection":"onr","kind":"near","query":"How does ONR regulate the road transport of radioactive material?"}
+{"collection":"eu","kind":"near","query":"What does the Euratom Basic Safety Standards Directive say about radon in homes?"}
+{"collection":"eu","kind":"near","query":"What are the EU rules on shipments of radioactive waste between Member States?"}

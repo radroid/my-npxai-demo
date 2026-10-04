@@ -1,0 +1,38 @@
+{
+	"id": "eu-dir-2009-71@oj-2009-07-02",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "f5606f93cb120d65c858e659a4488769242339d0e8672c8bdd0dea1595f0097b",
+	"chunks": 17,
+	"requirement_chunks": 11,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"Recitals",
+		"Art. 1 Objectives",
+		"Art. 2 Scope",
+		"Art. 3 Definitions",
+		"Art. 4 Legislative, regulatory and organisational framework",
+		"Art. 5 Competent regulatory authority",
+		"Art. 6 Licence holders",
+		"Art. 7 Expertise and skills in nuclear safety",
+		"Art. 8 Information to the public",
+		"Art. 9 Reporting",
+		"Art. 10 Transposition",
+		"Art. 11 Entry into force",
+		"Art. 12 Addressees"
+	],
+	"report": {
+		"adapter": "eu-xhtml",
+		"parser_version": "eu-xhtml@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 13,
+		"paragraphs": 67,
+		"chars": 17010,
+		"alpha_ratio": 0.82,
+		"word_like_ratio": 0.985
+	},
+	"published_at": "2026-10-01T23:19:16.850Z"
+}

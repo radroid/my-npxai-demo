@@ -1,0 +1,39 @@
+{
+	"id": "nrc-rg-1.179@rev-2",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "6cf1c0bc6dbdbfcb103d97ebfe7929205111ae873151f9e643b72d0e23cd7a5b",
+	"chunks": 28,
+	"requirement_chunks": 8,
+	"chunks_with_page": 28,
+	"sections_sample": [
+		"Front matter",
+		"A INTRODUCTION",
+		"B DISCUSSION",
+		"C STAFF REGULATORY GUIDANCE",
+		"C.1 General Information",
+		"C.2 Site Characterization",
+		"C.3 Identification of Remaining Site Dismantlement Activities",
+		"C.4 Remediation Plans",
+		"C.5 Final Status Survey Plan",
+		"C.6 Compliance with the Radiological Criteria for License Termination",
+		"C.7 Update the Site-Specific Decommissioning Costs",
+		"C.8 Supplement to the Environmental Report",
+		"C.9 References",
+		"D IMPLEMENTATION"
+	],
+	"report": {
+		"adapter": "pdf",
+		"parser_version": "pdf-lines@1",
+		"pages": 15,
+		"boilerplate_lines_removed": 14,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 14,
+		"paragraphs": 106,
+		"chars": 38577,
+		"alpha_ratio": 0.792,
+		"word_like_ratio": 0.984
+	},
+	"published_at": "2026-10-01T23:46:54.583Z"
+}

@@ -1,0 +1,52 @@
+{
+	"id": "cnsc-regdoc-2.3.2@v2",
+	"register_version": "2026-10-01.3",
+	"outcome": "published",
+	"sha256": "b1b0a1500a99f8e3f11087cbbb7fc63e1b2b614bde3471b98003e52d4e907f76",
+	"chunks": 53,
+	"requirement_chunks": 18,
+	"chunks_with_page": 0,
+	"sections_sample": [
+		"Introduction",
+		"Preface",
+		"Important note",
+		"1.1 Purpose",
+		"1.2 Scope",
+		"1.3 Relevant legislation",
+		"1.4 National and international documents",
+		"2 Accident Management and Its Links With Emergency Preparedness and the Principle of Defence in Depth",
+		"3 Requirements for Integrated Accident Management",
+		"3.1 Goals of accident management",
+		"3.2 General requirements",
+		"3.3 Equipment and instrumentation requirements",
+		"3.4 Requirements for procedures and guidelines",
+		"3.5 Requirements for human and organizational performance",
+		"4 Guidance for Developing Integrated Accident Management",
+		"4.1 General considerations",
+		"4.2 Establishment of integrated accident management",
+		"4.2.1 Identification of challenges to reactor safety functions",
+		"4.2.2 Identification of reactor capabilities",
+		"4.2.3 Development of strategies and measures",
+		"4.2.4 Supporting analyses",
+		"4.2.5 Development of procedures and guidelines",
+		"4.3 Other considerations",
+		"4.3.1 Equipment provisions",
+		"4.3.2 Role of instrumentation"
+	],
+	"report": {
+		"adapter": "cnsc-html",
+		"parser_version": "cnsc-html@1",
+		"pages": null,
+		"boilerplate_lines_removed": 0,
+		"toc_lines_removed": 0,
+		"warnings": [
+			"some numbered sections have no anchor; their links use the document URL"
+		],
+		"sections": 41,
+		"paragraphs": 343,
+		"chars": 72379,
+		"alpha_ratio": 0.834,
+		"word_like_ratio": 0.99
+	},
+	"published_at": "2026-10-02T00:26:22.257Z"
+}

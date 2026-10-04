@@ -1,0 +1,33 @@
+{
+	"id": "nrc-rg-8.10@rev-2",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "d3b1765578d5361213f355103d031608fccea2d3900ed0fe0789073a3fbca617",
+	"chunks": 22,
+	"requirement_chunks": 1,
+	"chunks_with_page": 22,
+	"sections_sample": [
+		"Front matter",
+		"A INTRODUCTION",
+		"B DISCUSSION",
+		"C STAFF REGULATORY GUIDANCE",
+		"C.1 Management Commitment",
+		"C.2 Radiation Protection Manager and Radiation Safety Officer",
+		"C.3 Radiation Protection Staff Responsibility",
+		"D IMPLEMENTATION"
+	],
+	"report": {
+		"adapter": "pdf",
+		"parser_version": "pdf-lines@1",
+		"pages": 15,
+		"boilerplate_lines_removed": 14,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 8,
+		"paragraphs": 112,
+		"chars": 33269,
+		"alpha_ratio": 0.794,
+		"word_like_ratio": 0.989
+	},
+	"published_at": "2026-10-01T23:47:02.528Z"
+}

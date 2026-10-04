@@ -1,0 +1,38 @@
+{
+	"id": "onr-saps@2014-rev1",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "7f4bee75373f2555eaadb2d0349649335e32492708183bb91780ff2d1bde22e7",
+	"chunks": 306,
+	"requirement_chunks": 43,
+	"chunks_with_page": 306,
+	"sections_sample": [
+		"Front matter",
+		"4 Sections of the Nuclear Installations Act 1965 (NIA) relating to the licensing and",
+		"9 The SAPs are consistent with ‘Reducing Risks, Protecting People: HSE’s Decision-",
+		"22 The UK is a member state of the International Atomic Energy Agency (IAEA) and",
+		"23 In addition to working with IAEA on Safety Standards, ONR assists the UK",
+		"3 ONR Guidance on the Demonstration of ALARP (As Low As Reasonably",
+		"6 ONR Licensing Nuclear Installations",
+		"7 HSG65 (Third edition) Managing for health and safety. HSE Books 2013 ISBN 978 0",
+		"9 The official report of The Fukushima Nuclear Accident Independent Investigation",
+		"10 IAEA Safety Requirements SSR-2/1 Safety of Nuclear Power Plants: Design. ISBN",
+		"11 IAEA Safety Standard SSG-2 Deterministic Safety Analysis for Nuclear Power",
+		"12 Working with ionising radiation. Ionising Radiations Regulations 2017. Approved",
+		"13 The Hinkley Point Public Inquiries: A Report by Michael Barnes QC The Stationery"
+	],
+	"report": {
+		"adapter": "pdf",
+		"parser_version": "pdf-lines@1",
+		"pages": 226,
+		"boilerplate_lines_removed": 542,
+		"toc_lines_removed": 59,
+		"warnings": [],
+		"sections": 13,
+		"paragraphs": 2040,
+		"chars": 562928,
+		"alpha_ratio": 0.816,
+		"word_like_ratio": 0.989
+	},
+	"published_at": "2026-10-01T23:48:44.509Z"
+}

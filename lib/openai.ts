@@ -30,6 +30,40 @@ export function getArtifactModel(): string {
 	return process.env.OPENAI_ARTIFACT_MODEL || OPENAI_MODELS.artifact;
 }
 
+// Multi-source (KH_SOURCE_CORPUS=v2) chat model, overridable the same way.
+// The legacy CNSC path always uses OPENAI_MODELS.chat. Separate because the
+// v2 answers carry legal-force and cross-jurisdiction discipline that the
+// default model follows unreliably (docs/phase-12-sources.md §4).
+//
+// Allowlisted: the spend guard (lib/guard.ts) admits requests by TOKENS,
+// with caps sized for gpt-4o-mini, so only models priced at or below
+// gpt-4.1-mini (about 2.7× gpt-4o-mini per token) are accepted — a typo'd or
+// premium id would otherwise change the cost per admission silently, or fail
+// every request. Anything else falls back to the default, logged once. A
+// pricier model needs the guard's caps re-sized first.
+export const SOURCE_CHAT_MODELS = [
+	"gpt-4o-mini",
+	"gpt-4.1-nano",
+	"gpt-4.1-mini",
+] as const;
+let warnedSourceModel: string | null = null;
+export function getSourceChatModel(): string {
+	const wanted = process.env.KH_V2_CHAT_MODEL?.trim();
+	if (!wanted) return OPENAI_MODELS.chat;
+	if ((SOURCE_CHAT_MODELS as readonly string[]).includes(wanted)) return wanted;
+	if (warnedSourceModel !== wanted) {
+		warnedSourceModel = wanted;
+		console.warn(
+			JSON.stringify({
+				event: "kh_v2_chat_model_rejected",
+				fallback: OPENAI_MODELS.chat,
+				allowed: SOURCE_CHAT_MODELS,
+			}),
+		);
+	}
+	return OPENAI_MODELS.chat;
+}
+
 // Full-dimension text-embedding-3-large. The 3072-dim vectors measurably beat
 // -small@1536 on the golden set (brute-force cosine: hit@8 92.4%→96.7%,
 // recall@8 79.2%→85.8%, MRR 0.782→0.816). Matryoshka-truncating -large back to

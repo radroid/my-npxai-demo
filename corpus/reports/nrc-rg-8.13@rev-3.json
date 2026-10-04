@@ -1,0 +1,42 @@
+{
+	"id": "nrc-rg-8.13@rev-3",
+	"register_version": "2026-10-01.2",
+	"outcome": "published",
+	"sha256": "de2702f3edd135286e8ee9881fbf795bd683cbb0162ffa286db9089309fe54d5",
+	"chunks": 24,
+	"requirement_chunks": 9,
+	"chunks_with_page": 24,
+	"sections_sample": [
+		"Front matter",
+		"A INTRODUCTION",
+		"B DISCUSSION",
+		"C.1 Who Should Receive Instruction",
+		"C.2 Providing Instruction",
+		"C.3 Licensee's Policy on Declared Pregnant Women",
+		"C.4 Duration of Lower Dose Limits for the Embryo/",
+		"C.5 Substantial Variations Above a Uniform Month",
+		"D IMPLEMENTATION",
+		"D.2 National Council on Radiation Protection and",
+		"D.1 National Council on Radiation Protection and",
+		"D.2 International Commission on Radiological",
+		"D.4 Committee on the Biological Effects of Ionizing",
+		"D.5 United Nations Scientific Committee on the Ef",
+		"D.8 National Council on Radiation Protection and",
+		"D.9 National Council on Radiation Protection and",
+		"D.10 National Radiological Protection Board, Advice"
+	],
+	"report": {
+		"adapter": "pdf",
+		"parser_version": "pdf-lines@1",
+		"pages": 11,
+		"boilerplate_lines_removed": 12,
+		"toc_lines_removed": 0,
+		"warnings": [],
+		"sections": 17,
+		"paragraphs": 99,
+		"chars": 26436,
+		"alpha_ratio": 0.782,
+		"word_like_ratio": 0.971
+	},
+	"published_at": "2026-10-01T23:47:03.442Z"
+}
